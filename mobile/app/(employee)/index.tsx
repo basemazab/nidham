@@ -2,15 +2,12 @@ import { View, Text, StyleSheet, ScrollView, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { useAuth } from "@/lib/auth";
-import { Button } from "@/components/Button";
+import { AttendanceCard } from "@/components/AttendanceCard";
 import { colors, fontSize, radius, spacing } from "@/lib/theme";
 
-// Phase 2 stub home. Confirms the auth context resolved a linked
-// employee row, and reserves the slots that Phase 3 will fill in:
-//   - Clock In / Clock Out (GPS-aware)
-//   - Today's status
-//   - Quick actions (leave / advance / permission)
-//   - Latest payslip
+// Employee home screen. The attendance card is the headline feature
+// (Phase 3, live GPS clock-in/out). Phase 4 will fill in the four
+// action tiles below for leave / advance / permission / payslips.
 export default function HomeScreen() {
   const { user, employee, signOut } = useAuth();
   const isLinked = employee !== null;
@@ -44,29 +41,7 @@ export default function HomeScreen() {
             </Pressable>
           </View>
         ) : (
-          <View style={styles.card}>
-            <Text style={styles.cardEyebrow}>الحضور اليوم</Text>
-            <Text style={styles.statusTitle}>📍 قريبًا — Phase 3</Text>
-            <Text style={styles.statusBody}>
-              في الإصدار الجاي هتقدر تثبت حضور وانصراف من هنا، والنظام
-              هيتأكد إنك في موقع العمل عبر GPS.
-            </Text>
-            <View style={styles.placeholderBtns}>
-              <Button
-                label="✓ تثبيت حضور"
-                onPress={() => {}}
-                disabled
-                style={{ flex: 1 }}
-              />
-              <Button
-                label="انصراف"
-                variant="secondary"
-                onPress={() => {}}
-                disabled
-                style={{ flex: 1 }}
-              />
-            </View>
-          </View>
+          <AttendanceCard employeeId={employee!.id} />
         )}
 
         {isLinked && (
@@ -149,29 +124,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.slate800,
     marginBottom: spacing.lg,
-  },
-  cardEyebrow: {
-    color: colors.cyan,
-    fontSize: fontSize.xs,
-    fontWeight: "800",
-    letterSpacing: 1,
-    marginBottom: spacing.sm,
-  },
-  statusTitle: {
-    color: colors.white,
-    fontSize: fontSize.lg,
-    fontWeight: "900",
-    marginBottom: spacing.sm,
-  },
-  statusBody: {
-    color: colors.slate400,
-    fontSize: fontSize.sm,
-    lineHeight: 22,
-    marginBottom: spacing.lg,
-  },
-  placeholderBtns: {
-    flexDirection: "row",
-    gap: spacing.sm,
   },
   actionsGrid: {
     flexDirection: "row",
