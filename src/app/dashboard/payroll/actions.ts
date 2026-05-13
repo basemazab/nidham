@@ -130,20 +130,22 @@ export async function generatePayrollPeriod(formData: FormData) {
   const employees = employeesRes.data ?? [];
   const attendance = attendanceRes.data ?? [];
 
-  // Compute & insert entry per employee
+  // Compute & insert entry per employee.
+  // Buckets:
+  //   attended: explicit "present"
+  //   halfDay : explicit "half_day"
+  //   absent  : explicit "absent"  → only kind that triggers a deduction
+  //   leave   : everything else paid-but-not-worked (leave/holiday/weekend/
+  //             sick_leave/...) — derived as the remainder so a new status
+  //             added later never silently disappears from the math.
   const entries = employees.map((emp) => {
     const empAttendance = attendance.filter((a) => a.employee_id === emp.id);
-    const breakdown: AttendanceBreakdown = {
-      attended: empAttendance.filter((a) => a.status === "present").length,
-      halfDay: empAttendance.filter((a) => a.status === "half_day").length,
-      leave: empAttendance.filter(
-        (a) =>
-          a.status === "leave" ||
-          a.status === "holiday" ||
-          a.status === "weekend",
-      ).length,
-      absent: empAttendance.filter((a) => a.status === "absent").length,
-    };
+    const attended = empAttendance.filter((a) => a.status === "present").length;
+    const halfDay = empAttendance.filter((a) => a.status === "half_day").length;
+    const absent = empAttendance.filter((a) => a.status === "absent").length;
+    const leave = Math.max(0, empAttendance.length - attended - halfDay - absent);
+
+    const breakdown: AttendanceBreakdown = { attended, halfDay, leave, absent };
 
     const result = calculatePayroll(
       {
@@ -182,7 +184,11 @@ export async function generatePayrollPeriod(formData: FormData) {
   });
 
   if (entries.length > 0) {
-    await supabase.from("payroll_entries").insert(entries);
+    // Upsert keyed by the (period_id, employee_id) unique index so a
+    // double-submit or page refresh doesn't crash on the constraint.
+    await supabase.from("payroll_entries").upsert(entries, {
+      onConflict: "period_id,employee_id",
+    });
   }
 
   revalidatePath("/dashboard/payroll");
@@ -293,34 +299,62 @@ export async function approvePayrollPeriod(periodId: string) {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  await supabase
+  // Server-side gate — the UI hides the button when status != "draft", but a
+  // direct call (e.g., replayed form post) must also be rejected so a
+  // "paid" period can never be reverted to "approved".
+  const { error } = await supabase
     .from("payroll_periods")
     .update({
       status: "approved",
       approved_at: new Date().toISOString(),
       approved_by: user.id,
     })
-    .eq("id", periodId);
+    .eq("id", periodId)
+    .eq("status", "draft");
+
+  if (error) {
+    redirect(
+      `/dashboard/payroll/${periodId}?error=` +
+        encodeURIComponent(error.message),
+    );
+  }
 
   revalidatePath(`/dashboard/payroll/${periodId}`);
 }
 
 export async function markPayrollAsPaid(periodId: string) {
   const supabase = await createClient();
-  await supabase
+
+  // Only an approved period can be marked paid — guards against replay.
+  const { error } = await supabase
     .from("payroll_periods")
     .update({
       status: "paid",
       paid_at: new Date().toISOString(),
     })
-    .eq("id", periodId);
+    .eq("id", periodId)
+    .eq("status", "approved");
+
+  if (error) {
+    redirect(
+      `/dashboard/payroll/${periodId}?error=` +
+        encodeURIComponent(error.message),
+    );
+  }
 
   revalidatePath(`/dashboard/payroll/${periodId}`);
 }
 
 export async function deletePayrollPeriod(periodId: string) {
   const supabase = await createClient();
-  await supabase.from("payroll_periods").delete().eq("id", periodId);
+
+  // Only draft periods may be deleted; otherwise audit history is lost.
+  await supabase
+    .from("payroll_periods")
+    .delete()
+    .eq("id", periodId)
+    .eq("status", "draft");
+
   revalidatePath("/dashboard/payroll");
   redirect("/dashboard/payroll");
 }

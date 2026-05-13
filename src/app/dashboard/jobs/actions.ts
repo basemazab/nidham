@@ -9,8 +9,10 @@ import { createClient } from "@/lib/supabase/server";
 // ----------------------------------------------------------------------------
 
 function asText(value: FormDataEntryValue | null): string | null {
-  if (value === null) return null;
-  const t = String(value).trim();
+  // Reject non-string FormData entries (e.g., File objects) instead of
+  // letting String() coerce them to "[object File]".
+  if (value === null || typeof value !== "string") return null;
+  const t = value.trim();
   return t.length === 0 ? null : t;
 }
 

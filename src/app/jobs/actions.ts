@@ -35,10 +35,11 @@ export async function submitPublicApplication(
   formData: FormData,
 ) {
   // 1. Honeypot — bots fill every input; humans don't see this one.
+  // We silently redirect to the public listing rather than back to the
+  // form with an error, which would leak that the trap was triggered.
   const honey = asText(formData.get("website"));
   if (honey) {
-    // Pretend success but discard
-    redirect(`/jobs/${slug}/apply?error=` + encodeURIComponent("تم"));
+    redirect("/jobs");
   }
 
   const fullName = asText(formData.get("full_name"));
