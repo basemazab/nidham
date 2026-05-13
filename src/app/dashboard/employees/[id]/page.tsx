@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { updateEmployee, deleteEmployee, generateEmployeeInvitation } from "../actions";
 import { CopyButton } from "@/components/copy-button";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
+import { InvitationQR } from "@/components/invitation-qr";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -121,32 +122,24 @@ export default async function EditEmployeePage({ params, searchParams }: PagePro
           )}
 
           {invite_generated && employee.invitation_token && (
-            <div className="mb-3 p-4 rounded-xl bg-white border border-emerald-200">
-              <div className="text-xs font-bold text-emerald-800 mb-2 font-cairo">
-                ✓ تم إنشاء الكود — صالح لمدة 30 يوم
-              </div>
-              <div className="bg-slate-900 text-emerald-300 px-3 py-2 rounded-lg font-mono text-xs break-all mb-3" dir="ltr">
-                {employee.invitation_token}
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <CopyButton
-                  text={employee.invitation_token}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-brand-cyan-dark text-white text-sm font-bold hover:bg-brand-cyan transition font-cairo"
-                  copiedClassName="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-bold font-cairo"
-                />
-                {employee.phone && (
-                  <a
-                    href={`https://wa.me/${employee.phone.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(
-                      `أهلاً ${employee.full_name.split(" ")[0]}، ده كود دعوتك لتطبيق نِظام:\n\n${employee.invitation_token}\n\nنزّل التطبيق "Nidham" واختار "عندك كود دعوة من HR" وادخل الكود مع إيميل وكلمة سر من اختيارك.`,
-                    )}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold transition font-cairo"
-                  >
-                    💬 ابعت على واتساب
-                  </a>
-                )}
-              </div>
+            <div className="mb-3">
+              <InvitationQR
+                token={employee.invitation_token}
+                employeeName={employee.full_name}
+                whatsappPhone={employee.phone}
+              />
+            </div>
+          )}
+
+          {/* If a token already exists (e.g. user revisited the page), also
+              surface the QR so they can re-display it without regenerating. */}
+          {!invite_generated && employee.invitation_token && !employee.user_id && (
+            <div className="mb-3">
+              <InvitationQR
+                token={employee.invitation_token}
+                employeeName={employee.full_name}
+                whatsappPhone={employee.phone}
+              />
             </div>
           )}
 

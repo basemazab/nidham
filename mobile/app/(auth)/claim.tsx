@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -9,7 +9,7 @@ import {
   Pressable,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { Brand } from "@/components/Brand";
 import { Input } from "@/components/Input";
 import { Button } from "@/components/Button";
@@ -27,11 +27,30 @@ import { colors, fontSize, spacing } from "@/lib/theme";
 //   creates a profile row with role='employee'.
 export default function ClaimScreen() {
   const { signUpAndClaim } = useAuth();
+
+  // Deep-link entry: `nidham://claim?token=...` carries the invitation
+  // token in the URL so the field is pre-filled. The QR codes the
+  // dashboard generates use this exact format -- one tap on the camera
+  // notification opens the app right here.
+  const params = useLocalSearchParams<{ token?: string }>();
+  const incomingToken =
+    typeof params.token === "string" ? params.token : "";
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [token, setToken] = useState("");
+  const [token, setToken] = useState(incomingToken);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fromQR, setFromQR] = useState(!!incomingToken);
+
+  // If the user navigates back-and-forth and a new token arrives, sync.
+  useEffect(() => {
+    if (incomingToken && incomingToken !== token) {
+      setToken(incomingToken);
+      setFromQR(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [incomingToken]);
 
   const handleSubmit = async () => {
     if (!email.trim() || !password || !token.trim()) {
@@ -72,6 +91,14 @@ export default function ClaimScreen() {
             <Text style={styles.sub}>
               لازم يكون عندك كود دعوة من الـ HR في شركتك
             </Text>
+
+            {fromQR && (
+              <View style={styles.qrBanner}>
+                <Text style={styles.qrBannerText}>
+                  ✓ تم تحميل كود الدعوة من الـ QR
+                </Text>
+              </View>
+            )}
 
             <Input
               label="الإيميل"
@@ -175,6 +202,21 @@ const styles = StyleSheet.create({
   backBtnText: {
     color: colors.cyan,
     fontSize: fontSize.md,
+    fontWeight: "700",
+  },
+  qrBanner: {
+    backgroundColor: "rgba(34,211,238,0.10)",
+    borderColor: colors.cyan,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.lg,
+    alignItems: "center",
+  },
+  qrBannerText: {
+    color: colors.cyan,
+    fontSize: fontSize.sm,
     fontWeight: "700",
   },
 });

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { importEmployees } from "./actions";
 import { requireHRPage } from "@/lib/permissions";
+import { PDFImportFlow } from "@/components/pdf-import-flow";
 
 type Params = Promise<{
   inserted?: string;
@@ -129,10 +130,13 @@ export default async function ImportEmployeesPage({
           </p>
         </section>
 
-        <section className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
-          <h2 className="text-lg font-bold font-cairo text-slate-800 mb-3">
-            ⬆ ارفع الملف
+        <section className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 mb-6">
+          <h2 className="text-lg font-bold font-cairo text-slate-800 mb-1">
+            ⬆ Excel / CSV
           </h2>
+          <p className="text-sm text-slate-500 mb-4 font-cairo">
+            الطريقة الأسرع لو عندك شيت منظّم بصفوف وأعمدة محددة.
+          </p>
           <form action={importEmployees} className="space-y-4">
             <input
               type="file"
@@ -151,6 +155,23 @@ export default async function ImportEmployeesPage({
               ابدأ الرفع
             </button>
           </form>
+        </section>
+
+        <section className="bg-gradient-to-br from-amber-50 via-white to-amber-50/50 rounded-2xl shadow-sm border-2 border-amber-200 p-6">
+          <div className="flex items-center gap-2 mb-1">
+            <h2 className="text-lg font-bold font-cairo text-slate-800">
+              ✦ PDF بالـ AI
+            </h2>
+            <span className="text-[10px] bg-amber-200 text-amber-900 px-2 py-0.5 rounded-full font-bold">
+              جديد
+            </span>
+          </div>
+          <p className="text-sm text-slate-600 mb-4 font-cairo">
+            عندك PDF من برنامج HR قديم، أو ورقة موظفين مطبوعة، أو أي ملف
+            فيه أسامي وبيانات؟ الـ AI هيقراها ويستخرج الصفوف، وانت بتراجعها
+            قبل ما تنحفظ.
+          </p>
+          <PDFImportFlow />
         </section>
       </div>
     </main>

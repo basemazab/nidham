@@ -7,6 +7,135 @@ import { createClient } from "@/lib/supabase/server";
 import { requireHR } from "@/lib/permissions";
 import { arabicizeDbError } from "@/lib/i18n";
 
+export type EmployeeImportRow = {
+  full_name: string;
+  employee_code: string | null;
+  job_title: string | null;
+  department: string | null;
+  phone: string | null;
+  email: string | null;
+  hire_date: string | null;
+  basic_salary: number | null;
+  national_id: string | null;
+};
+
+// Confirmed-PDF flow: the client has already parsed the PDF via
+// /api/import/parse-pdf, the user reviewed + edited the rows, and now
+// posts them back to insert. Runs the same dedup checks the Excel
+// importer does and returns inserted / skipped counts via the same
+// query-string contract so the result UI is identical.
+export async function confirmPdfImport(rows: EmployeeImportRow[]) {
+  await requireHR();
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("company_id")
+    .eq("id", user.id)
+    .single();
+  if (!profile) throw new Error("Profile not found");
+
+  if (!Array.isArray(rows) || rows.length === 0) {
+    redirect(
+      "/dashboard/employees/import?error=" +
+        encodeURIComponent("مفيش صفوف لاضافتها"),
+    );
+  }
+  if (rows.length > 200) {
+    redirect(
+      "/dashboard/employees/import?error=" +
+        encodeURIComponent("الحد الأقصى 200 صف في الرفعة الواحدة"),
+    );
+  }
+
+  const inserted: string[] = [];
+  const skipped: { row: number; reason: string }[] = [];
+
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    const rowIndex = i + 1;
+
+    if (!r.full_name || r.full_name.trim().length < 2) {
+      skipped.push({ row: rowIndex, reason: "ناقص اسم الموظف" });
+      continue;
+    }
+    if (r.national_id && !/^\d{14}$/.test(r.national_id)) {
+      skipped.push({
+        row: rowIndex,
+        reason: "الرقم القومي لازم يكون 14 رقم",
+      });
+      continue;
+    }
+
+    if (r.national_id) {
+      const { data: dupe } = await supabase
+        .from("employees")
+        .select("id")
+        .eq("company_id", profile.company_id)
+        .eq("national_id", r.national_id)
+        .maybeSingle();
+      if (dupe) {
+        skipped.push({
+          row: rowIndex,
+          reason: "مسجّل قبل كده (نفس الرقم القومي)",
+        });
+        continue;
+      }
+    } else if (r.employee_code) {
+      const { data: dupe } = await supabase
+        .from("employees")
+        .select("id")
+        .eq("company_id", profile.company_id)
+        .eq("employee_code", r.employee_code)
+        .maybeSingle();
+      if (dupe) {
+        skipped.push({ row: rowIndex, reason: "مسجّل قبل كده (نفس الكود)" });
+        continue;
+      }
+    }
+
+    const { error } = await supabase.from("employees").insert({
+      company_id: profile.company_id,
+      full_name: r.full_name.trim(),
+      employee_code: r.employee_code,
+      job_title: r.job_title,
+      department: r.department,
+      phone: r.phone,
+      email: r.email,
+      hire_date: r.hire_date,
+      basic_salary: r.basic_salary,
+      national_id: r.national_id,
+      status: "active",
+    });
+
+    if (error) {
+      skipped.push({ row: rowIndex, reason: arabicizeDbError(error.message) });
+      continue;
+    }
+    inserted.push(r.full_name);
+  }
+
+  revalidatePath("/dashboard/employees");
+
+  const params = new URLSearchParams({
+    inserted: String(inserted.length),
+    skipped: String(skipped.length),
+    source: "pdf",
+  });
+  if (skipped.length > 0) {
+    params.set(
+      "skips",
+      skipped.slice(0, 20).map((s) => `${s.row}:${s.reason}`).join("|"),
+    );
+  }
+  redirect(`/dashboard/employees/import?${params.toString()}`);
+}
+
 // Bulk import for employees. Mirrors the attendance importer's contract:
 //   - Accept an .xlsx / .xls / .csv file under 5 MB.
 //   - Accept Arabic + English column aliases.
