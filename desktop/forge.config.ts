@@ -5,12 +5,32 @@ import { AutoUnpackNativesPlugin } from "@electron-forge/plugin-auto-unpack-nati
 import { FusesPlugin } from "@electron-forge/plugin-fuses";
 import { VitePlugin } from "@electron-forge/plugin-vite";
 import { FuseV1Options, FuseVersion } from "@electron/fuses";
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
+
+// Optional icon files -- the bundle still builds and runs without them
+// (the Electron default icon is used). Drop a 512x512 PNG and matching
+// .ico into ./assets/ to brand the installer + window. See
+// assets/README.md.
+const hasPngIcon = existsSync(resolve(__dirname, "assets/icon.png"));
+const hasIcoIcon = existsSync(resolve(__dirname, "assets/icon.ico"));
+
+const squirrelOptions: ConstructorParameters<typeof MakerSquirrel>[0] = {
+  name: "Nidham",
+  authors: "Basem Azab",
+  description: "Nidham HR + CRM + AI Recruitment",
+};
+if (hasIcoIcon) {
+  squirrelOptions.setupIcon = "./assets/icon.ico";
+  squirrelOptions.iconUrl =
+    "https://raw.githubusercontent.com/basemazab/nidham/main/desktop/assets/icon.ico";
+}
 
 const config: ForgeConfig = {
   packagerConfig: {
     name: "Nidham",
     executableName: "Nidham",
-    icon: "./assets/icon", // forge appends .ico on Win, .icns on Mac
+    ...(hasPngIcon || hasIcoIcon ? { icon: "./assets/icon" } : {}),
     appBundleId: "com.nidham.desktop",
     appCategoryType: "public.app-category.business",
     asar: true,
@@ -20,16 +40,7 @@ const config: ForgeConfig = {
   rebuildConfig: {},
 
   makers: [
-    new MakerSquirrel({
-      name: "Nidham",
-      authors: "Basem Azab",
-      description: "Nidham HR + CRM + AI Recruitment",
-      // Setup.exe icon (shown in Programs & Features)
-      setupIcon: "./assets/icon.ico",
-      // Icon embedded in the .exe itself
-      iconUrl:
-        "https://raw.githubusercontent.com/basemazab/nidham/main/desktop/assets/icon.ico",
-    }),
+    new MakerSquirrel(squirrelOptions),
     new MakerZIP({}, ["darwin", "linux"]),
   ],
 
