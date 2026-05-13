@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { requireAdmin } from "@/lib/permissions";
 
 function asText(value: FormDataEntryValue | null): string | null {
   if (value === null) return null;
@@ -11,27 +12,8 @@ function asText(value: FormDataEntryValue | null): string | null {
 }
 
 export async function createInvitation(formData: FormData) {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
-  // Get inviter's profile (must be admin)
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("company_id, role")
-    .eq("id", user.id)
-    .single();
-
-  if (!profile) throw new Error("Profile not found");
-  if (profile.role !== "admin") {
-    redirect(
-      "/dashboard/team?error=" +
-        encodeURIComponent("لازم تكون مدير عشان تدعو موظفين"),
-    );
-  }
+  const { supabase, profile } = await requireAdmin();
+  const user = { id: profile.id };
 
   const email = asText(formData.get("email"))?.toLowerCase() ?? null;
   const fullName = asText(formData.get("full_name"));
@@ -82,6 +64,7 @@ export async function createInvitation(formData: FormData) {
 }
 
 export async function cancelInvitation(id: string) {
+  await requireAdmin();
   const supabase = await createClient();
 
   await supabase
@@ -93,6 +76,7 @@ export async function cancelInvitation(id: string) {
 }
 
 export async function resendInvitation(id: string) {
+  await requireAdmin();
   const supabase = await createClient();
 
   // Reset expiry to 7 days from now

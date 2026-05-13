@@ -5,14 +5,27 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { logout } from "@/app/login/actions";
 
+type Role = "admin" | "manager" | "employee";
+
 type Props = {
   userName: string;
   companyName: string;
   userEmail: string;
   isSuperAdmin?: boolean;
+  role?: Role;
 };
 
-const NAV_ITEMS = [
+type NavItem = {
+  href: string;
+  label: string;
+  icon: string;
+  section: "main" | "ai" | "reports" | "settings";
+  // Roles that may see + click this item. Defaults to HR (admin + manager).
+  // Settings + team management are admin-only.
+  visibleTo?: Role[];
+};
+
+const NAV_ITEMS: readonly NavItem[] = [
   { href: "/dashboard", label: "الرئيسية", icon: "🏠", section: "main" },
   { href: "/dashboard/employees", label: "الموظفين", icon: "👥", section: "main" },
   { href: "/dashboard/attendance", label: "الحضور", icon: "⏰", section: "main" },
@@ -22,14 +35,14 @@ const NAV_ITEMS = [
   { href: "/dashboard/customers", label: "العملاء", icon: "💼", section: "main" },
   { href: "/dashboard/interactions", label: "التفاعلات", icon: "💬", section: "main" },
   { href: "/dashboard/contracts", label: "العقود", icon: "📋", section: "main" },
-  { href: "/dashboard/team", label: "فريق الشركة", icon: "🤝", section: "main" },
+  { href: "/dashboard/team", label: "فريق الشركة", icon: "🤝", section: "main", visibleTo: ["admin"] },
   { href: "/dashboard/ai", label: "المساعد الذكي ✦", icon: "🤖", section: "ai" },
   { href: "/dashboard/reports/attendance", label: "تقرير الحضور", icon: "📊", section: "reports" },
   { href: "/dashboard/reports/bridge", label: "Bridge ✦", icon: "✦", section: "reports" },
-  { href: "/dashboard/settings/office-location", label: "موقع المكتب 📍", icon: "⚙", section: "settings" },
-] as const;
+  { href: "/dashboard/settings/office-location", label: "موقع المكتب 📍", icon: "⚙", section: "settings", visibleTo: ["admin"] },
+];
 
-export function DashboardSidebar({ userName, companyName, userEmail, isSuperAdmin }: Props) {
+export function DashboardSidebar({ userName, companyName, userEmail, isSuperAdmin, role }: Props) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -43,12 +56,17 @@ export function DashboardSidebar({ userName, companyName, userEmail, isSuperAdmi
     return pathname === href || pathname?.startsWith(href + "/");
   };
 
-  const mainItems = NAV_ITEMS.filter((i) => i.section === "main");
-  const aiItems = NAV_ITEMS.filter((i) => i.section === "ai");
-  const reportItems = NAV_ITEMS.filter((i) => i.section === "reports");
-  const settingsItems = NAV_ITEMS.filter((i) => i.section === "settings");
+  const canSee = (item: NavItem) =>
+    !item.visibleTo || (role !== undefined && item.visibleTo.includes(role));
 
-  const NavSection = ({ label, items }: { label: string; items: typeof NAV_ITEMS[number][] }) => (
+  const mainItems = NAV_ITEMS.filter((i) => i.section === "main" && canSee(i));
+  const aiItems = NAV_ITEMS.filter((i) => i.section === "ai" && canSee(i));
+  const reportItems = NAV_ITEMS.filter((i) => i.section === "reports" && canSee(i));
+  const settingsItems = NAV_ITEMS.filter((i) => i.section === "settings" && canSee(i));
+
+  const NavSection = ({ label, items }: { label: string; items: NavItem[] }) => {
+    if (items.length === 0) return null;
+    return (
     <>
       <div className="text-[10px] text-slate-400 font-bold tracking-wider mb-2 px-3 font-cairo uppercase">
         {label}
@@ -76,7 +94,8 @@ export function DashboardSidebar({ userName, companyName, userEmail, isSuperAdmi
         })}
       </div>
     </>
-  );
+    );
+  };
 
   const UserFooter = () => (
     <div className="p-3 border-t border-slate-100 bg-slate-50/50 space-y-1">
@@ -187,10 +206,10 @@ export function DashboardSidebar({ userName, companyName, userEmail, isSuperAdmi
               </button>
             </div>
             <nav className="flex-1 overflow-y-auto p-3">
-              <NavSection label="الموديولات" items={[...mainItems]} />
-              <NavSection label="✦ ذكاء" items={[...aiItems]} />
-              <NavSection label="التقارير" items={[...reportItems]} />
-              <NavSection label="الإعدادات" items={[...settingsItems]} />
+              <NavSection label="الموديولات" items={mainItems} />
+              <NavSection label="✦ ذكاء" items={aiItems} />
+              <NavSection label="التقارير" items={reportItems} />
+              <NavSection label="الإعدادات" items={settingsItems} />
             </nav>
             <UserFooter />
           </aside>
@@ -203,9 +222,10 @@ export function DashboardSidebar({ userName, companyName, userEmail, isSuperAdmi
           <Logo />
         </div>
         <nav className="flex-1 overflow-y-auto p-3">
-          <NavSection label="الموديولات" items={[...mainItems]} />
-          <NavSection label="✦ ذكاء" items={[...aiItems]} />
-          <NavSection label="التقارير" items={[...reportItems]} />
+          <NavSection label="الموديولات" items={mainItems} />
+          <NavSection label="✦ ذكاء" items={aiItems} />
+          <NavSection label="التقارير" items={reportItems} />
+          <NavSection label="الإعدادات" items={settingsItems} />
         </nav>
         <UserFooter />
       </aside>

@@ -4,6 +4,12 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import * as XLSX from "xlsx";
 import { createClient } from "@/lib/supabase/server";
+import { requireHR } from "@/lib/permissions";
+
+// Hard cap on uploaded file size. XLSX.read loads the whole buffer
+// into memory, so accepting an arbitrarily-large workbook is an easy
+// OOM vector. 5 MB covers any plausible monthly attendance sheet.
+const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 
 const VALID_STATUSES = new Set([
   "present",
@@ -102,6 +108,7 @@ function normalizeTime(raw: unknown): string | null {
 }
 
 export async function importAttendance(formData: FormData) {
+  await requireHR();
   const supabase = await createClient();
 
   const {
@@ -121,6 +128,13 @@ export async function importAttendance(formData: FormData) {
     redirect(
       "/dashboard/attendance/import?error=" +
         encodeURIComponent("ارفع ملف Excel"),
+    );
+  }
+
+  if (file.size > MAX_UPLOAD_BYTES) {
+    redirect(
+      "/dashboard/attendance/import?error=" +
+        encodeURIComponent("الملف أكبر من المسموح به (5 ميجا)"),
     );
   }
 

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { requireHR } from "@/lib/permissions";
 
 // ----------------------------------------------------------------------------
 // Helpers
@@ -67,6 +68,7 @@ async function getCurrentCompanyId(
 // ----------------------------------------------------------------------------
 
 export async function createJob(formData: FormData) {
+  await requireHR();
   const supabase = await createClient();
   const companyId = await getCurrentCompanyId(supabase);
   const {
@@ -122,6 +124,7 @@ export async function createJob(formData: FormData) {
 }
 
 export async function updateJob(jobId: string, formData: FormData) {
+  await requireHR();
   const supabase = await createClient();
 
   const title = asText(formData.get("title"));
@@ -164,6 +167,7 @@ export async function updateJob(jobId: string, formData: FormData) {
 }
 
 export async function deleteJob(jobId: string) {
+  await requireHR();
   const supabase = await createClient();
   await supabase.from("jobs").delete().eq("id", jobId);
   revalidatePath("/dashboard/jobs");
@@ -171,6 +175,7 @@ export async function deleteJob(jobId: string) {
 }
 
 export async function changeJobStatus(jobId: string, status: string) {
+  await requireHR();
   const supabase = await createClient();
   await supabase
     .from("jobs")
@@ -190,6 +195,7 @@ export async function changeJobStatus(jobId: string, status: string) {
  * the application is created and the user can re-run AI from its detail page.
  */
 export async function addApplicantToJob(jobId: string, formData: FormData) {
+  await requireHR();
   const supabase = await createClient();
   const companyId = await getCurrentCompanyId(supabase);
 
@@ -317,6 +323,7 @@ export async function updateApplicationStatus(
   status: string,
   redirectTo: string,
 ) {
+  await requireHR();
   const supabase = await createClient();
   const {
     data: { user },
@@ -339,6 +346,7 @@ export async function saveApplicationNotes(
   applicationId: string,
   formData: FormData,
 ) {
+  await requireHR();
   const supabase = await createClient();
   const notes = asText(formData.get("hr_notes"));
   const interviewAt = asText(formData.get("interview_at"));
@@ -364,6 +372,7 @@ export async function saveApplicationNotes(
 }
 
 export async function deleteApplication(applicationId: string, jobId: string) {
+  await requireHR();
   const supabase = await createClient();
   await supabase.from("applications").delete().eq("id", applicationId);
   revalidatePath(`/dashboard/jobs/${jobId}`);

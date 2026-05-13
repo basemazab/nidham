@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { requireHR } from "@/lib/permissions";
 
 function asText(value: FormDataEntryValue | null): string | null {
   if (value === null) return null;
@@ -75,6 +76,7 @@ function validate(input: ContractInput): string | null {
 }
 
 export async function createContract(formData: FormData) {
+  await requireHR();
   const input = parseInput(formData);
   const err = validate(input);
   if (err) {
@@ -98,6 +100,7 @@ export async function createContract(formData: FormData) {
 }
 
 export async function updateContract(id: string, formData: FormData) {
+  await requireHR();
   const input = parseInput(formData);
   const err = validate(input);
   if (err) {
@@ -122,6 +125,7 @@ export async function updateContract(id: string, formData: FormData) {
 }
 
 export async function deleteContract(id: string) {
+  await requireHR();
   const supabase = await createClient();
   await supabase.from("contracts").delete().eq("id", id);
   revalidatePath("/dashboard/contracts");

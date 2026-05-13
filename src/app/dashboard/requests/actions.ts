@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { requireHR } from "@/lib/permissions";
 
 type RequestKind = "leave" | "advance" | "permission";
 
@@ -29,11 +30,9 @@ export async function decideRequest(
   decision: "approved" | "rejected",
   formData: FormData,
 ) {
+  const { profile } = await requireHR();
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const user = { id: profile.id };
 
   const hrNotes = asText(formData.get("hr_notes"));
 
@@ -62,6 +61,7 @@ export async function decideRequest(
  * Locks to status='approved' so paid advances can't be paid twice.
  */
 export async function markAdvancePaid(id: string) {
+  await requireHR();
   const supabase = await createClient();
   await supabase
     .from("advance_requests")

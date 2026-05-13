@@ -1,6 +1,7 @@
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { generateObject } from "ai";
 import { createClient } from "@/lib/supabase/server";
+import { checkRateLimit } from "@/lib/rate-limit";
 import {
   buildScreeningPrompt,
   screeningSchema,
@@ -35,6 +36,34 @@ export async function POST(req: Request) {
   } = await supabase.auth.getUser();
   if (!user) {
     return jsonError("Unauthorized", 401);
+  }
+
+  // HR-only -- this endpoint reads CVs + writes AI scores to applications.
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+  if (!profile || (profile.role !== "admin" && profile.role !== "manager")) {
+    return jsonError("الفحص الذكي مخصص لـ HR فقط", 403);
+  }
+
+  // Rate limit: 40 screenings / 10 minutes per user -- enough to clear an
+  // application backlog in a sprint without enabling a runaway loop.
+  const rl = checkRateLimit(`ai-screen:${user.id}`, 40, 10 * 60_000);
+  if (!rl.ok) {
+    return new Response(
+      JSON.stringify({
+        error: `كتر شويه على الفحص — جرب تاني بعد ${Math.ceil(rl.retryAfterSeconds / 60)} دقيقة`,
+      }),
+      {
+        status: 429,
+        headers: {
+          "Content-Type": "application/json",
+          "Retry-After": String(rl.retryAfterSeconds),
+        },
+      },
+    );
   }
 
   if (!process.env.GEMINI_API_KEY) {

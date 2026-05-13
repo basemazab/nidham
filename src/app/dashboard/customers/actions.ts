@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { requireHR } from "@/lib/permissions";
 
 function asText(value: FormDataEntryValue | null): string | null {
   if (value === null) return null;
@@ -36,6 +37,7 @@ async function getCurrentCompanyId(
 }
 
 export async function createCustomer(formData: FormData) {
+  await requireHR();
   const supabase = await createClient();
 
   const fullName = asText(formData.get("full_name"));
@@ -71,6 +73,7 @@ export async function createCustomer(formData: FormData) {
 }
 
 export async function updateCustomer(id: string, formData: FormData) {
+  await requireHR();
   const supabase = await createClient();
 
   const fullName = asText(formData.get("full_name"));
@@ -109,6 +112,7 @@ export async function updateCustomer(id: string, formData: FormData) {
 }
 
 export async function deleteCustomer(id: string) {
+  await requireHR();
   const supabase = await createClient();
   await supabase.from("customers").delete().eq("id", id);
   revalidatePath("/dashboard/customers");

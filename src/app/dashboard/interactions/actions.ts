@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { requireHR } from "@/lib/permissions";
 
 function asText(value: FormDataEntryValue | null): string | null {
   if (value === null) return null;
@@ -29,6 +30,7 @@ async function getCurrentCompanyId(
 }
 
 export async function logInteraction(formData: FormData) {
+  await requireHR();
   const supabase = await createClient();
 
   const employeeId = asText(formData.get("employee_id"));
@@ -71,6 +73,7 @@ export async function logInteraction(formData: FormData) {
 }
 
 export async function updateInteraction(id: string, formData: FormData) {
+  await requireHR();
   const supabase = await createClient();
 
   const employeeId = asText(formData.get("employee_id"));
@@ -109,6 +112,7 @@ export async function updateInteraction(id: string, formData: FormData) {
 }
 
 export async function deleteInteraction(id: string) {
+  await requireHR();
   const supabase = await createClient();
   await supabase.from("interactions").delete().eq("id", id);
   revalidatePath("/dashboard/interactions");

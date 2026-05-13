@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { requireAdmin } from "@/lib/permissions";
 
 function asNumber(value: FormDataEntryValue | null): number | null {
   if (value === null || typeof value !== "string") return null;
@@ -23,22 +24,10 @@ function asBool(value: FormDataEntryValue | null): boolean {
 }
 
 export async function updateOfficeLocation(formData: FormData) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
-  // Locate the caller's company via their profile
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("company_id")
-    .eq("id", user.id)
-    .single();
-
-  if (!profile) {
-    redirect("/dashboard?error=" + encodeURIComponent("Profile not found"));
-  }
+  // The office geofence governs where the mobile clock-in is accepted.
+  // Moving or disabling it is an admin-only action -- a manager-level
+  // user shouldn't be able to silently turn off the geofence.
+  const { supabase, profile } = await requireAdmin();
 
   const lat = asNumber(formData.get("office_lat"));
   const lng = asNumber(formData.get("office_lng"));

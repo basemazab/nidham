@@ -1,6 +1,7 @@
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { streamText } from "ai";
 import { createClient } from "@/lib/supabase/server";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 // Use our env var name (GEMINI_API_KEY) instead of the SDK's default
 // (GOOGLE_GENERATIVE_AI_API_KEY). One provider instance for the whole route.
@@ -204,6 +205,35 @@ export async function POST(req: Request) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,
     });
+  }
+
+  // Only HR (admin/manager) can use the AI assistant -- it has access to
+  // company-wide attendance + customer data via the system prompt.
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+  if (!profile || (profile.role !== "admin" && profile.role !== "manager")) {
+    return new Response(
+      JSON.stringify({ error: "المساعد الذكي مخصص لـ HR فقط" }),
+      { status: 403 },
+    );
+  }
+
+  // Rate limit: 30 chat turns / 10 minutes per user -- comfortable for
+  // legitimate use and a hard ceiling on accidental billing burn.
+  const rl = checkRateLimit(`ai-chat:${user.id}`, 30, 10 * 60_000);
+  if (!rl.ok) {
+    return new Response(
+      JSON.stringify({
+        error: `كتر شويه على المساعد — جرب تاني بعد ${Math.ceil(rl.retryAfterSeconds / 60)} دقيقة`,
+      }),
+      {
+        status: 429,
+        headers: { "Retry-After": String(rl.retryAfterSeconds) },
+      },
+    );
   }
 
   if (!process.env.GEMINI_API_KEY) {

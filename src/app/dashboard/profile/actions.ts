@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { requireAdmin } from "@/lib/permissions";
 
 export async function updateMyProfile(formData: FormData) {
   const supabase = await createClient();
@@ -33,18 +34,61 @@ export async function updateMyProfile(formData: FormData) {
   redirect("/dashboard/profile?profile_updated=1");
 }
 
+// Change password with re-authentication. A stolen session cookie used to
+// be able to silently rotate the password (locking the rightful owner
+// out and persisting access for the attacker); require proof that the
+// caller knows the current password before applying the change.
 export async function changeMyPassword(formData: FormData) {
+  const currentPassword = String(formData.get("current_password") ?? "");
   const password = String(formData.get("password") ?? "");
-  if (!password || password.length < 6) {
+  const confirmPassword = String(formData.get("confirm_password") ?? "");
+
+  if (!currentPassword) {
     redirect(
       "/dashboard/profile?error=" +
-        encodeURIComponent("كلمة السر لازم تكون 6 حروف على الأقل"),
+        encodeURIComponent("كلمة السر الحالية مطلوبة"),
+    );
+  }
+  if (!password || password.length < 8) {
+    redirect(
+      "/dashboard/profile?error=" +
+        encodeURIComponent("كلمة السر الجديدة لازم تكون 8 حروف على الأقل"),
+    );
+  }
+  if (password === currentPassword) {
+    redirect(
+      "/dashboard/profile?error=" +
+        encodeURIComponent("كلمة السر الجديدة لازم تكون مختلفة عن الحالية"),
+    );
+  }
+  if (password !== confirmPassword) {
+    redirect(
+      "/dashboard/profile?error=" +
+        encodeURIComponent("كلمة السر الجديدة وتأكيدها مش مطابقين"),
     );
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.updateUser({ password });
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user || !user.email) redirect("/login");
 
+  // Re-verify the current password. signInWithPassword refreshes the
+  // session, which is harmless on success; on failure we get a clean
+  // "invalid credentials" we can translate to Arabic.
+  const { error: reauthErr } = await supabase.auth.signInWithPassword({
+    email: user.email,
+    password: currentPassword,
+  });
+  if (reauthErr) {
+    redirect(
+      "/dashboard/profile?error=" +
+        encodeURIComponent("كلمة السر الحالية غلط"),
+    );
+  }
+
+  const { error } = await supabase.auth.updateUser({ password });
   if (error) {
     redirect(
       "/dashboard/profile?error=" + encodeURIComponent(error.message),
@@ -55,25 +99,7 @@ export async function changeMyPassword(formData: FormData) {
 }
 
 export async function updateMyCompany(formData: FormData) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
-  // Only admins can update company
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role, company_id")
-    .eq("id", user.id)
-    .single();
-
-  if (!profile || profile.role !== "admin") {
-    redirect(
-      "/dashboard/profile?error=" +
-        encodeURIComponent("لازم تكون مدير عشان تعدّل بيانات الشركة"),
-    );
-  }
+  const { supabase, profile } = await requireAdmin();
 
   const companyName = String(formData.get("company_name") ?? "").trim();
   const industry = String(formData.get("industry") ?? "").trim() || null;

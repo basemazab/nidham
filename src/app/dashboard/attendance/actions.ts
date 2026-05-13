@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { requireHR } from "@/lib/permissions";
 
 const VALID_STATUSES = [
   "present",
@@ -14,6 +15,7 @@ const VALID_STATUSES = [
 ] as const;
 
 export async function saveAttendance(formData: FormData) {
+  await requireHR();
   const supabase = await createClient();
 
   const {

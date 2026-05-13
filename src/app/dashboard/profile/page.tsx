@@ -124,10 +124,23 @@ export default async function ProfilePage({
         <section className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 mb-6">
           <h2 className="text-lg font-bold font-cairo text-slate-800 mb-1">🔒 تغيير كلمة السر</h2>
           <p className="text-xs text-slate-500 mb-5 font-cairo">
-            اختار كلمة سر قوية — 6 حروف على الأقل
+            اختار كلمة سر قوية — 8 حروف على الأقل. هتطلب منك كلمة السر الحالية للتأكد.
           </p>
 
           <form action={changeMyPassword} className="space-y-4">
+            <div>
+              <label htmlFor="current_password" className="block text-sm font-medium text-slate-700 mb-2 font-cairo">
+                كلمة السر الحالية
+              </label>
+              <input
+                id="current_password"
+                name="current_password"
+                type="password"
+                required
+                autoComplete="current-password"
+                className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none transition text-slate-900"
+              />
+            </div>
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-slate-700 mb-2 font-cairo">
                 كلمة السر الجديدة
@@ -137,7 +150,21 @@ export default async function ProfilePage({
                 name="password"
                 type="password"
                 required
-                minLength={6}
+                minLength={8}
+                autoComplete="new-password"
+                className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none transition text-slate-900"
+              />
+            </div>
+            <div>
+              <label htmlFor="confirm_password" className="block text-sm font-medium text-slate-700 mb-2 font-cairo">
+                تأكيد كلمة السر الجديدة
+              </label>
+              <input
+                id="confirm_password"
+                name="confirm_password"
+                type="password"
+                required
+                minLength={8}
                 autoComplete="new-password"
                 className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none transition text-slate-900"
               />

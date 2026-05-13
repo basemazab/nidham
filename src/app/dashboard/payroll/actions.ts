@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { calculatePayroll, type AttendanceBreakdown } from "@/lib/payroll";
+import { requireAdmin, requireHR } from "@/lib/permissions";
 
 function asText(value: FormDataEntryValue | null): string | null {
   if (value === null) return null;
@@ -56,6 +57,7 @@ type AttendanceRecord = {
  * + that month's attendance.
  */
 export async function generatePayrollPeriod(formData: FormData) {
+  await requireHR();
   const supabase = await createClient();
   const companyId = await getCurrentCompanyId(supabase);
 
@@ -199,6 +201,7 @@ export async function generatePayrollPeriod(formData: FormData) {
  * Recalculate an individual payroll entry (e.g., after editing bonuses/deductions).
  */
 export async function updatePayrollEntry(entryId: string, formData: FormData) {
+  await requireHR();
   const supabase = await createClient();
   const companyId = await getCurrentCompanyId(supabase);
 
@@ -293,11 +296,10 @@ export async function updatePayrollEntry(entryId: string, formData: FormData) {
 }
 
 export async function approvePayrollPeriod(periodId: string) {
+  // Approving payroll is an admin-only action -- it commits money flow
+  // and the approver is recorded in approved_by.
+  const { profile } = await requireAdmin();
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
 
   // Server-side gate — the UI hides the button when status != "draft", but a
   // direct call (e.g., replayed form post) must also be rejected so a
@@ -307,7 +309,7 @@ export async function approvePayrollPeriod(periodId: string) {
     .update({
       status: "approved",
       approved_at: new Date().toISOString(),
-      approved_by: user.id,
+      approved_by: profile.id,
     })
     .eq("id", periodId)
     .eq("status", "draft");
@@ -323,6 +325,7 @@ export async function approvePayrollPeriod(periodId: string) {
 }
 
 export async function markPayrollAsPaid(periodId: string) {
+  await requireAdmin();
   const supabase = await createClient();
 
   // Only an approved period can be marked paid — guards against replay.
@@ -346,6 +349,7 @@ export async function markPayrollAsPaid(periodId: string) {
 }
 
 export async function deletePayrollPeriod(periodId: string) {
+  await requireAdmin();
   const supabase = await createClient();
 
   // Only draft periods may be deleted; otherwise audit history is lost.

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { requireAdmin, requireHR } from "@/lib/permissions";
 
 function asText(value: FormDataEntryValue | null): string | null {
   if (value === null) return null;
@@ -18,6 +19,7 @@ function asNumber(value: FormDataEntryValue | null): number | null {
 }
 
 export async function createEmployee(formData: FormData) {
+  await requireHR();
   const supabase = await createClient();
 
   const fullName = asText(formData.get("full_name"));
@@ -59,6 +61,7 @@ export async function createEmployee(formData: FormData) {
 }
 
 export async function updateEmployee(id: string, formData: FormData) {
+  await requireHR();
   const supabase = await createClient();
 
   const fullName = asText(formData.get("full_name"));
@@ -104,6 +107,9 @@ export async function updateEmployee(id: string, formData: FormData) {
 }
 
 export async function deleteEmployee(id: string) {
+  // Deletion cascades to attendance, payroll_entries, leave_requests,
+  // advance_requests, permission_requests -- restrict to admin only.
+  await requireAdmin();
   const supabase = await createClient();
   await supabase.from("employees").delete().eq("id", id);
   revalidatePath("/dashboard/employees");
@@ -119,6 +125,7 @@ export async function deleteEmployee(id: string) {
  * company, so there's no extra permission gate here.
  */
 export async function generateEmployeeInvitation(id: string) {
+  await requireHR();
   const supabase = await createClient();
   const { error } = await supabase.rpc("generate_employee_invitation", {
     p_employee_id: id,
