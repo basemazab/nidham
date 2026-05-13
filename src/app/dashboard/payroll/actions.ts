@@ -133,6 +133,22 @@ export async function generatePayrollPeriod(formData: FormData) {
   const employees = employeesRes.data ?? [];
   const attendance = attendanceRes.data ?? [];
 
+  // Auto-link advances: for each employee, ask the DB how much of their
+  // open advances should be deducted in this specific (year, month).
+  // compute_advance_deduction_for_month is referentially transparent --
+  // deleting / regenerating the period self-corrects. Migration 019.
+  const advanceDeductions = new Map<string, number>();
+  await Promise.all(
+    employees.map(async (emp) => {
+      const { data } = await supabase.rpc(
+        "compute_advance_deduction_for_month",
+        { p_employee_id: emp.id, p_year: year, p_month: month },
+      );
+      const value = typeof data === "number" ? data : 0;
+      advanceDeductions.set(emp.id, value);
+    }),
+  );
+
   // Compute & insert entry per employee.
   // Buckets:
   //   attended: explicit "present"
@@ -149,6 +165,7 @@ export async function generatePayrollPeriod(formData: FormData) {
     const leave = Math.max(0, empAttendance.length - attended - halfDay - absent);
 
     const breakdown: AttendanceBreakdown = { attended, halfDay, leave, absent };
+    const loanDeduction = advanceDeductions.get(emp.id) ?? 0;
 
     const result = calculatePayroll(
       {
@@ -156,6 +173,7 @@ export async function generatePayrollPeriod(formData: FormData) {
         housingAllowance: emp.housing_allowance ?? 0,
         transportAllowance: emp.transport_allowance ?? 0,
         otherAllowances: emp.other_allowances ?? 0,
+        loanDeduction,
       },
       breakdown,
       workingDays,
@@ -179,7 +197,7 @@ export async function generatePayrollPeriod(formData: FormData) {
       absence_deduction: result.absenceDeduction,
       social_insurance: result.socialInsurance,
       income_tax: result.incomeTax,
-      loan_deduction: 0,
+      loan_deduction: loanDeduction,
       other_deductions: 0,
       total_deductions: result.totalDeductions,
       net_salary: result.netSalary,

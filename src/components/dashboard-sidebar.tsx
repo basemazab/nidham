@@ -39,6 +39,7 @@ const NAV_ITEMS: readonly NavItem[] = [
   { href: "/dashboard/ai", label: "المساعد الذكي ✦", icon: "🤖", section: "ai" },
   { href: "/dashboard/reports/attendance", label: "تقرير الحضور", icon: "📊", section: "reports" },
   { href: "/dashboard/reports/bridge", label: "Bridge ✦", icon: "✦", section: "reports" },
+  { href: "/dashboard/audit-log", label: "سجل النشاط", icon: "📋", section: "reports", visibleTo: ["admin"] },
   { href: "/dashboard/settings/office-location", label: "موقع المكتب 📍", icon: "⚙", section: "settings", visibleTo: ["admin"] },
 ];
 
