@@ -141,7 +141,14 @@ services:
       - "${KONG_HTTPS_PORT:-8443}:8443"
     volumes:
       - ./kong/kong.yml:/home/kong/temp.yml:ro
-    entrypoint: ["bash", "-c", "eval \"echo \\\"$$(cat ~/temp.yml)\\\"\" > ~/kong.yml && /docker-entrypoint.sh kong docker-start"]
+    # sed is safer than eval here: eval re-parses the whole YAML through
+    # the shell, which corrupts wildcards like "*" (gets globbed) and any
+    # internal double-quoted strings. sed just does textual placeholder
+    # replacement and leaves the rest of the YAML untouched.
+    entrypoint:
+      - bash
+      - -c
+      - 'sed -e "s|\$${ANON_KEY}|$$ANON_KEY|g" -e "s|\$${SERVICE_ROLE_KEY}|$$SERVICE_ROLE_KEY|g" /home/kong/temp.yml > /home/kong/kong.yml && exec /docker-entrypoint.sh kong docker-start'
 
   # --------------------------------------------------------------------------
   # Nidham Next.js app
