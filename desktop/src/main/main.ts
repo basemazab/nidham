@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, Menu, shell, net } from "electron";
 import path from "node:path";
+import squirrelStartup from "electron-squirrel-startup";
 import {
   getServerUrl,
   setServerUrl,
@@ -10,10 +11,15 @@ import {
 import { buildAppMenu } from "./menu";
 
 // Squirrel runs the installer's pre/post hooks via the same exe, with
-// flags like --squirrel-install. This module short-circuits the app boot
-// during those hooks so the user doesn't see a window flash.
-//   eslint-disable-next-line @typescript-eslint/no-var-requires
-if (require("electron-squirrel-startup")) {
+// flags like --squirrel-install. The default export is a boolean: true
+// when the process was launched as a hook (create shortcuts / update /
+// uninstall) -- in which case the module already spawned Update.exe to
+// do the work and we just need to exit before showing a window.
+//
+// Use ES import (not require) so Vite's SSR build actually inlines the
+// module instead of leaving a runtime require() the packaged asar
+// can't resolve.
+if (squirrelStartup) {
   app.quit();
 }
 
