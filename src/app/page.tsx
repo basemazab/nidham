@@ -1,9 +1,46 @@
 import Link from "next/link";
 
-export default function Home() {
+type SearchParams = Promise<{
+  error?: string;
+  error_code?: string;
+  error_description?: string;
+}>;
+
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}) {
+  const params = await searchParams;
+  const hasAuthError = !!(params.error || params.error_code);
+  const friendlyError =
+    params.error_code === "otp_expired"
+      ? "اللينك انتهت صلاحيته أو اتستخدم قبل كده — اطلب لينك جديد"
+      : params.error_description
+      ? decodeURIComponent(params.error_description.replace(/\+/g, " "))
+      : "حصلت مشكلة في تسجيل الدخول — جرّب تاني";
+
   return (
     <main className="flex-1 flex items-center justify-center px-6 py-12 bg-gradient-to-b from-slate-50 via-white to-cyan-50/30">
       <div className="max-w-2xl w-full text-center">
+        {hasAuthError && (
+          <div className="mb-8 p-4 rounded-xl bg-red-50 border-2 border-red-200 text-right">
+            <div className="flex items-start gap-3">
+              <span className="text-2xl">⚠️</span>
+              <div className="flex-1">
+                <h3 className="font-bold text-red-800 mb-1 font-cairo">حصلت مشكلة</h3>
+                <p className="text-sm text-red-700 mb-3 font-cairo">{friendlyError}</p>
+                <Link
+                  href="/forgot-password"
+                  className="inline-block text-sm text-red-700 font-bold underline hover:no-underline font-cairo"
+                >
+                  اطلب لينك إعادة تعيين جديد ←
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Logo */}
         <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-brand-cyan to-brand-navy mb-8 shadow-xl shadow-cyan-500/20">
           <span className="text-4xl font-black text-white font-display">ن</span>
