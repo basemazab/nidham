@@ -123,16 +123,29 @@ services:
       - rest
     environment:
       KONG_DATABASE: "off"
-      KONG_DECLARATIVE_CONFIG: /var/lib/kong/kong.yml
+      KONG_DECLARATIVE_CONFIG: /home/kong/kong.yml
       KONG_DNS_ORDER: LAST,A,CNAME
       KONG_PLUGINS: request-transformer,cors,key-auth
       KONG_NGINX_PROXY_PROXY_BUFFER_SIZE: 160k
       KONG_NGINX_PROXY_PROXY_BUFFERS: 64 160k
+      # Exposed to the bash entrypoint below so `${ANON_KEY}` and
+      # `${SERVICE_ROLE_KEY}` placeholders in kong.yml get expanded before
+      # Kong reads its declarative config. Without this, Kong stores the
+      # literal strings "${ANON_KEY}" / "${SERVICE_ROLE_KEY}" as the
+      # consumer api keys, and every authenticated request rejects with
+      # "Invalid authentication credentials".
+      ANON_KEY: ${ANON_KEY}
+      SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY}
     ports:
       - "${KONG_HTTP_PORT:-8000}:8000"
       - "${KONG_HTTPS_PORT:-8443}:8443"
     volumes:
-      - ./kong/kong.yml:/var/lib/kong/kong.yml:ro
+      - ./kong/kong.yml:/home/kong/temp.yml:ro
+    entrypoint: >
+      bash -c '
+        eval "echo \"$$(cat ~/temp.yml)\"" > ~/kong.yml
+        && /docker-entrypoint.sh kong docker-start
+      '
 
   # --------------------------------------------------------------------------
   # Nidham Next.js app
