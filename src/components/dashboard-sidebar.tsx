@@ -99,15 +99,25 @@ export function DashboardSidebar({ userName, companyName, userEmail }: Props) {
         </div>
       </nav>
 
-      {/* User card + Logout */}
+      {/* User card + Profile + Logout */}
       <div className="p-3 border-t border-slate-100 bg-slate-50/50">
-        <div className="px-3 py-2 mb-1">
+        <Link
+          href="/dashboard/profile"
+          className={`block px-3 py-2 rounded-lg transition mb-1 ${
+            isActive("/dashboard/profile")
+              ? "bg-brand-cyan/10"
+              : "hover:bg-slate-100"
+          }`}
+        >
           <div className="text-[10px] text-brand-gold font-bold tracking-wider mb-1 font-cairo uppercase">
             {companyName}
           </div>
           <div className="text-sm font-bold text-slate-800 font-cairo">{userName}</div>
           <div className="text-xs text-slate-500 truncate font-mono">{userEmail}</div>
-        </div>
+          <div className="text-[10px] text-brand-cyan-dark font-cairo font-bold mt-1">
+            ⚙ الإعدادات الشخصية ←
+          </div>
+        </Link>
         <form action={logout}>
           <button
             type="submit"

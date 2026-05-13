@@ -1,14 +1,14 @@
 import Link from "next/link";
-import { login } from "./actions";
+import { requestPasswordReset } from "./actions";
 
-type SearchParams = Promise<{ error?: string }>;
+type SearchParams = Promise<{ error?: string; sent?: string }>;
 
-export default async function LoginPage({
+export default async function ForgotPasswordPage({
   searchParams,
 }: {
   searchParams: SearchParams;
 }) {
-  const { error } = await searchParams;
+  const { error, sent } = await searchParams;
 
   return (
     <main className="flex-1 flex items-center justify-center px-6 py-12 bg-gradient-to-b from-slate-50 via-white to-cyan-50/30">
@@ -23,9 +23,18 @@ export default async function LoginPage({
         </Link>
 
         <div className="bg-white p-8 rounded-2xl shadow-xl border border-slate-100">
-          <h2 className="text-2xl font-bold text-slate-800 mb-6 font-cairo text-center">
-            تسجيل الدخول
+          <h2 className="text-2xl font-bold text-slate-800 mb-2 font-cairo text-center">
+            نسيت كلمة السر؟
           </h2>
+          <p className="text-sm text-slate-500 text-center mb-6 font-cairo">
+            هنبعتلك لينك على إيميلك تقدر تغيّر منه كلمة السر
+          </p>
+
+          {sent && (
+            <div className="mb-4 p-4 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm font-cairo">
+              ✓ لو الإيميل مسجّل عندنا، هتلاقي لينك إعادة تعيين كلمة السر في الـ Inbox بتاعك (وممكن في Spam).
+            </div>
+          )}
 
           {error && (
             <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm font-cairo">
@@ -33,7 +42,7 @@ export default async function LoginPage({
             </div>
           )}
 
-          <form action={login} className="space-y-4">
+          <form action={requestPasswordReset} className="space-y-4">
             <div>
               <label
                 htmlFor="email"
@@ -52,47 +61,21 @@ export default async function LoginPage({
               />
             </div>
 
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label
-                  htmlFor="password"
-                  className="block text-sm font-medium text-slate-700 font-cairo"
-                >
-                  كلمة السر
-                </label>
-                <Link
-                  href="/forgot-password"
-                  className="text-xs text-brand-cyan-dark hover:underline font-cairo"
-                >
-                  نسيتها؟
-                </Link>
-              </div>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                required
-                minLength={6}
-                autoComplete="current-password"
-                className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none transition text-slate-900"
-              />
-            </div>
-
             <button
               type="submit"
               className="w-full px-6 py-3 rounded-lg bg-gradient-to-r from-brand-cyan to-brand-cyan-dark text-white font-bold shadow-lg shadow-cyan-500/30 hover:shadow-cyan-500/50 hover:-translate-y-0.5 transition-all font-cairo"
             >
-              دخول
+              ابعت لينك إعادة التعيين
             </button>
           </form>
 
           <p className="text-center text-sm text-slate-600 mt-6">
-            مش عندك حساب؟{" "}
+            تفتكرت كلمة السر؟{" "}
             <Link
-              href="/signup"
+              href="/login"
               className="text-brand-cyan-dark font-bold hover:underline"
             >
-              اعمل حساب جديد
+              ارجع لتسجيل الدخول
             </Link>
           </p>
         </div>
