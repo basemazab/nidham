@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { formatEGP } from "@/lib/format";
 
 type Contract = {
   id: string;
@@ -17,11 +18,6 @@ type Contract = {
 
 function daysBetween(from: Date, to: Date): number {
   return Math.round((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24));
-}
-
-function formatEGP(value: number | null): string {
-  if (value === null) return "—";
-  return value.toLocaleString("ar-EG") + " ج";
 }
 
 export default async function ContractsPage() {

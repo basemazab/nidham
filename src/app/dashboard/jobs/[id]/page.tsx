@@ -11,6 +11,7 @@ import {
   type AiRecommendation,
 } from "@/lib/recruitment";
 import { CopyButton } from "@/components/copy-button";
+import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { headers } from "next/headers";
 
 type PageProps = {
@@ -175,9 +176,12 @@ export default async function JobDetailPage({ params }: PageProps) {
               </form>
             )}
             <form action={async () => { "use server"; await deleteJob(id); }}>
-              <button type="submit" className="px-4 py-2 rounded-lg border border-red-200 text-red-600 font-bold text-sm hover:bg-red-50 transition font-cairo">
-                حذف
-              </button>
+              <ConfirmSubmitButton
+                label="حذف"
+                message={`هتمسح الوظيفة "${job.title}" وكل المرشحين المرتبطين بيها. مفيش رجوع.`}
+                confirmLabel="نعم احذف"
+                className="px-4 py-2 rounded-lg border border-red-200 text-red-600 font-bold text-sm hover:bg-red-50 transition font-cairo cursor-pointer"
+              />
             </form>
           </div>
         </header>

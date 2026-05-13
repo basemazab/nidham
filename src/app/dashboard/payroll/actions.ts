@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { calculatePayroll, type AttendanceBreakdown } from "@/lib/payroll";
 import { requireAdmin, requireHR } from "@/lib/permissions";
+import { arabicizeDbError } from "@/lib/i18n";
 
 function asText(value: FormDataEntryValue | null): string | null {
   if (value === null) return null;
@@ -317,7 +318,7 @@ export async function approvePayrollPeriod(periodId: string) {
   if (error) {
     redirect(
       `/dashboard/payroll/${periodId}?error=` +
-        encodeURIComponent(error.message),
+        encodeURIComponent(arabicizeDbError(error.message)),
     );
   }
 
@@ -341,7 +342,7 @@ export async function markPayrollAsPaid(periodId: string) {
   if (error) {
     redirect(
       `/dashboard/payroll/${periodId}?error=` +
-        encodeURIComponent(error.message),
+        encodeURIComponent(arabicizeDbError(error.message)),
     );
   }
 

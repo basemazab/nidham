@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { logout } from "../login/actions";
 import { updateSubscription, extendTrial } from "./actions";
+import { formatEGP } from "@/lib/format";
 
 type CompanyRow = {
   id: string;
@@ -46,11 +47,6 @@ function daysFromToday(dateStr: string): number {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   return Math.round((d - today.getTime()) / (1000 * 60 * 60 * 24));
-}
-
-function formatEGP(value: number | null): string {
-  if (value === null || value === undefined) return "—";
-  return value.toLocaleString("ar-EG") + " ج";
 }
 
 export default async function AdminPage() {

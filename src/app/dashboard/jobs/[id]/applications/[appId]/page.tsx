@@ -7,6 +7,7 @@ import {
   saveApplicationNotes,
   deleteApplication,
 } from "../../../actions";
+import { formatEGP } from "@/lib/format";
 import {
   STATUS_LABELS_AR,
   STATUS_CLASSES,
@@ -67,11 +68,6 @@ const STATUS_OPTIONS: ApplicationStatus[] = [
   "rejected",
   "withdrawn",
 ];
-
-function formatEGP(n: number | null): string {
-  if (n === null) return "—";
-  return n.toLocaleString("ar-EG", { maximumFractionDigits: 0 }) + " ج";
-}
 
 export default async function ApplicationDetailPage({ params }: PageProps) {
   const { id, appId } = await params;

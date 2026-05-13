@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireHR } from "@/lib/permissions";
+import { arabicizeDbError } from "@/lib/i18n";
 
 function asText(value: FormDataEntryValue | null): string | null {
   if (value === null) return null;
@@ -64,7 +65,8 @@ export async function createCustomer(formData: FormData) {
 
   if (error) {
     redirect(
-      "/dashboard/customers/new?error=" + encodeURIComponent(error.message),
+      "/dashboard/customers/new?error=" +
+        encodeURIComponent(arabicizeDbError(error.message)),
     );
   }
 
@@ -102,7 +104,8 @@ export async function updateCustomer(id: string, formData: FormData) {
 
   if (error) {
     redirect(
-      `/dashboard/customers/${id}?error=` + encodeURIComponent(error.message),
+      `/dashboard/customers/${id}?error=` +
+        encodeURIComponent(arabicizeDbError(error.message)),
     );
   }
 

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireHR } from "@/lib/permissions";
+import { arabicizeDbError } from "@/lib/i18n";
 
 // ----------------------------------------------------------------------------
 // Helpers
@@ -115,7 +116,7 @@ export async function createJob(formData: FormData) {
   if (error || !data) {
     redirect(
       "/dashboard/jobs/new?error=" +
-        encodeURIComponent(error?.message ?? "فشل إنشاء الوظيفة"),
+        encodeURIComponent(arabicizeDbError(error?.message ?? "فشل إنشاء الوظيفة")),
     );
   }
 
@@ -157,7 +158,7 @@ export async function updateJob(jobId: string, formData: FormData) {
   if (error) {
     redirect(
       `/dashboard/jobs/${jobId}/edit?error=` +
-        encodeURIComponent(error.message),
+        encodeURIComponent(arabicizeDbError(error.message)),
     );
   }
 
@@ -250,7 +251,7 @@ export async function addApplicantToJob(jobId: string, formData: FormData) {
     if (candErr || !newCand) {
       redirect(
         `/dashboard/jobs/${jobId}/applications/new?error=` +
-          encodeURIComponent(candErr?.message ?? "فشل حفظ بيانات المرشح"),
+          encodeURIComponent(arabicizeDbError(candErr?.message ?? "فشل حفظ بيانات المرشح")),
       );
     }
     candidateId = newCand.id;
@@ -302,7 +303,7 @@ export async function addApplicantToJob(jobId: string, formData: FormData) {
   if (appErr || !app) {
     redirect(
       `/dashboard/jobs/${jobId}/applications/new?error=` +
-        encodeURIComponent(appErr?.message ?? "فشل حفظ المرشح"),
+        encodeURIComponent(arabicizeDbError(appErr?.message ?? "فشل حفظ المرشح")),
     );
   }
 

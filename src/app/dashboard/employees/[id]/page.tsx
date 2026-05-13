@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { updateEmployee, deleteEmployee, generateEmployeeInvitation } from "../actions";
 import { CopyButton } from "@/components/copy-button";
+import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -418,12 +419,12 @@ export default async function EditEmployeePage({ params, searchParams }: PagePro
           {/* Delete in separate form to avoid double-action collision */}
           <div className="mt-8 pt-6 border-t border-red-100">
             <form action={deleteAction}>
-              <button
-                type="submit"
-                className="text-sm text-red-600 hover:text-red-800 font-cairo"
-              >
-                🗑 حذف الموظف نهائيًا
-              </button>
+              <ConfirmSubmitButton
+                label="🗑 حذف الموظف نهائيًا"
+                message={`هتمسح "${employee.full_name}" وكل بيانات الحضور والرواتب والطلبات المرتبطة بيه. مفيش رجوع بعد التأكيد.`}
+                confirmLabel="نعم احذف"
+                className="text-sm text-red-600 hover:text-red-800 font-cairo cursor-pointer"
+              />
             </form>
           </div>
         </div>

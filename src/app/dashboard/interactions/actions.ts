@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireHR } from "@/lib/permissions";
+import { arabicizeDbError } from "@/lib/i18n";
 
 function asText(value: FormDataEntryValue | null): string | null {
   if (value === null) return null;
@@ -63,7 +64,8 @@ export async function logInteraction(formData: FormData) {
 
   if (error) {
     redirect(
-      "/dashboard/interactions?error=" + encodeURIComponent(error.message),
+      "/dashboard/interactions?error=" +
+        encodeURIComponent(arabicizeDbError(error.message)),
     );
   }
 
@@ -102,7 +104,8 @@ export async function updateInteraction(id: string, formData: FormData) {
 
   if (error) {
     redirect(
-      `/dashboard/interactions/${id}?error=` + encodeURIComponent(error.message),
+      `/dashboard/interactions/${id}?error=` +
+        encodeURIComponent(arabicizeDbError(error.message)),
     );
   }
 

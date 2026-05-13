@@ -216,10 +216,11 @@ export function calculatePayroll(
 // ============================================================================
 // HELPER: Format currency in Arabic
 // ============================================================================
+// Payroll context always wants 2 decimals (payslips read down to the
+// piastre). General-purpose currency formatting lives in lib/format.ts.
+
+import { formatEGP as baseFormatEGP } from "./format";
 
 export function formatEGP(value: number): string {
-  return value.toLocaleString("ar-EG", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }) + " ج";
+  return baseFormatEGP(value, true);
 }

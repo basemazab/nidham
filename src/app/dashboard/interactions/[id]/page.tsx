@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { updateInteraction, deleteInteraction } from "../actions";
+import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -139,9 +140,12 @@ export default async function EditInteractionPage({ params, searchParams }: Page
 
           <div className="mt-8 pt-6 border-t border-red-100">
             <form action={deleteAction}>
-              <button type="submit" className="text-sm text-red-600 hover:text-red-800 font-cairo">
-                🗑 حذف التفاعل نهائيًا
-              </button>
+              <ConfirmSubmitButton
+                label="🗑 حذف التفاعل نهائيًا"
+                message="هتمسح التفاعل ده. مفيش رجوع."
+                confirmLabel="نعم احذف"
+                className="text-sm text-red-600 hover:text-red-800 font-cairo cursor-pointer"
+              />
             </form>
           </div>
         </div>

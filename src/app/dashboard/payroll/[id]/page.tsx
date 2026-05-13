@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { approvePayrollPeriod, markPayrollAsPaid, deletePayrollPeriod } from "../actions";
 import { formatEGP } from "@/lib/payroll";
+import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -116,9 +117,12 @@ export default async function PayrollPeriodPage({ params }: PageProps) {
             )}
             {period.status === "draft" && (
               <form action={async () => { "use server"; await deletePayrollPeriod(id); }}>
-                <button type="submit" className="px-4 py-2 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 font-bold text-sm font-cairo transition">
-                  حذف
-                </button>
+                <ConfirmSubmitButton
+                  label="حذف"
+                  message="هتمسح فترة الرواتب دي وكل entries الموظفين فيها. الحذف ممكن بس على الـ draft."
+                  confirmLabel="نعم احذف"
+                  className="px-4 py-2 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 font-bold text-sm font-cairo transition cursor-pointer"
+                />
               </form>
             )}
           </div>

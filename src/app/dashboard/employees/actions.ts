@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireAdmin, requireHR } from "@/lib/permissions";
+import { arabicizeDbError } from "@/lib/i18n";
 
 function asText(value: FormDataEntryValue | null): string | null {
   if (value === null) return null;
@@ -52,7 +53,8 @@ export async function createEmployee(formData: FormData) {
 
   if (error) {
     redirect(
-      "/dashboard/employees/new?error=" + encodeURIComponent(error.message),
+      "/dashboard/employees/new?error=" +
+        encodeURIComponent(arabicizeDbError(error.message)),
     );
   }
 
@@ -97,7 +99,8 @@ export async function updateEmployee(id: string, formData: FormData) {
 
   if (error) {
     redirect(
-      `/dashboard/employees/${id}?error=` + encodeURIComponent(error.message),
+      `/dashboard/employees/${id}?error=` +
+        encodeURIComponent(arabicizeDbError(error.message)),
     );
   }
 
@@ -133,7 +136,7 @@ export async function generateEmployeeInvitation(id: string) {
   if (error) {
     redirect(
       `/dashboard/employees/${id}?invite_error=` +
-        encodeURIComponent(error.message),
+        encodeURIComponent(arabicizeDbError(error.message)),
     );
   }
   revalidatePath(`/dashboard/employees/${id}`);

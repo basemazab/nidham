@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { formatEGP } from "@/lib/format";
 
 type Customer = {
   id: string;
@@ -35,11 +36,6 @@ const statusLabel: Record<
     classes: "bg-slate-100 text-slate-600 border-slate-200",
   },
 };
-
-function formatEGP(value: number | null): string {
-  if (value === null) return "—";
-  return value.toLocaleString("ar-EG") + " ج";
-}
 
 export default async function CustomersPage() {
   const supabase = await createClient();

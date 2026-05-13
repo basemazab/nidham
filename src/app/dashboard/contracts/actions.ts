@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireHR } from "@/lib/permissions";
+import { arabicizeDbError } from "@/lib/i18n";
 
 function asText(value: FormDataEntryValue | null): string | null {
   if (value === null) return null;
@@ -91,7 +92,8 @@ export async function createContract(formData: FormData) {
 
   if (error) {
     redirect(
-      "/dashboard/contracts/new?error=" + encodeURIComponent(error.message),
+      "/dashboard/contracts/new?error=" +
+        encodeURIComponent(arabicizeDbError(error.message)),
     );
   }
 
@@ -115,7 +117,8 @@ export async function updateContract(id: string, formData: FormData) {
 
   if (error) {
     redirect(
-      `/dashboard/contracts/${id}?error=` + encodeURIComponent(error.message),
+      `/dashboard/contracts/${id}?error=` +
+        encodeURIComponent(arabicizeDbError(error.message)),
     );
   }
 
