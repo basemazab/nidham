@@ -128,16 +128,19 @@ export default async function DashboardPage() {
             <p className="text-xs text-brand-cyan-dark font-bold">جاهز ✓</p>
           </Link>
 
-          <div className="bg-white p-6 rounded-2xl border border-slate-100 opacity-60">
+          <Link
+            href="/dashboard/customers"
+            className="bg-white p-6 rounded-2xl border border-slate-100 hover:border-brand-cyan/40 hover:shadow-lg hover:-translate-y-0.5 transition-all"
+          >
             <div className="text-3xl mb-2">💼</div>
-            <h3 className="font-bold font-cairo mb-1">العملاء + Bridge</h3>
-            <p className="text-xs text-slate-500">قريبًا</p>
-          </div>
+            <h3 className="font-bold font-cairo mb-1 text-slate-800">العملاء</h3>
+            <p className="text-xs text-brand-cyan-dark font-bold">جاهز ✓</p>
+          </Link>
         </div>
 
         {/* Status note */}
         <div className="mt-8 p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800 font-cairo text-center">
-          🚧 نسخة Beta · موديولات شغّالة: الموظفين + الحضور + تقرير الحضور · العملاء + Bridge جايين
+          🚧 نسخة Beta · موديولات شغّالة: الموظفين + الحضور + التقرير + العملاء · Bridge Analytics جاي (قلب النظام)
         </div>
       </div>
     </main>
