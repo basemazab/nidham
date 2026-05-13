@@ -37,7 +37,7 @@
 -- 1. leave_balances
 -- ----------------------------------------------------------------------------
 
-create table public.leave_balances (
+create table if not exists public.leave_balances (
   id            uuid primary key default gen_random_uuid(),
   company_id    uuid not null references public.companies(id) on delete cascade,
   employee_id   uuid not null references public.employees(id) on delete cascade,
@@ -58,23 +58,27 @@ create table public.leave_balances (
   unique (employee_id, year, leave_type)
 );
 
-create index idx_leave_balances_company  on public.leave_balances(company_id);
-create index idx_leave_balances_employee on public.leave_balances(employee_id, year);
+create index if not exists idx_leave_balances_company  on public.leave_balances(company_id);
+create index if not exists idx_leave_balances_employee on public.leave_balances(employee_id, year);
 
+drop trigger if exists leave_balances_set_updated_at on public.leave_balances;
 create trigger leave_balances_set_updated_at
   before update on public.leave_balances
   for each row execute function public.tg_set_updated_at();
 
 alter table public.leave_balances enable row level security;
 
+drop policy if exists "employee_view_own_leave_balance" on public.leave_balances;
 create policy "employee_view_own_leave_balance"
   on public.leave_balances for select
   using (employee_id = public.current_employee_id());
 
+drop policy if exists "hr_view_leave_balances" on public.leave_balances;
 create policy "hr_view_leave_balances"
   on public.leave_balances for select
   using (company_id = public.current_company_id() and public.is_hr());
 
+drop policy if exists "hr_manage_leave_balances" on public.leave_balances;
 create policy "hr_manage_leave_balances"
   on public.leave_balances for all
   using (company_id = public.current_company_id() and public.is_hr())
@@ -139,6 +143,7 @@ begin
 end;
 $$;
 
+drop trigger if exists employees_seed_leave_balances on public.employees;
 create trigger employees_seed_leave_balances
   after insert on public.employees
   for each row execute function public.tg_seed_leave_balances();
@@ -185,6 +190,7 @@ begin
 end;
 $$;
 
+drop trigger if exists leave_requests_balance_sync on public.leave_requests;
 create trigger leave_requests_balance_sync
   after update on public.leave_requests
   for each row execute function public.tg_leave_request_balance();
@@ -194,7 +200,7 @@ create trigger leave_requests_balance_sync
 -- 2. audit_log
 -- ----------------------------------------------------------------------------
 
-create table public.audit_log (
+create table if not exists public.audit_log (
   id            bigserial primary key,
   company_id    uuid not null,
   actor_id      uuid,   -- auth.users.id; null for system actions
@@ -206,12 +212,13 @@ create table public.audit_log (
   created_at    timestamptz default now() not null
 );
 
-create index idx_audit_log_company   on public.audit_log(company_id, created_at desc);
-create index idx_audit_log_table_row on public.audit_log(table_name, row_id);
-create index idx_audit_log_actor     on public.audit_log(actor_id);
+create index if not exists idx_audit_log_company   on public.audit_log(company_id, created_at desc);
+create index if not exists idx_audit_log_table_row on public.audit_log(table_name, row_id);
+create index if not exists idx_audit_log_actor     on public.audit_log(actor_id);
 
 alter table public.audit_log enable row level security;
 
+drop policy if exists "hr_view_audit_log" on public.audit_log;
 create policy "hr_view_audit_log"
   on public.audit_log for select
   using (company_id = public.current_company_id() and public.is_hr());
@@ -266,34 +273,42 @@ $$;
 
 -- Attach the trigger to high-value tables. Read-heavy tables (attendance,
 -- interactions) are skipped to keep insert cost low; we can extend later.
+drop trigger if exists audit_employees on public.employees;
 create trigger audit_employees
   after insert or update or delete on public.employees
   for each row execute function public.tg_write_audit_log();
 
+drop trigger if exists audit_payroll_periods on public.payroll_periods;
 create trigger audit_payroll_periods
   after insert or update or delete on public.payroll_periods
   for each row execute function public.tg_write_audit_log();
 
+drop trigger if exists audit_payroll_entries on public.payroll_entries;
 create trigger audit_payroll_entries
   after insert or update or delete on public.payroll_entries
   for each row execute function public.tg_write_audit_log();
 
+drop trigger if exists audit_leave_requests on public.leave_requests;
 create trigger audit_leave_requests
   after insert or update or delete on public.leave_requests
   for each row execute function public.tg_write_audit_log();
 
+drop trigger if exists audit_advance_requests on public.advance_requests;
 create trigger audit_advance_requests
   after insert or update or delete on public.advance_requests
   for each row execute function public.tg_write_audit_log();
 
+drop trigger if exists audit_permission_requests on public.permission_requests;
 create trigger audit_permission_requests
   after insert or update or delete on public.permission_requests
   for each row execute function public.tg_write_audit_log();
 
+drop trigger if exists audit_contracts on public.contracts;
 create trigger audit_contracts
   after insert or update or delete on public.contracts
   for each row execute function public.tg_write_audit_log();
 
+drop trigger if exists audit_team_invitations on public.team_invitations;
 create trigger audit_team_invitations
   after insert or update or delete on public.team_invitations
   for each row execute function public.tg_write_audit_log();
