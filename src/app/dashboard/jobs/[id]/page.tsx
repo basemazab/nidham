@@ -10,6 +10,8 @@ import {
   type ApplicationStatus,
   type AiRecommendation,
 } from "@/lib/recruitment";
+import { CopyButton } from "@/components/copy-button";
+import { headers } from "next/headers";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -29,6 +31,8 @@ type Job = {
   salary_max: number | null;
   experience_years_min: number | null;
   status: "draft" | "open" | "closed" | "filled" | "cancelled";
+  is_public: boolean;
+  slug: string | null;
   posted_at: string | null;
 };
 
@@ -91,6 +95,15 @@ export default async function JobDetailPage({ params }: PageProps) {
   if (!jobRes.data) notFound();
   const job = jobRes.data;
   const apps = appsRes.data ?? [];
+
+  // Build the public URL when this job is published
+  let publicUrl: string | null = null;
+  if (job.is_public && job.status === "open" && job.slug) {
+    const h = await headers();
+    const host = h.get("host") ?? "";
+    const proto = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
+    publicUrl = `${proto}://${host}/jobs/${job.slug}`;
+  }
 
   // Funnel stats
   const counts = apps.reduce(
@@ -168,6 +181,31 @@ export default async function JobDetailPage({ params }: PageProps) {
             </form>
           </div>
         </header>
+
+        {/* Public URL banner */}
+        {publicUrl && (
+          <div className="mb-6 bg-gradient-to-l from-cyan-50 to-emerald-50 border-2 border-brand-cyan/30 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-xs font-bold text-cyan-700 mb-1 font-cairo">
+                ✦ الوظيفة منشورة على بورتال نِظام
+              </div>
+              <a
+                href={publicUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm font-mono text-slate-700 hover:text-brand-cyan-dark truncate block"
+                dir="ltr"
+              >
+                {publicUrl}
+              </a>
+            </div>
+            <CopyButton
+              text={publicUrl}
+              className="shrink-0 px-3 py-1.5 rounded-lg bg-white border border-cyan-200 text-cyan-700 font-bold text-xs hover:bg-cyan-50 transition font-cairo"
+              copiedClassName="shrink-0 px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 font-bold text-xs font-cairo"
+            />
+          </div>
+        )}
 
         {/* Funnel cards */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">

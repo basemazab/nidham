@@ -101,6 +101,7 @@ export async function createJob(formData: FormData) {
       salary_max: asNumber(formData.get("salary_max")),
       experience_years_min: asInt(formData.get("experience_years_min")) ?? 0,
       status: asText(formData.get("status")) ?? "open",
+      is_public: asBool(formData.get("is_public")),
       slug,
       created_by: user?.id ?? null,
     })
@@ -144,6 +145,7 @@ export async function updateJob(jobId: string, formData: FormData) {
       salary_max: asNumber(formData.get("salary_max")),
       experience_years_min: asInt(formData.get("experience_years_min")) ?? 0,
       status: asText(formData.get("status")) ?? "open",
+      is_public: asBool(formData.get("is_public")),
     })
     .eq("id", jobId);
 

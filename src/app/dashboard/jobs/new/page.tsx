@@ -156,16 +156,38 @@ export default async function NewJobPage({
               </div>
             </div>
 
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                name="remote_ok"
-                className="w-4 h-4 rounded border-slate-300 text-brand-cyan focus:ring-brand-cyan"
-              />
-              <span className="text-sm text-slate-700 font-cairo">
-                يقبل العمل عن بُعد
-              </span>
-            </label>
+            <div className="space-y-3 bg-slate-50 rounded-lg p-4 border border-slate-100">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="remote_ok"
+                  className="w-4 h-4 rounded border-slate-300 text-brand-cyan focus:ring-brand-cyan"
+                />
+                <span className="text-sm text-slate-700 font-cairo">
+                  يقبل العمل عن بُعد
+                </span>
+              </label>
+
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="is_public"
+                  defaultChecked
+                  className="mt-0.5 w-4 h-4 rounded border-slate-300 text-brand-cyan focus:ring-brand-cyan"
+                />
+                <span className="text-sm text-slate-700 font-cairo">
+                  <strong>انشر على بورتال نِظام العام ✦</strong>
+                  <br />
+                  <span className="text-xs text-slate-500">
+                    أي حد يقدر يشوف الوظيفة دي على{" "}
+                    <code className="font-mono text-[10px] bg-white px-1 rounded">
+                      nidham.com/jobs
+                    </code>{" "}
+                    ويقدم بدون تسجيل دخول.
+                  </span>
+                </span>
+              </label>
+            </div>
 
             {/* Description */}
             <div className="border-t border-slate-100 pt-5">
