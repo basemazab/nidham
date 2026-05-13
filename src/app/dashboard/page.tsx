@@ -22,28 +22,47 @@ export default async function DashboardPage() {
   }
 
   // Fetch everything in parallel
-  const [profileRes, employeesCount, customersCount, interactionsCount] =
-    await Promise.all([
-      supabase
-        .from("profiles")
-        .select("full_name, role, companies(name, industry)")
-        .eq("id", user.id)
-        .single<Profile>(),
-      supabase
-        .from("employees")
-        .select("id", { count: "exact", head: true }),
-      supabase
-        .from("customers")
-        .select("id", { count: "exact", head: true }),
-      supabase
-        .from("interactions")
-        .select("id", { count: "exact", head: true }),
-    ]);
+  const [
+    profileRes,
+    employeesCount,
+    customersCount,
+    interactionsCount,
+    subscriptionRes,
+  ] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("full_name, role, companies(name, industry)")
+      .eq("id", user.id)
+      .single<Profile>(),
+    supabase.from("employees").select("id", { count: "exact", head: true }),
+    supabase.from("customers").select("id", { count: "exact", head: true }),
+    supabase
+      .from("interactions")
+      .select("id", { count: "exact", head: true }),
+    supabase
+      .from("subscriptions")
+      .select("plan, status, ends_at")
+      .single<{ plan: string; status: string; ends_at: string }>(),
+  ]);
 
   const profile = profileRes.data;
   const empCount = employeesCount.count ?? 0;
   const custCount = customersCount.count ?? 0;
   const intCount = interactionsCount.count ?? 0;
+
+  const subscription = subscriptionRes.data;
+  const subDaysLeft = subscription
+    ? Math.round(
+        (new Date(subscription.ends_at + "T00:00:00").getTime() - Date.now()) /
+          (1000 * 60 * 60 * 24),
+      )
+    : 0;
+  const subPlanLabel: Record<string, string> = {
+    trial: "تجريبية",
+    basic: "Basic",
+    pro: "Pro",
+    enterprise: "Enterprise",
+  };
 
   const displayName = profile?.full_name ?? user.email?.split("@")[0] ?? "مستخدم";
   const companyName = profile?.companies?.name ?? "—";
@@ -87,6 +106,40 @@ export default async function DashboardPage() {
                 {user.email}
               </p>
             </div>
+
+            {/* Subscription badge */}
+            {subscription && (
+              <Link
+                href="/dashboard/subscription"
+                className={`flex flex-col items-center justify-center px-4 py-3 rounded-xl border-2 transition hover:-translate-y-0.5 ${
+                  subscription.status === "trial"
+                    ? subDaysLeft <= 3
+                      ? "bg-red-50 border-red-300 hover:border-red-500"
+                      : "bg-amber-50 border-amber-300 hover:border-amber-500"
+                    : "bg-emerald-50 border-emerald-200 hover:border-emerald-400"
+                }`}
+              >
+                <div className="text-[10px] text-slate-500 tracking-wider font-cairo">
+                  💎 خطتك
+                </div>
+                <div className="text-lg font-black text-slate-800 font-cairo">
+                  {subPlanLabel[subscription.plan] ?? subscription.plan}
+                </div>
+                <div
+                  className={`text-xs font-bold font-cairo ${
+                    subscription.status === "trial"
+                      ? subDaysLeft <= 3
+                        ? "text-red-600"
+                        : "text-amber-700"
+                      : "text-emerald-700"
+                  }`}
+                >
+                  {subDaysLeft >= 0
+                    ? `${subDaysLeft} يوم متبقي`
+                    : `انتهت من ${Math.abs(subDaysLeft)} يوم`}
+                </div>
+              </Link>
+            )}
           </div>
         </div>
 

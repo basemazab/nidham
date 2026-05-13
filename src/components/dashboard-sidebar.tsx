@@ -70,10 +70,21 @@ export function DashboardSidebar({ userName, companyName, userEmail }: Props) {
   );
 
   const UserFooter = () => (
-    <div className="p-3 border-t border-slate-100 bg-slate-50/50">
+    <div className="p-3 border-t border-slate-100 bg-slate-50/50 space-y-1">
+      <Link
+        href="/dashboard/subscription"
+        className={`flex items-center gap-2 px-3 py-2 rounded-lg transition font-cairo text-sm ${
+          isActive("/dashboard/subscription")
+            ? "bg-amber-50 text-amber-700 font-bold"
+            : "text-slate-600 hover:bg-slate-100"
+        }`}
+      >
+        <span>💎</span>
+        <span>خطتك واشتراكك</span>
+      </Link>
       <Link
         href="/dashboard/profile"
-        className={`block px-3 py-2 rounded-lg transition mb-1 ${
+        className={`block px-3 py-2 rounded-lg transition ${
           isActive("/dashboard/profile") ? "bg-brand-cyan/10" : "hover:bg-slate-100"
         }`}
       >
