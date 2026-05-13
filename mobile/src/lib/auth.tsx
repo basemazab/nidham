@@ -51,14 +51,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   // Initial load: restore the persisted session from SecureStore.
+  // We give the storage + Supabase auth at most 5 seconds before we
+  // give up and render the (logged-out) login screen. Without the
+  // safety net, a flaky SecureStore read or network blip would leave
+  // the app stuck on the splash spinner forever.
   useEffect(() => {
     let mounted = true;
-    (async () => {
-      const { data } = await supabase.auth.getSession();
+    let bailed = false;
+    const bailTimer = setTimeout(() => {
       if (!mounted) return;
-      setSession(data.session);
-      await resolveEmployee(data.session);
+      bailed = true;
+      console.warn("Auth init timed out after 5s -- proceeding logged out");
       setLoading(false);
+    }, 5000);
+
+    (async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        if (!mounted || bailed) return;
+        setSession(data.session);
+        await resolveEmployee(data.session);
+      } catch (err) {
+        console.warn("Auth init failed", err);
+      } finally {
+        clearTimeout(bailTimer);
+        if (mounted && !bailed) setLoading(false);
+      }
     })();
     const { data: subscription } = supabase.auth.onAuthStateChange(
       async (_event, newSession) => {
