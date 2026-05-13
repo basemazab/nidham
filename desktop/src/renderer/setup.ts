@@ -71,7 +71,20 @@ form.addEventListener("submit", async (e) => {
   setStatus("loading", "بنحفظ ونفتح Nidham...");
   toggleButtons(true);
 
-  const result = await window.nidham.saveAndOpen(url);
+  let result: Awaited<ReturnType<typeof window.nidham.saveAndOpen>>;
+  try {
+    result = await window.nidham.saveAndOpen(url);
+  } catch (err) {
+    // window.nidham would be missing if the preload script failed to load
+    // (path bug, sandbox restriction, etc.) — surface it clearly instead
+    // of leaving the form locked in the loading state.
+    toggleButtons(false);
+    setStatus(
+      "error",
+      `✗ IPC error: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    return;
+  }
 
   if (!result.ok || !result.sanitizedUrl) {
     toggleButtons(false);
@@ -79,10 +92,9 @@ form.addEventListener("submit", async (e) => {
     return;
   }
 
-  // Navigate this same window to the Nidham server we just saved.
-  // We do it from the renderer (not via main.loadURL) so the IPC
-  // promise resolves first and the navigation happens in a single,
-  // predictable step instead of two racing async paths.
+  // Navigate this same window to the Nidham server we just saved. Doing
+  // it from the renderer (instead of mainWindow.loadURL) keeps the IPC
+  // reply and the navigation in a single deterministic JS context.
   setStatus("loading", `بنفتح ${result.sanitizedUrl}...`);
   window.location.href = result.sanitizedUrl;
 });

@@ -17,6 +17,13 @@ if (require("electron-squirrel-startup")) {
   app.quit();
 }
 
+// Enable Chrome DevTools Protocol on port 9222 in dev mode so we can
+// automate / inspect the renderer remotely (e.g. via Puppeteer or curl
+// against /json/version). Harmless if no one connects.
+if (!app.isPackaged) {
+  app.commandLine.appendSwitch("remote-debugging-port", "9222");
+}
+
 // Globals injected by electron-forge's Vite plugin. They point to the
 // built setup-window HTML at runtime.
 declare const SETUP_WINDOW_VITE_DEV_SERVER_URL: string | undefined;
@@ -44,7 +51,13 @@ function createWindow(loadUrl: string, isSetup: boolean): BrowserWindow {
     icon: path.join(process.resourcesPath, "assets", "icon.png"),
     autoHideMenuBar: isSetup, // hide menu on first-run setup
     webPreferences: {
-      preload: path.join(__dirname, "../preload/preload.js"),
+      // Both main.js and preload.js end up in .vite/build/ side by side
+      // -- electron-forge plugin-vite emits all targets into the same
+      // build directory. Pointing this at "../preload/preload.js" used
+      // to send Electron looking for .vite/preload/preload.js, which
+      // doesn't exist; the preload silently failed to load and the
+      // renderer's window.nidham bridge was undefined.
+      preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false, // off so preload can use 'electron' module
@@ -162,13 +175,18 @@ ipcMain.handle("setup:test-connection", async (_evt, rawUrl: string) => {
 ipcMain.handle("setup:save-and-open", (_evt, rawUrl: string) => {
   const url = sanitizeUrl(rawUrl);
   if (!url) return { ok: false, error: "URL مش صحيح" };
-  setServerUrl(url);
+  try {
+    setServerUrl(url);
+  } catch (err) {
+    return {
+      ok: false,
+      error: `فشل الحفظ: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
 
   // Reveal the app menu now that we're leaving setup mode. The renderer
-  // takes care of the actual navigation (window.location.href = url)
-  // -- doing it there keeps the IPC promise + navigation strictly
-  // ordered in a single JS context, instead of relying on setImmediate
-  // and the main-process loadURL racing the IPC reply.
+  // takes care of the actual navigation (window.location.href = url) so
+  // the IPC reply + navigation stay in a single JS context.
   if (mainWindow && !mainWindow.isDestroyed()) {
     Menu.setApplicationMenu(buildAppMenu(() => mainWindow));
     mainWindow.setAutoHideMenuBar(false);
