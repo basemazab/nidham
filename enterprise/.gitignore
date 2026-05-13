@@ -1,0 +1,11 @@
+# Real secrets — only the .env.example template is tracked
+.env
+.env.local
+
+# Backups created locally
+backups/
+
+# Volume snapshots if anyone exports them
+*.sql
+*.sql.gz
+!migrations/*.sql

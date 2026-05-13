@@ -1,0 +1,161 @@
+# ============================================================================
+# Nidham Enterprise Edition — full self-hosted stack
+#
+# Brings up everything Nidham needs on a single Windows / Linux server:
+#
+#   • db    — PostgreSQL 15 (Supabase's image, ships with auth/storage
+#             schemas + RLS helpers pre-installed)
+#   • auth  — GoTrue (handles signup/login/JWT — replaces Supabase Auth cloud)
+#   • rest  — PostgREST (the REST API the JS client talks to)
+#   • kong  — API gateway that fronts auth + rest under a single URL
+#   • app   — the Nidham Next.js app itself
+#
+# First-time setup:
+#   1. cp .env.example .env
+#   2. powershell scripts/generate-keys.ps1      # writes JWT_SECRET/ANON/SERVICE
+#   3. docker compose up -d
+#   4. powershell scripts/apply-migrations.ps1   # runs the 14 SQL files
+# ============================================================================
+
+name: nidham
+
+services:
+  # --------------------------------------------------------------------------
+  # PostgreSQL — Supabase's flavour with auth + storage schemas baked in
+  # --------------------------------------------------------------------------
+  db:
+    image: supabase/postgres:15.1.1.78
+    container_name: nidham-db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_HOST: /var/run/postgresql
+      PGPORT: 5432
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: postgres
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXP: 3600
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      # Migrations are NOT mounted into /docker-entrypoint-initdb.d/.
+      # We apply them with scripts/apply-migrations.ps1 AFTER the container is
+      # up, which gives Supabase's own init scripts time to set up auth roles
+      # and schemas first. Initdb scripts only run once on volume creation;
+      # this two-step flow is easier to debug and idempotent across upgrades.
+      - ./migrations:/migrations:ro
+
+  # --------------------------------------------------------------------------
+  # GoTrue — Supabase Auth, self-hosted
+  # Handles signup, login, password reset, JWT issuance. Same API as cloud.
+  # --------------------------------------------------------------------------
+  auth:
+    image: supabase/gotrue:v2.158.1
+    container_name: nidham-auth
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: 9999
+      API_EXTERNAL_URL: ${SITE_URL}
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD}@db:5432/postgres
+      GOTRUE_SITE_URL: ${SITE_URL}
+      GOTRUE_URI_ALLOW_LIST: ${ADDITIONAL_REDIRECT_URLS:-${SITE_URL}}
+      GOTRUE_DISABLE_SIGNUP: "false"
+      GOTRUE_JWT_ADMIN_ROLES: service_role
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_JWT_EXP: 3600
+      GOTRUE_JWT_SECRET: ${JWT_SECRET}
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
+      GOTRUE_MAILER_AUTOCONFIRM: ${MAILER_AUTOCONFIRM:-true}
+      GOTRUE_SMTP_ADMIN_EMAIL: ${SMTP_ADMIN_EMAIL:-admin@example.com}
+      GOTRUE_SMTP_HOST: ${SMTP_HOST:-}
+      GOTRUE_SMTP_PORT: ${SMTP_PORT:-587}
+      GOTRUE_SMTP_USER: ${SMTP_USER:-}
+      GOTRUE_SMTP_PASS: ${SMTP_PASS:-}
+      GOTRUE_SMTP_SENDER_NAME: ${SMTP_SENDER_NAME:-Nidham}
+      GOTRUE_MAILER_URLPATHS_INVITE: /auth/callback
+      GOTRUE_MAILER_URLPATHS_CONFIRMATION: /auth/callback
+      GOTRUE_MAILER_URLPATHS_RECOVERY: /auth/reset
+      GOTRUE_MAILER_URLPATHS_EMAIL_CHANGE: /auth/callback
+
+  # --------------------------------------------------------------------------
+  # PostgREST — exposes the public schema as a REST API
+  # This is what @supabase/supabase-js calls under the hood.
+  # --------------------------------------------------------------------------
+  rest:
+    image: postgrest/postgrest:v12.2.0
+    container_name: nidham-rest
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGRST_DB_URI: postgres://authenticator:${POSTGRES_PASSWORD}@db:5432/postgres
+      PGRST_DB_SCHEMAS: public,storage
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+      PGRST_DB_USE_LEGACY_GUCS: "false"
+      PGRST_APP_SETTINGS_JWT_SECRET: ${JWT_SECRET}
+      PGRST_APP_SETTINGS_JWT_EXP: 3600
+
+  # --------------------------------------------------------------------------
+  # Kong API gateway
+  # Fronts /auth/* (→ gotrue) and /rest/v1/* (→ postgrest) under one URL
+  # so the Nidham app sees a single Supabase-shaped endpoint.
+  # --------------------------------------------------------------------------
+  kong:
+    image: kong:2.8.1
+    container_name: nidham-kong
+    restart: unless-stopped
+    depends_on:
+      - auth
+      - rest
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /var/lib/kong/kong.yml
+      KONG_DNS_ORDER: LAST,A,CNAME
+      KONG_PLUGINS: request-transformer,cors,key-auth
+      KONG_NGINX_PROXY_PROXY_BUFFER_SIZE: 160k
+      KONG_NGINX_PROXY_PROXY_BUFFERS: 64 160k
+    ports:
+      - "${KONG_HTTP_PORT:-8000}:8000"
+      - "${KONG_HTTPS_PORT:-8443}:8443"
+    volumes:
+      - ./kong/kong.yml:/var/lib/kong/kong.yml:ro
+
+  # --------------------------------------------------------------------------
+  # Nidham Next.js app
+  # Built from the repo root via enterprise/Dockerfile.
+  # --------------------------------------------------------------------------
+  app:
+    build:
+      context: ..
+      dockerfile: enterprise/Dockerfile
+      args:
+        NEXT_PUBLIC_SUPABASE_URL: ${SITE_URL}
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${ANON_KEY}
+    container_name: nidham-app
+    restart: unless-stopped
+    depends_on:
+      - kong
+    environment:
+      NEXT_PUBLIC_SUPABASE_URL: ${SITE_URL}
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${ANON_KEY}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+    ports:
+      - "${APP_PORT:-3000}:3000"
+
+volumes:
+  db-data:
+    name: nidham-db-data
