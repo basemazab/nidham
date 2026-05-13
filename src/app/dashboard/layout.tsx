@@ -29,7 +29,7 @@ export default async function DashboardLayout({
   const companyName = profile?.companies?.name ?? "—";
 
   return (
-    <div className="flex min-h-screen bg-slate-50">
+    <div className="flex flex-col md:flex-row min-h-screen bg-slate-50">
       <DashboardSidebar
         userName={userName}
         companyName={companyName}
