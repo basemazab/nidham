@@ -10,6 +10,14 @@ create table public.super_admins (
   created_at  timestamp with time zone default now() not null
 );
 
+-- RLS on the table itself: users can only see their own row (so the layout
+-- can check "am I a super admin?" without exposing the full admin list).
+alter table public.super_admins enable row level security;
+
+create policy "users_can_check_own_super_admin"
+  on public.super_admins for select
+  using (user_id = auth.uid());
+
 -- Helper — is the current user a super admin?
 create or replace function public.is_super_admin()
 returns boolean
