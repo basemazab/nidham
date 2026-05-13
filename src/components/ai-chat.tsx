@@ -1,6 +1,7 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
+import { DefaultChatTransport } from "ai";
 import { useState, useRef, useEffect } from "react";
 
 const SUGGESTED_QUESTIONS = [
@@ -14,7 +15,9 @@ const SUGGESTED_QUESTIONS = [
 
 export function AIChat() {
   const [input, setInput] = useState("");
-  const { messages, sendMessage, status, error } = useChat();
+  const { messages, sendMessage, status, error } = useChat({
+    transport: new DefaultChatTransport({ api: "/api/ai/chat" }),
+  });
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
