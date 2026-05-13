@@ -164,12 +164,18 @@ ipcMain.handle("setup:save-and-open", (_evt, rawUrl: string) => {
   if (!url) return { ok: false, error: "URL مش صحيح" };
   setServerUrl(url);
 
-  // Swap the setup window for the real app window
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.close();
-  }
+  // ORDER MATTERS: open the new window BEFORE closing the setup one.
+  //
+  // If we close first, BrowserWindow.getAllWindows() momentarily returns
+  // an empty array, the 'window-all-closed' listener fires, app.quit()
+  // is called on Windows -- and the new window we try to create here
+  // never makes it on screen.
+  const oldWindow = mainWindow;
   mainWindow = createWindow(url, /* isSetup */ false);
   Menu.setApplicationMenu(buildAppMenu(() => mainWindow));
+  if (oldWindow && !oldWindow.isDestroyed()) {
+    oldWindow.close();
+  }
   return { ok: true };
 });
 
