@@ -16,6 +16,7 @@ const NAV_ITEMS = [
   { href: "/dashboard", label: "الرئيسية", icon: "🏠", section: "main" },
   { href: "/dashboard/employees", label: "الموظفين", icon: "👥", section: "main" },
   { href: "/dashboard/attendance", label: "الحضور", icon: "⏰", section: "main" },
+  { href: "/dashboard/payroll", label: "الرواتب", icon: "💰", section: "main" },
   { href: "/dashboard/customers", label: "العملاء", icon: "💼", section: "main" },
   { href: "/dashboard/interactions", label: "التفاعلات", icon: "💬", section: "main" },
   { href: "/dashboard/contracts", label: "العقود", icon: "📋", section: "main" },

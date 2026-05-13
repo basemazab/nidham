@@ -127,32 +127,141 @@ export default async function NewEmployeePage({
               </div>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="hire_date" className="block text-sm font-medium text-slate-700 mb-2 font-cairo">
-                  تاريخ التعيين
-                </label>
-                <input
-                  id="hire_date"
-                  name="hire_date"
-                  type="date"
-                  className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none transition text-slate-900"
-                />
-              </div>
+            <div>
+              <label htmlFor="hire_date" className="block text-sm font-medium text-slate-700 mb-2 font-cairo">
+                تاريخ التعيين
+              </label>
+              <input
+                id="hire_date"
+                name="hire_date"
+                type="date"
+                className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none transition text-slate-900"
+              />
+            </div>
 
-              <div>
-                <label htmlFor="basic_salary" className="block text-sm font-medium text-slate-700 mb-2 font-cairo">
-                  الراتب الأساسي (جنيه)
-                </label>
-                <input
-                  id="basic_salary"
-                  name="basic_salary"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  placeholder="5000"
-                  className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none transition text-slate-900"
-                />
+            {/* Salary structure — feeds the payroll module */}
+            <div className="border-t border-slate-100 pt-5">
+              <h3 className="text-sm font-bold text-slate-800 mb-1 font-cairo">💰 هيكل الراتب</h3>
+              <p className="text-xs text-slate-500 mb-3 font-cairo">
+                دي القيم اللي السيستم هيستخدمها لما تحسب المرتب الشهري. اتركها صفر لو الموظف لسه مش معتمد عليه راتب.
+              </p>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="basic_salary" className="block text-sm font-medium text-slate-700 mb-2 font-cairo">
+                    الراتب الأساسي (جنيه)
+                  </label>
+                  <input
+                    id="basic_salary"
+                    name="basic_salary"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="5000"
+                    className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none transition text-slate-900"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="housing_allowance" className="block text-sm font-medium text-slate-700 mb-2 font-cairo">
+                    بدل سكن
+                  </label>
+                  <input
+                    id="housing_allowance"
+                    name="housing_allowance"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0"
+                    className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none transition text-slate-900"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="transport_allowance" className="block text-sm font-medium text-slate-700 mb-2 font-cairo">
+                    بدل انتقال
+                  </label>
+                  <input
+                    id="transport_allowance"
+                    name="transport_allowance"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0"
+                    className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none transition text-slate-900"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="other_allowances" className="block text-sm font-medium text-slate-700 mb-2 font-cairo">
+                    بدلات أخرى
+                  </label>
+                  <input
+                    id="other_allowances"
+                    name="other_allowances"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0"
+                    className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none transition text-slate-900"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Identity & compliance */}
+            <div className="border-t border-slate-100 pt-5">
+              <h3 className="text-sm font-bold text-slate-800 mb-1 font-cairo">🪪 بيانات قانونية</h3>
+              <p className="text-xs text-slate-500 mb-3 font-cairo">
+                مهمة للقسائم والتأمينات والضريبة — لو مش متوفرة دلوقتي ممكن تضيفها بعدين.
+              </p>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="national_id" className="block text-sm font-medium text-slate-700 mb-2 font-cairo">
+                    الرقم القومي
+                  </label>
+                  <input
+                    id="national_id"
+                    name="national_id"
+                    type="text"
+                    inputMode="numeric"
+                    dir="ltr"
+                    placeholder="14 رقم"
+                    className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none transition text-slate-900 text-right font-mono"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="social_insurance_number" className="block text-sm font-medium text-slate-700 mb-2 font-cairo">
+                    رقم التأمينات
+                  </label>
+                  <input
+                    id="social_insurance_number"
+                    name="social_insurance_number"
+                    type="text"
+                    dir="ltr"
+                    className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none transition text-slate-900 text-right font-mono"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="bank_name" className="block text-sm font-medium text-slate-700 mb-2 font-cairo">
+                    البنك
+                  </label>
+                  <input
+                    id="bank_name"
+                    name="bank_name"
+                    type="text"
+                    placeholder="مثلًا: CIB"
+                    className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none transition text-slate-900"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="bank_account_number" className="block text-sm font-medium text-slate-700 mb-2 font-cairo">
+                    رقم الحساب البنكي / IBAN
+                  </label>
+                  <input
+                    id="bank_account_number"
+                    name="bank_account_number"
+                    type="text"
+                    dir="ltr"
+                    className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none transition text-slate-900 text-right font-mono"
+                  />
+                </div>
               </div>
             </div>
 

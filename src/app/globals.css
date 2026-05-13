@@ -29,3 +29,35 @@ body {
   color: var(--foreground);
   font-family: var(--font-tajawal), Arial, Helvetica, sans-serif;
 }
+
+/* Print: hide chrome (sidebar, header, etc.), keep only .print-area visible.
+   Used by the payroll payslip page. */
+@media print {
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+
+  body {
+    background: #ffffff !important;
+  }
+
+  /* Hide the dashboard sidebar/header when printing a payslip */
+  aside,
+  header {
+    display: none !important;
+  }
+
+  /* Make the main content take the full page */
+  main {
+    padding: 0 !important;
+    background: #ffffff !important;
+    min-height: auto !important;
+  }
+
+  /* Avoid splitting the payslip mid-page */
+  article {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}

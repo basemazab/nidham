@@ -18,6 +18,13 @@ type Employee = {
   email: string | null;
   hire_date: string | null;
   basic_salary: number | null;
+  housing_allowance: number | null;
+  transport_allowance: number | null;
+  other_allowances: number | null;
+  national_id: string | null;
+  social_insurance_number: string | null;
+  bank_name: string | null;
+  bank_account_number: string | null;
   status: "active" | "on_leave" | "terminated";
   notes: string | null;
   created_at: string;
@@ -154,28 +161,131 @@ export default async function EditEmployeePage({ params, searchParams }: PagePro
               </div>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="hire_date" className="block text-sm font-medium text-slate-700 mb-2 font-cairo">تاريخ التعيين</label>
-                <input
-                  id="hire_date"
-                  name="hire_date"
-                  type="date"
-                  defaultValue={employee.hire_date ?? ""}
-                  className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none transition text-slate-900"
-                />
+            <div>
+              <label htmlFor="hire_date" className="block text-sm font-medium text-slate-700 mb-2 font-cairo">تاريخ التعيين</label>
+              <input
+                id="hire_date"
+                name="hire_date"
+                type="date"
+                defaultValue={employee.hire_date ?? ""}
+                className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none transition text-slate-900"
+              />
+            </div>
+
+            {/* Salary structure — feeds the payroll module */}
+            <div className="border-t border-slate-100 pt-5">
+              <h3 className="text-sm font-bold text-slate-800 mb-1 font-cairo">💰 هيكل الراتب</h3>
+              <p className="text-xs text-slate-500 mb-3 font-cairo">
+                دي القيم اللي السيستم هيستخدمها لما تحسب المرتب الشهري.
+              </p>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="basic_salary" className="block text-sm font-medium text-slate-700 mb-2 font-cairo">الراتب الأساسي (جنيه)</label>
+                  <input
+                    id="basic_salary"
+                    name="basic_salary"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    defaultValue={employee.basic_salary ?? ""}
+                    className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none transition text-slate-900"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="housing_allowance" className="block text-sm font-medium text-slate-700 mb-2 font-cairo">بدل سكن</label>
+                  <input
+                    id="housing_allowance"
+                    name="housing_allowance"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    defaultValue={employee.housing_allowance ?? ""}
+                    placeholder="0"
+                    className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none transition text-slate-900"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="transport_allowance" className="block text-sm font-medium text-slate-700 mb-2 font-cairo">بدل انتقال</label>
+                  <input
+                    id="transport_allowance"
+                    name="transport_allowance"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    defaultValue={employee.transport_allowance ?? ""}
+                    placeholder="0"
+                    className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none transition text-slate-900"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="other_allowances" className="block text-sm font-medium text-slate-700 mb-2 font-cairo">بدلات أخرى</label>
+                  <input
+                    id="other_allowances"
+                    name="other_allowances"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    defaultValue={employee.other_allowances ?? ""}
+                    placeholder="0"
+                    className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none transition text-slate-900"
+                  />
+                </div>
               </div>
-              <div>
-                <label htmlFor="basic_salary" className="block text-sm font-medium text-slate-700 mb-2 font-cairo">الراتب الأساسي (جنيه)</label>
-                <input
-                  id="basic_salary"
-                  name="basic_salary"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  defaultValue={employee.basic_salary ?? ""}
-                  className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none transition text-slate-900"
-                />
+            </div>
+
+            {/* Identity & compliance */}
+            <div className="border-t border-slate-100 pt-5">
+              <h3 className="text-sm font-bold text-slate-800 mb-1 font-cairo">🪪 بيانات قانونية</h3>
+              <p className="text-xs text-slate-500 mb-3 font-cairo">
+                مهمة للقسائم والتأمينات والضريبة.
+              </p>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="national_id" className="block text-sm font-medium text-slate-700 mb-2 font-cairo">الرقم القومي</label>
+                  <input
+                    id="national_id"
+                    name="national_id"
+                    type="text"
+                    inputMode="numeric"
+                    dir="ltr"
+                    defaultValue={employee.national_id ?? ""}
+                    placeholder="14 رقم"
+                    className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none transition text-slate-900 text-right font-mono"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="social_insurance_number" className="block text-sm font-medium text-slate-700 mb-2 font-cairo">رقم التأمينات</label>
+                  <input
+                    id="social_insurance_number"
+                    name="social_insurance_number"
+                    type="text"
+                    dir="ltr"
+                    defaultValue={employee.social_insurance_number ?? ""}
+                    className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none transition text-slate-900 text-right font-mono"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="bank_name" className="block text-sm font-medium text-slate-700 mb-2 font-cairo">البنك</label>
+                  <input
+                    id="bank_name"
+                    name="bank_name"
+                    type="text"
+                    defaultValue={employee.bank_name ?? ""}
+                    placeholder="مثلًا: CIB"
+                    className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none transition text-slate-900"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="bank_account_number" className="block text-sm font-medium text-slate-700 mb-2 font-cairo">رقم الحساب البنكي / IBAN</label>
+                  <input
+                    id="bank_account_number"
+                    name="bank_account_number"
+                    type="text"
+                    dir="ltr"
+                    defaultValue={employee.bank_account_number ?? ""}
+                    className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none transition text-slate-900 text-right font-mono"
+                  />
+                </div>
               </div>
             </div>
 
