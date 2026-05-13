@@ -2,6 +2,10 @@
 out/
 .vite/
 
+# Distribution bundles (over GitHub's 100 MB file-size cap; share via
+# Drive / OneDrive / GitHub Releases instead)
+release/
+
 # Binary icon outputs are committed (so contributors don't need sharp)
 !assets/icon.png
 !assets/icon.ico
