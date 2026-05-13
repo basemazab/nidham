@@ -116,23 +116,43 @@ ipcMain.handle("setup:test-connection", async (_evt, rawUrl: string) => {
   const url = sanitizeUrl(rawUrl);
   if (!url) return { ok: false, error: "URL مش صحيح" };
 
-  // Use Electron's net module so we go through the same proxy/cookie jar
-  // the renderer eventually will, instead of Node's http (which doesn't).
+  // Hard timeout: Electron's net.request has NO default deadline and will
+  // happily wait forever on a wrong host. Without this, an HR typo would
+  // hang the spinner indefinitely.
+  const TIMEOUT_MS = 8000;
+
   return new Promise<{ ok: boolean; error?: string }>((resolve) => {
+    let settled = false;
+    const settle = (result: { ok: boolean; error?: string }) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      try {
+        req.abort();
+      } catch {
+        /* already finished */
+      }
+      resolve(result);
+    };
+
+    const timer = setTimeout(
+      () => settle({ ok: false, error: "السيرفر مش بيرد (انتهت المهلة 8 ثواني)" }),
+      TIMEOUT_MS,
+    );
+
     const req = net.request(`${url}/login`);
     req.on("response", (res) => {
       const status = res.statusCode ?? 0;
       if (status >= 200 && status < 500) {
-        resolve({ ok: true });
+        settle({ ok: true });
       } else {
-        resolve({ ok: false, error: `الخادم رد بـ HTTP ${status}` });
+        settle({ ok: false, error: `الخادم رد بـ HTTP ${status}` });
       }
-      // Drain so the connection closes cleanly
       res.on("data", () => undefined);
       res.on("end", () => undefined);
     });
     req.on("error", (err) => {
-      resolve({ ok: false, error: arabicizeNetError(err.message) });
+      settle({ ok: false, error: arabicizeNetError(err.message) });
     });
     req.setHeader("User-Agent", "Nidham-Desktop/1.0.0");
     req.end();
