@@ -11,6 +11,7 @@ type PageProps = {
 type Employee = {
   id: string;
   full_name: string;
+  employee_code: string | null;
   job_title: string | null;
   department: string | null;
   phone: string | null;
@@ -87,6 +88,22 @@ export default async function EditEmployeePage({ params, searchParams }: PagePro
                 required
                 defaultValue={employee.full_name}
                 className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none transition text-slate-900"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="employee_code" className="block text-sm font-medium text-slate-700 mb-2 font-cairo">
+                كود الموظف (لربط البصمة)
+                <span className="text-slate-400 text-xs mr-2">— نفس الكود اللي في جهاز ZKTeco</span>
+              </label>
+              <input
+                id="employee_code"
+                name="employee_code"
+                type="text"
+                dir="ltr"
+                defaultValue={employee.employee_code ?? ""}
+                placeholder="مثلًا: 100 أو EMP-042"
+                className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none transition text-slate-900 text-right font-mono"
               />
             </div>
 

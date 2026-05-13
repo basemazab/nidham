@@ -27,6 +27,7 @@ export async function createEmployee(formData: FormData) {
 
   const { error } = await supabase.from("employees").insert({
     full_name: fullName,
+    employee_code: asText(formData.get("employee_code")),
     job_title: asText(formData.get("job_title")),
     department: asText(formData.get("department")),
     phone: asText(formData.get("phone")),
@@ -65,6 +66,7 @@ export async function updateEmployee(id: string, formData: FormData) {
     .from("employees")
     .update({
       full_name: fullName,
+      employee_code: asText(formData.get("employee_code")),
       job_title: asText(formData.get("job_title")),
       department: asText(formData.get("department")),
       phone: asText(formData.get("phone")),

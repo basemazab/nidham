@@ -73,13 +73,22 @@ export default async function AttendancePage({
           </Link>
         </div>
 
-        <header className="mb-6">
-          <h1 className="text-3xl font-black font-cairo text-slate-800 mb-1">
-            تسجيل الحضور
-          </h1>
-          <p className="text-sm text-slate-500">
-            {formatArabicDate(selectedDate)} · {employees.length} موظف نشط
-          </p>
+        <header className="flex flex-wrap items-start justify-between gap-3 mb-6">
+          <div>
+            <h1 className="text-3xl font-black font-cairo text-slate-800 mb-1">
+              تسجيل الحضور
+            </h1>
+            <p className="text-sm text-slate-500">
+              {formatArabicDate(selectedDate)} · {employees.length} موظف نشط
+            </p>
+          </div>
+          <Link
+            href="/dashboard/attendance/import"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-bold text-sm shadow-md font-cairo transition"
+          >
+            <span>⚡</span>
+            <span>استيراد من ZKTeco / Excel</span>
+          </Link>
         </header>
 
         {/* Date selector */}

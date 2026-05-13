@@ -55,6 +55,21 @@ export default async function NewEmployeePage({
               />
             </div>
 
+            <div>
+              <label htmlFor="employee_code" className="block text-sm font-medium text-slate-700 mb-2 font-cairo">
+                كود الموظف (لربط البصمة)
+                <span className="text-slate-400 text-xs mr-2">— نفس الكود اللي في جهاز ZKTeco</span>
+              </label>
+              <input
+                id="employee_code"
+                name="employee_code"
+                type="text"
+                placeholder="مثلًا: 100 أو EMP-042"
+                dir="ltr"
+                className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none transition text-slate-900 text-right font-mono"
+              />
+            </div>
+
             <div className="grid md:grid-cols-2 gap-4">
               <div>
                 <label htmlFor="job_title" className="block text-sm font-medium text-slate-700 mb-2 font-cairo">
