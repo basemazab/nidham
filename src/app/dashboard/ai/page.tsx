@@ -24,10 +24,13 @@ export default async function AIPage() {
             ✦ AI Assistant
           </div>
           <h1 className="text-3xl font-black font-cairo text-slate-800 mb-1">
-            المساعد الذكي
+            المساعد الذكي للموارد البشرية
           </h1>
-          <p className="text-sm text-slate-500 font-cairo">
-            اسأل بالعربي عن أي بيانات في شركتك — موظفين، عملاء، حضور، Bridge — الـ AI هيحسبلك الرد في ثوانٍ.
+          <p className="text-sm text-slate-500 font-cairo leading-relaxed">
+            اسأل بالعربي عن قانون العمل المصري، التأمينات، الضرائب،
+            مكافأة نهاية الخدمة، الإجازات — أو عن بيانات شركتك وموظفينك
+            مباشرة. الـ AI متدرّب على قانون العمل 12/2003 وقانون التأمينات
+            148/2019.
           </p>
         </header>
 

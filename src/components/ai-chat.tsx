@@ -4,13 +4,18 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { useState, useRef, useEffect } from "react";
 
-const SUGGESTED_QUESTIONS = [
-  "مين أحسن موظف عندي الشهر ده؟",
-  "كم عميل في الـ Pipeline دلوقتي؟",
-  "إيه أكتر مصدر للعملاء؟",
-  "في موظف ملتزم بس مش منتج؟",
-  "كم تفاعل إيجابي حصل الشهر ده؟",
-  "اعملي ملخص سريع للشركة",
+// Two flavours of question on purpose: half about Egyptian labor law
+// (which the system prompt now teaches the model), half about the
+// company's actual data. Users learn that the AI handles both worlds.
+const SUGGESTED_QUESTIONS: { q: string; cat: "law" | "data" }[] = [
+  { q: "كام يوم إجازة سنوية بقانون العمل المصري؟", cat: "law" },
+  { q: "مين أحسن موظف عندي الشهر ده؟", cat: "data" },
+  { q: "ازاي أحسب مكافأة نهاية الخدمة؟", cat: "law" },
+  { q: "كام عميل في الـ Pipeline دلوقتي؟", cat: "data" },
+  { q: "ضريبة الدخل على مرتب 8000 ج كام؟", cat: "law" },
+  { q: "في موظف ملتزم بس مش منتج؟", cat: "data" },
+  { q: "إيه حقوق الموظف في إجازة الوضع؟", cat: "law" },
+  { q: "اعملي ملخص سريع للشركة", cat: "data" },
 ];
 
 export function AIChat() {
@@ -48,18 +53,27 @@ export function AIChat() {
             <h2 className="text-2xl font-black font-cairo text-slate-800 mb-1">
               مرحبًا، أنا نِظام AI
             </h2>
-            <p className="text-sm text-slate-500 mb-6 font-cairo max-w-md">
-              اسألني أي حاجة عن بيانات شركتك بالعربي — موظفين، عملاء، حضور، تفاعلات، تقارير.
+            <p className="text-sm text-slate-500 mb-6 font-cairo max-w-lg leading-relaxed">
+              مساعد موارد بشرية متخصص في السوق المصري. اسألني عن قانون العمل،
+              الإجازات، الضرائب، التأمينات، نهاية الخدمة، أو عن بيانات
+              شركتك وموظفيك مباشرة.
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-w-2xl w-full">
-              {SUGGESTED_QUESTIONS.map((q, i) => (
+              {SUGGESTED_QUESTIONS.map(({ q, cat }, i) => (
                 <button
                   key={i}
                   type="button"
                   onClick={() => handleSuggestionClick(q)}
-                  className="text-right px-4 py-3 rounded-xl border border-slate-200 hover:border-brand-cyan/40 hover:bg-slate-50 transition text-sm text-slate-700 font-cairo"
+                  className={`text-right px-4 py-3 rounded-xl border transition text-sm font-cairo ${
+                    cat === "law"
+                      ? "border-amber-200 hover:border-amber-300 hover:bg-amber-50 text-slate-700"
+                      : "border-cyan-200 hover:border-brand-cyan/40 hover:bg-cyan-50/50 text-slate-700"
+                  }`}
                 >
-                  💬 {q}
+                  <span className="text-xs opacity-60">
+                    {cat === "law" ? "⚖ قانون" : "📊 بياناتك"}
+                  </span>{" "}
+                  {q}
                 </button>
               ))}
             </div>
@@ -130,7 +144,7 @@ export function AIChat() {
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="اسأل عن أي حاجة في بياناتك..."
+          placeholder="اسأل عن قانون العمل، الضرائب، الإجازات، أو بيانات شركتك..."
           disabled={isLoading}
           className="flex-1 px-4 py-3 rounded-xl border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none text-slate-900 font-cairo disabled:opacity-60"
         />
