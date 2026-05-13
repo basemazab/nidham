@@ -92,8 +92,20 @@ if ($tries -ge 30) {
   exit 1
 }
 
-# ---- 7. Apply migrations ---------------------------------------------------
-Write-Host "[7/7] Applying Nidham migrations..." -ForegroundColor Yellow
+# ---- 7a. Set passwords on Supabase service roles ---------------------------
+# Must run BEFORE auth/rest try to connect, otherwise they fail SASL auth
+# and crash-loop forever.
+Write-Host "[7/8] Setting Supabase role passwords..." -ForegroundColor Yellow
+& "$PSScriptRoot/setup-roles.ps1"
+if ($LASTEXITCODE -ne 0) { exit 1 }
+
+# Restart auth + rest so they pick up the freshly-set passwords (they were
+# crash-looping during the wait above).
+Write-Host "       Restarting auth + rest with new passwords..." -ForegroundColor DarkGray
+docker compose restart auth rest | Out-Null
+
+# ---- 7b. Apply migrations --------------------------------------------------
+Write-Host "[8/8] Applying Nidham migrations..." -ForegroundColor Yellow
 & "$PSScriptRoot/apply-migrations.ps1"
 
 # ---- Done ------------------------------------------------------------------
