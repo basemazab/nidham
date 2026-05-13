@@ -164,18 +164,21 @@ ipcMain.handle("setup:save-and-open", (_evt, rawUrl: string) => {
   if (!url) return { ok: false, error: "URL مش صحيح" };
   setServerUrl(url);
 
-  // ORDER MATTERS: open the new window BEFORE closing the setup one.
+  // No window swap. Just navigate the existing window from the local
+  // setup HTML to the customer's Nidham URL. That removes the race
+  // window in which the user could see a blank screen while the new
+  // window was waiting for ready-to-show on a slow network.
   //
-  // If we close first, BrowserWindow.getAllWindows() momentarily returns
-  // an empty array, the 'window-all-closed' listener fires, app.quit()
-  // is called on Windows -- and the new window we try to create here
-  // never makes it on screen.
-  const oldWindow = mainWindow;
-  mainWindow = createWindow(url, /* isSetup */ false);
-  Menu.setApplicationMenu(buildAppMenu(() => mainWindow));
-  if (oldWindow && !oldWindow.isDestroyed()) {
-    oldWindow.close();
-  }
+  // Deferred to the next tick so the IPC response makes it back to the
+  // renderer (which is about to be destroyed by the navigation) first.
+  setImmediate(() => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    Menu.setApplicationMenu(buildAppMenu(() => mainWindow));
+    mainWindow.setAutoHideMenuBar(false);
+    mainWindow.setMenuBarVisibility(true);
+    mainWindow.loadURL(url);
+  });
+
   return { ok: true };
 });
 
