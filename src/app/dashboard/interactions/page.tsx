@@ -314,14 +314,12 @@ export default async function InteractionsPage({
                             {i.notes ?? "—"}
                           </td>
                           <td className="px-4 py-3">
-                            <form
-                              action={async () => {
-                                "use server";
-                                await deleteInteraction(i.id);
-                              }}
+                            <Link
+                              href={`/dashboard/interactions/${i.id}`}
+                              className="text-xs text-brand-cyan-dark hover:text-brand-cyan font-cairo font-bold"
                             >
-                              <button type="submit" className="text-xs text-red-500 hover:text-red-700">حذف</button>
-                            </form>
+                              تعديل
+                            </Link>
                           </td>
                         </tr>
                       );

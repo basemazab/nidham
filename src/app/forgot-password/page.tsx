@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requestPasswordReset } from "./actions";
+import { SubmitButton } from "@/components/submit-button";
 
 type SearchParams = Promise<{ error?: string; sent?: string }>;
 
@@ -61,12 +62,12 @@ export default async function ForgotPasswordPage({
               />
             </div>
 
-            <button
-              type="submit"
+            <SubmitButton
+              loadingText="جاري الإرسال..."
               className="w-full px-6 py-3 rounded-lg bg-gradient-to-r from-brand-cyan to-brand-cyan-dark text-white font-bold shadow-lg shadow-cyan-500/30 hover:shadow-cyan-500/50 hover:-translate-y-0.5 transition-all font-cairo"
             >
               ابعت لينك إعادة التعيين
-            </button>
+            </SubmitButton>
           </form>
 
           <p className="text-center text-sm text-slate-600 mt-6">

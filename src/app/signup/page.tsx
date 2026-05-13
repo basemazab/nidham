@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { signup } from "../login/actions";
+import { SubmitButton } from "@/components/submit-button";
 
 type SearchParams = Promise<{ error?: string }>;
 
@@ -107,12 +108,12 @@ export default async function SignupPage({
               />
             </div>
 
-            <button
-              type="submit"
+            <SubmitButton
+              loadingText="جاري إنشاء الحساب..."
               className="w-full px-6 py-3 rounded-lg bg-gradient-to-r from-brand-cyan to-brand-cyan-dark text-white font-bold shadow-lg shadow-cyan-500/30 hover:shadow-cyan-500/50 hover:-translate-y-0.5 transition-all font-cairo"
             >
               إنشاء حساب الشركة
-            </button>
+            </SubmitButton>
           </form>
 
           <p className="text-center text-sm text-slate-600 mt-6">

@@ -70,6 +70,44 @@ export async function logInteraction(formData: FormData) {
   redirect("/dashboard/interactions?saved=1");
 }
 
+export async function updateInteraction(id: string, formData: FormData) {
+  const supabase = await createClient();
+
+  const employeeId = asText(formData.get("employee_id"));
+  const customerId = asText(formData.get("customer_id"));
+  const type = asText(formData.get("type"));
+  const outcome = asText(formData.get("outcome"));
+
+  if (!employeeId || !customerId || !type || !outcome) {
+    redirect(
+      `/dashboard/interactions/${id}?error=` +
+        encodeURIComponent("الموظف والعميل والنوع والنتيجة كلهم مطلوبين"),
+    );
+  }
+
+  const { error } = await supabase
+    .from("interactions")
+    .update({
+      employee_id: employeeId,
+      customer_id: customerId,
+      date: asText(formData.get("date")) ?? new Date().toISOString().split("T")[0],
+      type,
+      outcome,
+      notes: asText(formData.get("notes")),
+    })
+    .eq("id", id);
+
+  if (error) {
+    redirect(
+      `/dashboard/interactions/${id}?error=` + encodeURIComponent(error.message),
+    );
+  }
+
+  revalidatePath("/dashboard/interactions");
+  revalidatePath("/dashboard/reports/bridge");
+  redirect("/dashboard/interactions?updated=1");
+}
+
 export async function deleteInteraction(id: string) {
   const supabase = await createClient();
   await supabase.from("interactions").delete().eq("id", id);

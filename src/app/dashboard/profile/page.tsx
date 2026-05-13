@@ -151,6 +151,25 @@ export default async function ProfilePage({
           </form>
         </section>
 
+        {/* Data Export — backup all data as Excel */}
+        <section className="bg-gradient-to-br from-emerald-50 to-cyan-50 p-6 rounded-2xl border-2 border-emerald-200 mb-6">
+          <h2 className="text-lg font-bold font-cairo text-slate-800 mb-1">
+            💾 نسخة احتياطية من بياناتك
+          </h2>
+          <p className="text-xs text-slate-600 mb-4 font-cairo leading-relaxed">
+            نزّل كل بيانات شركتك (موظفين + عملاء + حضور + تفاعلات) في ملف Excel
+            واحد. خزّنه على جهازك أو سيرفر مكتبك — بياناتك ملكك ١٠٠%.
+          </p>
+          <a
+            href="/api/export"
+            download
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm font-cairo transition shadow-md"
+          >
+            <span>📥</span>
+            <span>تنزيل Excel كامل</span>
+          </a>
+        </section>
+
         {/* Company settings (admin only) */}
         <section className={`bg-white p-6 rounded-2xl shadow-sm border ${isAdmin ? "border-slate-100" : "border-slate-100 opacity-60"}`}>
           <h2 className="text-lg font-bold font-cairo text-slate-800 mb-1">
