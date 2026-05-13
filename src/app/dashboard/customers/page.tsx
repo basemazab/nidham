@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { deleteCustomer } from "./actions";
 
 type Customer = {
   id: string;
@@ -166,17 +165,17 @@ export default async function CustomersPage() {
                   return (
                     <tr key={customer.id} className="hover:bg-slate-50 transition">
                       <td className="px-5 py-4">
-                        <div className="flex items-center gap-3">
+                        <Link href={`/dashboard/customers/${customer.id}`} className="flex items-center gap-3 group">
                           <div className="w-9 h-9 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center text-white text-sm">
                             {typeIcon}
                           </div>
                           <div>
-                            <div className="font-medium text-slate-800 font-cairo">{customer.full_name}</div>
+                            <div className="font-medium text-slate-800 font-cairo group-hover:text-brand-cyan-dark transition">{customer.full_name}</div>
                             {customer.contact_name && (
                               <div className="text-xs text-slate-500">{customer.contact_name}</div>
                             )}
                           </div>
-                        </div>
+                        </Link>
                       </td>
                       <td className="px-5 py-4 text-slate-600 font-mono text-sm" dir="ltr">{customer.phone ?? "—"}</td>
                       <td className="px-5 py-4">
@@ -191,19 +190,12 @@ export default async function CustomersPage() {
                         {formatEGP(customer.estimated_value)}
                       </td>
                       <td className="px-5 py-4">
-                        <form
-                          action={async () => {
-                            "use server";
-                            await deleteCustomer(customer.id);
-                          }}
+                        <Link
+                          href={`/dashboard/customers/${customer.id}`}
+                          className="text-xs text-brand-cyan-dark hover:text-brand-cyan font-cairo font-bold"
                         >
-                          <button
-                            type="submit"
-                            className="text-xs text-red-500 hover:text-red-700 font-cairo"
-                          >
-                            حذف
-                          </button>
-                        </form>
+                          تعديل
+                        </Link>
                       </td>
                     </tr>
                   );

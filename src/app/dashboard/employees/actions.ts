@@ -50,6 +50,43 @@ export async function createEmployee(formData: FormData) {
   redirect("/dashboard/employees");
 }
 
+export async function updateEmployee(id: string, formData: FormData) {
+  const supabase = await createClient();
+
+  const fullName = asText(formData.get("full_name"));
+  if (!fullName) {
+    redirect(
+      `/dashboard/employees/${id}?error=` +
+        encodeURIComponent("اسم الموظف مطلوب"),
+    );
+  }
+
+  const { error } = await supabase
+    .from("employees")
+    .update({
+      full_name: fullName,
+      job_title: asText(formData.get("job_title")),
+      department: asText(formData.get("department")),
+      phone: asText(formData.get("phone")),
+      email: asText(formData.get("email")),
+      hire_date: asText(formData.get("hire_date")),
+      basic_salary: asNumber(formData.get("basic_salary")),
+      status: asText(formData.get("status")) ?? "active",
+      notes: asText(formData.get("notes")),
+    })
+    .eq("id", id);
+
+  if (error) {
+    redirect(
+      `/dashboard/employees/${id}?error=` + encodeURIComponent(error.message),
+    );
+  }
+
+  revalidatePath("/dashboard/employees");
+  revalidatePath(`/dashboard/employees/${id}`);
+  redirect("/dashboard/employees?updated=1");
+}
+
 export async function deleteEmployee(id: string) {
   const supabase = await createClient();
   await supabase.from("employees").delete().eq("id", id);

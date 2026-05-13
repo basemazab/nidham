@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { logout } from "../login/actions";
 
 type Profile = {
   full_name: string | null;
@@ -40,32 +39,6 @@ export default async function DashboardPage() {
   return (
     <main className="flex-1 px-6 py-8 bg-gradient-to-b from-slate-50 via-white to-cyan-50/30 min-h-screen">
       <div className="max-w-6xl mx-auto">
-        {/* Top bar */}
-        <header className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-3">
-            <div className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-brand-cyan to-brand-navy shadow-md shadow-cyan-500/20">
-              <span className="text-xl font-black text-white font-display">ن</span>
-            </div>
-            <div>
-              <div className="text-xl font-black font-display bg-gradient-to-r from-brand-cyan-dark to-brand-navy bg-clip-text text-transparent leading-none">
-                نِظام
-              </div>
-              <div className="text-[10px] tracking-widest text-brand-gold font-semibold">
-                DASHBOARD
-              </div>
-            </div>
-          </div>
-
-          <form action={logout}>
-            <button
-              type="submit"
-              className="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 hover:text-red-600 hover:bg-red-50 transition font-cairo"
-            >
-              تسجيل الخروج
-            </button>
-          </form>
-        </header>
-
         {/* Welcome card */}
         <div className="bg-white p-8 rounded-2xl shadow-xl border border-slate-100 mb-6">
           <div className="flex items-start gap-4">

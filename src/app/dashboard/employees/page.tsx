@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { deleteEmployee } from "./actions";
 
 type Employee = {
   id: string;
@@ -105,12 +104,12 @@ export default async function EmployeesPage() {
                   return (
                     <tr key={employee.id} className="hover:bg-slate-50 transition">
                       <td className="px-5 py-4">
-                        <div className="flex items-center gap-3">
+                        <Link href={`/dashboard/employees/${employee.id}`} className="flex items-center gap-3 group">
                           <div className="w-9 h-9 rounded-full bg-gradient-to-br from-brand-cyan to-brand-cyan-dark flex items-center justify-center text-white font-bold text-sm">
                             {employee.full_name[0]}
                           </div>
-                          <span className="font-medium text-slate-800 font-cairo">{employee.full_name}</span>
-                        </div>
+                          <span className="font-medium text-slate-800 font-cairo group-hover:text-brand-cyan-dark transition">{employee.full_name}</span>
+                        </Link>
                       </td>
                       <td className="px-5 py-4 text-slate-600">{employee.job_title ?? "—"}</td>
                       <td className="px-5 py-4 text-slate-600">{employee.department ?? "—"}</td>
@@ -121,19 +120,12 @@ export default async function EmployeesPage() {
                         </span>
                       </td>
                       <td className="px-5 py-4">
-                        <form
-                          action={async () => {
-                            "use server";
-                            await deleteEmployee(employee.id);
-                          }}
+                        <Link
+                          href={`/dashboard/employees/${employee.id}`}
+                          className="text-xs text-brand-cyan-dark hover:text-brand-cyan font-cairo font-bold"
                         >
-                          <button
-                            type="submit"
-                            className="text-xs text-red-500 hover:text-red-700 font-cairo"
-                          >
-                            حذف
-                          </button>
-                        </form>
+                          تعديل
+                        </Link>
                       </td>
                     </tr>
                   );

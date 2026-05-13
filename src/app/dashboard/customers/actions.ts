@@ -70,6 +70,44 @@ export async function createCustomer(formData: FormData) {
   redirect("/dashboard/customers");
 }
 
+export async function updateCustomer(id: string, formData: FormData) {
+  const supabase = await createClient();
+
+  const fullName = asText(formData.get("full_name"));
+  if (!fullName) {
+    redirect(
+      `/dashboard/customers/${id}?error=` +
+        encodeURIComponent("اسم العميل مطلوب"),
+    );
+  }
+
+  const { error } = await supabase
+    .from("customers")
+    .update({
+      full_name: fullName,
+      contact_name: asText(formData.get("contact_name")),
+      type: asText(formData.get("type")) ?? "individual",
+      phone: asText(formData.get("phone")),
+      email: asText(formData.get("email")),
+      status: asText(formData.get("status")) ?? "lead",
+      assigned_to: asText(formData.get("assigned_to")),
+      estimated_value: asNumber(formData.get("estimated_value")),
+      source: asText(formData.get("source")),
+      notes: asText(formData.get("notes")),
+    })
+    .eq("id", id);
+
+  if (error) {
+    redirect(
+      `/dashboard/customers/${id}?error=` + encodeURIComponent(error.message),
+    );
+  }
+
+  revalidatePath("/dashboard/customers");
+  revalidatePath(`/dashboard/customers/${id}`);
+  redirect("/dashboard/customers?updated=1");
+}
+
 export async function deleteCustomer(id: string) {
   const supabase = await createClient();
   await supabase.from("customers").delete().eq("id", id);
