@@ -14,6 +14,7 @@ import { useAuth } from "@/lib/auth";
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/Button";
+import { DateField } from "@/components/DateField";
 import { colors, fontSize, radius, spacing } from "@/lib/theme";
 import {
   cancelPendingRequest,
@@ -226,16 +227,7 @@ function NewPermissionForm({
         ))}
       </View>
 
-      <Text style={styles.label}>التاريخ</Text>
-      <TextInput
-        value={date}
-        onChangeText={setDate}
-        placeholder="2026-05-14"
-        placeholderTextColor={colors.slate500}
-        style={styles.input}
-        inputMode="numeric"
-        maxLength={10}
-      />
+      <DateField label="التاريخ" value={date} onChange={setDate} />
 
       {showTimes && (
         <>

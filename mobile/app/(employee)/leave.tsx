@@ -14,6 +14,7 @@ import { useAuth } from "@/lib/auth";
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/Button";
+import { DateField } from "@/components/DateField";
 import { colors, fontSize, radius, spacing } from "@/lib/theme";
 import {
   cancelPendingRequest,
@@ -286,35 +287,19 @@ function NewLeaveForm({
 
       {/* Dates */}
       <View style={styles.dateRow}>
-        <View style={styles.dateField}>
-          <Text style={styles.label}>من</Text>
-          <TextInput
-            value={startDate}
-            onChangeText={setStartDate}
-            placeholder="2026-05-14"
-            placeholderTextColor={colors.slate500}
-            style={styles.input}
-            inputMode="numeric"
-            maxLength={10}
-          />
-        </View>
-        <View style={styles.dateField}>
-          <Text style={styles.label}>إلى</Text>
-          <TextInput
-            value={endDate}
-            onChangeText={setEndDate}
-            placeholder="2026-05-18"
-            placeholderTextColor={colors.slate500}
-            style={styles.input}
-            inputMode="numeric"
-            maxLength={10}
-          />
-        </View>
+        <DateField
+          label="من"
+          value={startDate}
+          onChange={setStartDate}
+          minimumDate={new Date(Date.now() - 7 * 24 * 3600 * 1000)}
+        />
+        <DateField
+          label="إلى"
+          value={endDate}
+          onChange={setEndDate}
+          minimumDate={startDate ? new Date(`${startDate}T00:00:00`) : undefined}
+        />
       </View>
-      <Text style={styles.helpText}>
-        صيغة التاريخ: سنة-شهر-يوم (مثال: 2026-05-14)
-      </Text>
-
       <Text style={styles.label}>السبب (اختياري)</Text>
       <TextInput
         value={reason}
