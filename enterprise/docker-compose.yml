@@ -150,8 +150,15 @@ services:
     depends_on:
       - kong
     environment:
+      # NEXT_PUBLIC_* is baked into the JS bundle at build time — that's what
+      # the browser sees, so it must be the URL the user types in (host).
       NEXT_PUBLIC_SUPABASE_URL: ${SITE_URL}
       NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${ANON_KEY}
+      # SUPABASE_URL (no NEXT_PUBLIC_) is server-only. Our supabase/server +
+      # supabase/public clients prefer it when set, so server actions reach
+      # Kong over the Docker network instead of bouncing off the app
+      # container's own loopback.
+      SUPABASE_URL: http://kong:8000
       GEMINI_API_KEY: ${GEMINI_API_KEY}
     ports:
       - "${APP_PORT:-3000}:3000"

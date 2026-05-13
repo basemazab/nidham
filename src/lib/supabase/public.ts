@@ -10,8 +10,13 @@ import { createServerClient } from "@supabase/ssr";
  * the public policies apply, which keeps tenant data isolated.
  */
 export function createPublicClient() {
+  // Same dual-URL story as src/lib/supabase/server.ts — server-side code in
+  // the Enterprise docker stack reaches Kong via the internal hostname.
+  const supabaseUrl =
+    process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!;
+
   return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    supabaseUrl,
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
     {
       cookies: {
