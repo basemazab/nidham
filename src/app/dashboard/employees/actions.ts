@@ -109,6 +109,30 @@ export async function deleteEmployee(id: string) {
   revalidatePath("/dashboard/employees");
 }
 
+/**
+ * Generates an invitation token for an employee. The HR person hands
+ * the resulting UUID to the employee (paper / WhatsApp / SMS), and the
+ * mobile app's "Claim invitation" flow uses it to bind the new auth
+ * user to this employees row.
+ *
+ * RLS on the RPC checks that the caller is admin/manager in the same
+ * company, so there's no extra permission gate here.
+ */
+export async function generateEmployeeInvitation(id: string) {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("generate_employee_invitation", {
+    p_employee_id: id,
+  });
+  if (error) {
+    redirect(
+      `/dashboard/employees/${id}?invite_error=` +
+        encodeURIComponent(error.message),
+    );
+  }
+  revalidatePath(`/dashboard/employees/${id}`);
+  redirect(`/dashboard/employees/${id}?invite_generated=1`);
+}
+
 async function getCurrentCompanyId(
   supabase: Awaited<ReturnType<typeof createClient>>,
 ): Promise<string> {

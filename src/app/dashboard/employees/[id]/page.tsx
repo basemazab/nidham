@@ -1,11 +1,16 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { updateEmployee, deleteEmployee } from "../actions";
+import { updateEmployee, deleteEmployee, generateEmployeeInvitation } from "../actions";
+import { CopyButton } from "@/components/copy-button";
 
 type PageProps = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{
+    error?: string;
+    invite_error?: string;
+    invite_generated?: string;
+  }>;
 };
 
 type Employee = {
@@ -28,11 +33,14 @@ type Employee = {
   status: "active" | "on_leave" | "terminated";
   notes: string | null;
   created_at: string;
+  user_id: string | null;
+  invitation_token: string | null;
+  invitation_token_created_at: string | null;
 };
 
 export default async function EditEmployeePage({ params, searchParams }: PageProps) {
   const { id } = await params;
-  const { error } = await searchParams;
+  const { error, invite_error, invite_generated } = await searchParams;
 
   const supabase = await createClient();
   const {
@@ -54,6 +62,10 @@ export default async function EditEmployeePage({ params, searchParams }: PagePro
     await deleteEmployee(id);
     redirect("/dashboard/employees?deleted=1");
   };
+  const generateInviteAction = async () => {
+    "use server";
+    await generateEmployeeInvitation(id);
+  };
 
   return (
     <main className="flex-1 px-6 py-8 bg-gradient-to-b from-slate-50 via-white to-cyan-50/30 min-h-screen">
@@ -67,7 +79,7 @@ export default async function EditEmployeePage({ params, searchParams }: PagePro
           </Link>
         </div>
 
-        <header className="mb-8">
+        <header className="mb-6">
           <h1 className="text-3xl font-black font-cairo text-slate-800 mb-1">
             تعديل بيانات الموظف
           </h1>
@@ -75,6 +87,79 @@ export default async function EditEmployeePage({ params, searchParams }: PagePro
             {employee.full_name} · تم إضافته في {new Date(employee.created_at).toLocaleDateString("ar-EG")}
           </p>
         </header>
+
+        {/* Mobile invitation section -- shown above the form because HR
+            usually needs it more than the employee's basic details. */}
+        <div className="mb-6 bg-gradient-to-br from-cyan-50 via-white to-cyan-50/50 border-2 border-brand-cyan/30 rounded-2xl p-6">
+          <div className="flex items-start justify-between gap-3 mb-3">
+            <div>
+              <h2 className="text-lg font-black font-cairo text-slate-800 flex items-center gap-2">
+                📱 تطبيق الموبايل
+              </h2>
+              <p className="text-xs text-slate-500 mt-1 font-cairo">
+                {employee.user_id
+                  ? "الموظف ده متربط بحساب تطبيق الموبايل"
+                  : "اعمل كود دعوة وابعته للموظف عشان يقدر يستخدم تطبيق الموبايل"}
+              </p>
+            </div>
+            <span
+              className={`px-2.5 py-1 rounded-full text-[10px] font-bold border font-cairo whitespace-nowrap ${
+                employee.user_id
+                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                  : "bg-slate-100 text-slate-600 border-slate-200"
+              }`}
+            >
+              {employee.user_id ? "متربط ✓" : "غير متربط"}
+            </span>
+          </div>
+
+          {invite_error && (
+            <div className="mb-3 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm font-cairo">
+              ⚠ {decodeURIComponent(invite_error)}
+            </div>
+          )}
+
+          {invite_generated && employee.invitation_token && (
+            <div className="mb-3 p-4 rounded-xl bg-white border border-emerald-200">
+              <div className="text-xs font-bold text-emerald-800 mb-2 font-cairo">
+                ✓ تم إنشاء الكود — صالح لمدة 30 يوم
+              </div>
+              <div className="bg-slate-900 text-emerald-300 px-3 py-2 rounded-lg font-mono text-xs break-all mb-3" dir="ltr">
+                {employee.invitation_token}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <CopyButton
+                  text={employee.invitation_token}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-brand-cyan-dark text-white text-sm font-bold hover:bg-brand-cyan transition font-cairo"
+                  copiedClassName="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-bold font-cairo"
+                />
+                {employee.phone && (
+                  <a
+                    href={`https://wa.me/${employee.phone.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(
+                      `أهلاً ${employee.full_name.split(" ")[0]}، ده كود دعوتك لتطبيق نِظام:\n\n${employee.invitation_token}\n\nنزّل التطبيق "Nidham" واختار "عندك كود دعوة من HR" وادخل الكود مع إيميل وكلمة سر من اختيارك.`,
+                    )}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold transition font-cairo"
+                  >
+                    💬 ابعت على واتساب
+                  </a>
+                )}
+              </div>
+            </div>
+          )}
+
+          {!employee.user_id && (
+            <form action={generateInviteAction}>
+              <button
+                type="submit"
+                className="px-5 py-2.5 rounded-lg bg-gradient-to-r from-brand-cyan to-brand-cyan-dark text-white font-bold text-sm shadow-md hover:shadow-lg transition font-cairo"
+              >
+                {employee.invitation_token ? "إنشاء كود جديد" : "إنشاء كود دعوة"}
+              </button>
+            </form>
+          )}
+        </div>
 
         <div className="bg-white p-8 rounded-2xl shadow-xl border border-slate-100">
           {error && (
