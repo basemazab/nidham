@@ -19,14 +19,23 @@ export default async function DashboardLayout({
 
   if (!user) redirect("/login");
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("full_name, companies(name)")
-    .eq("id", user.id)
-    .single<Profile>();
+  const [profileRes, superAdminRes] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("full_name, companies(name)")
+      .eq("id", user.id)
+      .single<Profile>(),
+    supabase
+      .from("super_admins")
+      .select("user_id")
+      .eq("user_id", user.id)
+      .maybeSingle(),
+  ]);
 
+  const profile = profileRes.data;
   const userName = profile?.full_name ?? user.email?.split("@")[0] ?? "مستخدم";
   const companyName = profile?.companies?.name ?? "—";
+  const isSuperAdmin = !!superAdminRes.data;
 
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-slate-50">
@@ -34,6 +43,7 @@ export default async function DashboardLayout({
         userName={userName}
         companyName={companyName}
         userEmail={user.email ?? ""}
+        isSuperAdmin={isSuperAdmin}
       />
       <div className="flex-1 min-w-0">{children}</div>
     </div>

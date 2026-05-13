@@ -9,6 +9,7 @@ type Props = {
   userName: string;
   companyName: string;
   userEmail: string;
+  isSuperAdmin?: boolean;
 };
 
 const NAV_ITEMS = [
@@ -22,7 +23,7 @@ const NAV_ITEMS = [
   { href: "/dashboard/reports/bridge", label: "Bridge ✦", icon: "✦", section: "reports" },
 ] as const;
 
-export function DashboardSidebar({ userName, companyName, userEmail }: Props) {
+export function DashboardSidebar({ userName, companyName, userEmail, isSuperAdmin }: Props) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -71,6 +72,15 @@ export function DashboardSidebar({ userName, companyName, userEmail }: Props) {
 
   const UserFooter = () => (
     <div className="p-3 border-t border-slate-100 bg-slate-50/50 space-y-1">
+      {isSuperAdmin && (
+        <Link
+          href="/admin"
+          className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-300 text-amber-800 font-cairo text-sm font-bold hover:from-amber-100 hover:to-yellow-100 transition"
+        >
+          <span>👑</span>
+          <span>Super Admin Panel</span>
+        </Link>
+      )}
       <Link
         href="/dashboard/subscription"
         className={`flex items-center gap-2 px-3 py-2 rounded-lg transition font-cairo text-sm ${
