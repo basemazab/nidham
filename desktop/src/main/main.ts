@@ -164,22 +164,18 @@ ipcMain.handle("setup:save-and-open", (_evt, rawUrl: string) => {
   if (!url) return { ok: false, error: "URL مش صحيح" };
   setServerUrl(url);
 
-  // No window swap. Just navigate the existing window from the local
-  // setup HTML to the customer's Nidham URL. That removes the race
-  // window in which the user could see a blank screen while the new
-  // window was waiting for ready-to-show on a slow network.
-  //
-  // Deferred to the next tick so the IPC response makes it back to the
-  // renderer (which is about to be destroyed by the navigation) first.
-  setImmediate(() => {
-    if (!mainWindow || mainWindow.isDestroyed()) return;
+  // Reveal the app menu now that we're leaving setup mode. The renderer
+  // takes care of the actual navigation (window.location.href = url)
+  // -- doing it there keeps the IPC promise + navigation strictly
+  // ordered in a single JS context, instead of relying on setImmediate
+  // and the main-process loadURL racing the IPC reply.
+  if (mainWindow && !mainWindow.isDestroyed()) {
     Menu.setApplicationMenu(buildAppMenu(() => mainWindow));
     mainWindow.setAutoHideMenuBar(false);
     mainWindow.setMenuBarVisibility(true);
-    mainWindow.loadURL(url);
-  });
+  }
 
-  return { ok: true };
+  return { ok: true, sanitizedUrl: url };
 });
 
 // ----------------------------------------------------------------------------

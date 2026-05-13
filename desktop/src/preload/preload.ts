@@ -7,7 +7,12 @@ const api = {
   testConnection: (url: string): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke("setup:test-connection", url),
 
-  saveAndOpen: (url: string): Promise<{ ok: boolean; error?: string }> =>
+  // Persists the URL in the main process and reveals the app menu.
+  // On success returns the sanitized URL so the renderer can navigate
+  // to it via window.location.href.
+  saveAndOpen: (
+    url: string,
+  ): Promise<{ ok: boolean; error?: string; sanitizedUrl?: string }> =>
     ipcRenderer.invoke("setup:save-and-open", url),
 };
 

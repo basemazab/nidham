@@ -73,14 +73,18 @@ form.addEventListener("submit", async (e) => {
 
   const result = await window.nidham.saveAndOpen(url);
 
-  if (!result.ok) {
+  if (!result.ok || !result.sanitizedUrl) {
     toggleButtons(false);
     setStatus("error", `✗ ${result.error ?? "فشل الحفظ"}`);
     return;
   }
 
-  // On success, the main process closes this window and opens the app.
-  // Nothing more for us to do.
+  // Navigate this same window to the Nidham server we just saved.
+  // We do it from the renderer (not via main.loadURL) so the IPC
+  // promise resolves first and the navigation happens in a single,
+  // predictable step instead of two racing async paths.
+  setStatus("loading", `بنفتح ${result.sanitizedUrl}...`);
+  window.location.href = result.sanitizedUrl;
 });
 
 // ----------------------------------------------------------------------------
