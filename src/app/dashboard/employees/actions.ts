@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireAdmin, requireHR } from "@/lib/permissions";
 import { arabicizeDbError } from "@/lib/i18n";
+import { sendEmail, emailMobileInvitation } from "@/lib/email";
 
 function asText(value: FormDataEntryValue | null): string | null {
   if (value === null) return null;
@@ -139,6 +140,36 @@ export async function generateEmployeeInvitation(id: string) {
         encodeURIComponent(arabicizeDbError(error.message)),
     );
   }
+
+  // Read the freshly-issued token + the employee's email so we can
+  // ship the invite over email automatically. Skip silently if the
+  // employee has no email on file -- the HR can still copy the token
+  // from the dashboard and hand it over manually.
+  void (async () => {
+    try {
+      const { data: emp } = await supabase
+        .from("employees")
+        .select("full_name, email, invitation_token")
+        .eq("id", id)
+        .single<{
+          full_name: string;
+          email: string | null;
+          invitation_token: string | null;
+        }>();
+      if (!emp?.email || !emp?.invitation_token) return;
+      await sendEmail(
+        emailMobileInvitation({
+          to: emp.email,
+          employeeName: emp.full_name,
+          inviteToken: emp.invitation_token,
+        }),
+      );
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn("generateEmployeeInvitation email failed:", err);
+    }
+  })();
+
   revalidatePath(`/dashboard/employees/${id}`);
   redirect(`/dashboard/employees/${id}?invite_generated=1`);
 }

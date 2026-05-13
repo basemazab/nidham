@@ -46,10 +46,26 @@ export default function HomeScreen() {
 
         {isLinked && (
           <View style={styles.actionsGrid}>
-            <ActionTile icon="🏝️" label="إجازة" disabled hint="Phase 4" />
-            <ActionTile icon="💵" label="سلفة" disabled hint="Phase 4" />
-            <ActionTile icon="⏰" label="استئذان" disabled hint="Phase 4" />
-            <ActionTile icon="🧾" label="قسائم الراتب" disabled hint="Phase 4" />
+            <ActionTile
+              icon="🏝️"
+              label="إجازة"
+              onPress={() => router.push("/(employee)/leave")}
+            />
+            <ActionTile
+              icon="💵"
+              label="سلفة"
+              onPress={() => router.push("/(employee)/advance")}
+            />
+            <ActionTile
+              icon="⏰"
+              label="استئذان"
+              onPress={() => router.push("/(employee)/permission")}
+            />
+            <ActionTile
+              icon="🧾"
+              label="قسائم الراتب"
+              onPress={() => router.push("/(employee)/payslips")}
+            />
           </View>
         )}
 
@@ -66,18 +82,27 @@ function ActionTile({
   label,
   hint,
   disabled,
+  onPress,
 }: {
   icon: string;
   label: string;
   hint?: string;
   disabled?: boolean;
+  onPress?: () => void;
 }) {
   return (
-    <View style={[styles.tile, disabled && { opacity: 0.4 }]}>
+    <Pressable
+      onPress={disabled ? undefined : onPress}
+      style={({ pressed }) => [
+        styles.tile,
+        disabled && { opacity: 0.4 },
+        pressed && !disabled && { opacity: 0.7 },
+      ]}
+    >
       <Text style={styles.tileIcon}>{icon}</Text>
       <Text style={styles.tileLabel}>{label}</Text>
       {hint && <Text style={styles.tileHint}>{hint}</Text>}
-    </View>
+    </Pressable>
   );
 }
 

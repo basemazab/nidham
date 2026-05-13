@@ -23,9 +23,11 @@ export const colors = {
   slate900: "#0f172a",
 
   // Status
+  emerald400: "#34d399",
   emerald500: "#10b981",
   emerald600: "#059669",
   amber500: "#f59e0b",
+  red400: "#f87171",
   red500: "#ef4444",
   red600: "#dc2626",
 } as const;

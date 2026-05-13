@@ -59,13 +59,22 @@ export default async function EmployeesPage() {
             </p>
           </div>
 
-          <Link
-            href="/dashboard/employees/new"
-            className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-brand-cyan to-brand-cyan-dark text-white font-bold shadow-lg shadow-cyan-500/30 hover:shadow-cyan-500/50 hover:-translate-y-0.5 transition-all font-cairo"
-          >
-            <span className="text-lg leading-none">+</span>
-            <span>إضافة موظف</span>
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/dashboard/employees/import"
+              className="inline-flex items-center gap-2 px-4 py-3 rounded-xl border border-brand-cyan/30 bg-brand-cyan/5 text-brand-cyan-dark font-bold hover:bg-brand-cyan/10 transition font-cairo text-sm"
+            >
+              <span>📂</span>
+              <span>رفع من Excel</span>
+            </Link>
+            <Link
+              href="/dashboard/employees/new"
+              className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-brand-cyan to-brand-cyan-dark text-white font-bold shadow-lg shadow-cyan-500/30 hover:shadow-cyan-500/50 hover:-translate-y-0.5 transition-all font-cairo"
+            >
+              <span className="text-lg leading-none">+</span>
+              <span>إضافة موظف</span>
+            </Link>
+          </div>
         </header>
 
         {/* Table or empty state */}
