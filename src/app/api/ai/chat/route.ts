@@ -1,6 +1,32 @@
 import { google } from "@ai-sdk/google";
-import { streamText, type UIMessage, convertToModelMessages } from "ai";
+import { streamText } from "ai";
 import { createClient } from "@/lib/supabase/server";
+
+type UIMessagePart = { type: string; text?: string };
+type IncomingMessage = {
+  role: "user" | "assistant" | "system";
+  parts?: UIMessagePart[];
+  content?: string;
+};
+
+function normalizeMessages(raw: unknown): { role: "user" | "assistant" | "system"; content: string }[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((m): m is IncomingMessage => m && typeof m === "object" && "role" in m)
+    .map((m) => {
+      let content = "";
+      if (Array.isArray(m.parts)) {
+        content = m.parts
+          .filter((p) => p && p.type === "text" && typeof p.text === "string")
+          .map((p) => p.text!)
+          .join("");
+      } else if (typeof m.content === "string") {
+        content = m.content;
+      }
+      return { role: m.role, content };
+    })
+    .filter((m) => m.content.length > 0);
+}
 
 export const maxDuration = 30;
 
@@ -183,14 +209,29 @@ export async function POST(req: Request) {
     );
   }
 
-  const { messages }: { messages: UIMessage[] } = await req.json();
+  let body: { messages?: unknown };
+  try {
+    body = await req.json();
+  } catch {
+    return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
+      status: 400,
+    });
+  }
+
+  const messages = normalizeMessages(body.messages);
+  if (messages.length === 0) {
+    return new Response(
+      JSON.stringify({ error: "No messages received" }),
+      { status: 400 },
+    );
+  }
 
   const systemPrompt = await buildCompanyContext(supabase);
 
   const result = streamText({
     model: google("gemini-2.0-flash-exp"),
     system: systemPrompt,
-    messages: convertToModelMessages(messages),
+    messages,
   });
 
   return result.toUIMessageStreamResponse();
