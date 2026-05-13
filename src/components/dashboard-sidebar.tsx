@@ -20,6 +20,7 @@ const NAV_ITEMS = [
   { href: "/dashboard/interactions", label: "التفاعلات", icon: "💬", section: "main" },
   { href: "/dashboard/contracts", label: "العقود", icon: "📋", section: "main" },
   { href: "/dashboard/team", label: "فريق الشركة", icon: "🤝", section: "main" },
+  { href: "/dashboard/ai", label: "المساعد الذكي ✦", icon: "🤖", section: "ai" },
   { href: "/dashboard/reports/attendance", label: "تقرير الحضور", icon: "📊", section: "reports" },
   { href: "/dashboard/reports/bridge", label: "Bridge ✦", icon: "✦", section: "reports" },
 ] as const;
@@ -39,6 +40,7 @@ export function DashboardSidebar({ userName, companyName, userEmail, isSuperAdmi
   };
 
   const mainItems = NAV_ITEMS.filter((i) => i.section === "main");
+  const aiItems = NAV_ITEMS.filter((i) => i.section === "ai");
   const reportItems = NAV_ITEMS.filter((i) => i.section === "reports");
 
   const NavSection = ({ label, items }: { label: string; items: typeof NAV_ITEMS[number][] }) => (
@@ -181,6 +183,7 @@ export function DashboardSidebar({ userName, companyName, userEmail, isSuperAdmi
             </div>
             <nav className="flex-1 overflow-y-auto p-3">
               <NavSection label="الموديولات" items={[...mainItems]} />
+              <NavSection label="✦ ذكاء" items={[...aiItems]} />
               <NavSection label="التقارير" items={[...reportItems]} />
             </nav>
             <UserFooter />
