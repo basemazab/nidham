@@ -1,0 +1,218 @@
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
+import { saveAttendance } from "./actions";
+
+type SearchParams = Promise<{
+  date?: string;
+  error?: string;
+  saved?: string;
+}>;
+
+type Employee = {
+  id: string;
+  full_name: string;
+  job_title: string | null;
+  department: string | null;
+};
+
+function formatArabicDate(isoDate: string): string {
+  const date = new Date(isoDate + "T00:00:00");
+  return date.toLocaleDateString("ar-EG", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
+
+export default async function AttendancePage({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const params = await searchParams;
+  const todayIso = new Date().toISOString().split("T")[0];
+  const selectedDate = params.date ?? todayIso;
+
+  // Active employees only
+  const { data: employeesData } = await supabase
+    .from("employees")
+    .select("id, full_name, job_title, department")
+    .eq("status", "active")
+    .order("full_name")
+    .returns<Employee[]>();
+
+  const employees = employeesData ?? [];
+
+  // Existing attendance for this date
+  const { data: existing } = await supabase
+    .from("attendance")
+    .select("employee_id, status")
+    .eq("date", selectedDate);
+
+  const existingMap = new Map<string, string>(
+    existing?.map((r) => [r.employee_id as string, r.status as string]) ?? [],
+  );
+
+  return (
+    <main className="flex-1 px-6 py-8 bg-gradient-to-b from-slate-50 via-white to-cyan-50/30 min-h-screen">
+      <div className="max-w-5xl mx-auto">
+        <div className="mb-6">
+          <Link
+            href="/dashboard"
+            className="text-sm text-slate-500 hover:text-brand-cyan-dark font-cairo"
+          >
+            ← الرجوع للـ Dashboard
+          </Link>
+        </div>
+
+        <header className="mb-6">
+          <h1 className="text-3xl font-black font-cairo text-slate-800 mb-1">
+            تسجيل الحضور
+          </h1>
+          <p className="text-sm text-slate-500">
+            {formatArabicDate(selectedDate)} · {employees.length} موظف نشط
+          </p>
+        </header>
+
+        {/* Date selector */}
+        <form
+          method="get"
+          className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 mb-6 flex items-end gap-3"
+        >
+          <div className="flex-1">
+            <label htmlFor="date" className="block text-xs font-medium text-slate-600 mb-1 font-cairo">
+              التاريخ
+            </label>
+            <input
+              type="date"
+              id="date"
+              name="date"
+              defaultValue={selectedDate}
+              max={todayIso}
+              className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none text-slate-900"
+            />
+          </div>
+          <button
+            type="submit"
+            className="px-5 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm font-cairo transition"
+          >
+            تحميل تاريخ تاني
+          </button>
+        </form>
+
+        {/* Success/Error messages */}
+        {params.saved && (
+          <div className="mb-4 p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm font-cairo">
+            ✓ تم حفظ {params.saved} سجل حضور
+          </div>
+        )}
+        {params.error && (
+          <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm font-cairo">
+            ⚠ {decodeURIComponent(params.error)}
+          </div>
+        )}
+
+        {/* Empty state */}
+        {employees.length === 0 ? (
+          <div className="bg-white rounded-2xl shadow-md border border-slate-100 p-16 text-center">
+            <div className="text-6xl mb-4">👥</div>
+            <h2 className="text-xl font-bold font-cairo mb-2 text-slate-700">
+              مفيش موظفين نشطين
+            </h2>
+            <p className="text-slate-500 mb-6">
+              ضيف موظفين الأول من صفحة الموظفين
+            </p>
+            <Link
+              href="/dashboard/employees/new"
+              className="inline-block px-6 py-3 rounded-xl bg-brand-cyan-dark text-white font-bold hover:bg-brand-cyan transition font-cairo"
+            >
+              ضيف موظف
+            </Link>
+          </div>
+        ) : (
+          <form action={saveAttendance}>
+            <input type="hidden" name="date" value={selectedDate} />
+
+            <div className="bg-white rounded-2xl shadow-md border border-slate-100 overflow-hidden mb-4">
+              <table className="w-full text-right">
+                <thead className="bg-slate-50 border-b border-slate-200">
+                  <tr>
+                    <th className="px-5 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider font-cairo">
+                      الموظف
+                    </th>
+                    <th className="px-5 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider font-cairo">
+                      القسم
+                    </th>
+                    <th className="px-5 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider font-cairo">
+                      الحالة
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {employees.map((emp) => {
+                    const currentStatus = existingMap.get(emp.id) ?? "";
+                    return (
+                      <tr key={emp.id} className="hover:bg-slate-50/50">
+                        <td className="px-5 py-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-brand-cyan to-brand-cyan-dark flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                              {emp.full_name[0]}
+                            </div>
+                            <div>
+                              <div className="font-medium text-slate-800 font-cairo">
+                                {emp.full_name}
+                              </div>
+                              {emp.job_title && (
+                                <div className="text-xs text-slate-500">{emp.job_title}</div>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-5 py-3 text-slate-600 text-sm">
+                          {emp.department ?? "—"}
+                        </td>
+                        <td className="px-5 py-3">
+                          <select
+                            name={`status_${emp.id}`}
+                            defaultValue={currentStatus}
+                            className="px-4 py-2 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none text-slate-900 font-cairo min-w-[140px]"
+                          >
+                            <option value="">— اختار —</option>
+                            <option value="present">✓ حاضر</option>
+                            <option value="absent">✗ غايب</option>
+                            <option value="half_day">◐ نص يوم</option>
+                            <option value="leave">🏖 إجازة</option>
+                          </select>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="flex items-center justify-between bg-white p-4 rounded-xl border border-slate-100 sticky bottom-4 shadow-lg">
+              <p className="text-sm text-slate-600 font-cairo">
+                لو موظف ساكت ما عليش — مش هيتسجل ليه حاجة. اختار الحالة لكل موظف عايز تسجّله.
+              </p>
+              <button
+                type="submit"
+                className="px-6 py-3 rounded-xl bg-gradient-to-r from-brand-cyan to-brand-cyan-dark text-white font-bold shadow-lg shadow-cyan-500/30 hover:shadow-cyan-500/50 transition-all font-cairo"
+              >
+                حفظ الحضور
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </main>
+  );
+}

@@ -97,33 +97,47 @@ export default async function DashboardPage() {
         </div>
 
         {/* Module Grid */}
-        <div className="grid md:grid-cols-3 gap-4">
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Link
             href="/dashboard/employees"
             className="bg-white p-6 rounded-2xl border border-slate-100 hover:border-brand-cyan/40 hover:shadow-lg hover:-translate-y-0.5 transition-all"
           >
             <div className="text-3xl mb-2">👥</div>
             <h3 className="font-bold font-cairo mb-1 text-slate-800">الموظفين</h3>
-            <p className="text-xs text-brand-cyan-dark font-bold">جاهز ✓ — افتح الموديول</p>
+            <p className="text-xs text-brand-cyan-dark font-bold">جاهز ✓</p>
           </Link>
-          <div className="bg-white p-6 rounded-2xl border border-slate-100 opacity-60">
-            <div className="text-3xl mb-2">💼</div>
-            <h3 className="font-bold font-cairo mb-1">العملاء</h3>
-            <p className="text-xs text-slate-500">قريبًا</p>
-          </div>
-          <div className="bg-gradient-to-br from-cyan-50 to-white p-6 rounded-2xl border-2 border-brand-cyan/30 relative overflow-hidden">
+
+          <Link
+            href="/dashboard/attendance"
+            className="bg-white p-6 rounded-2xl border border-slate-100 hover:border-brand-cyan/40 hover:shadow-lg hover:-translate-y-0.5 transition-all"
+          >
+            <div className="text-3xl mb-2">⏰</div>
+            <h3 className="font-bold font-cairo mb-1 text-slate-800">الحضور والانصراف</h3>
+            <p className="text-xs text-brand-cyan-dark font-bold">جاهز ✓</p>
+          </Link>
+
+          <Link
+            href="/dashboard/reports/attendance"
+            className="bg-gradient-to-br from-cyan-50 to-white p-6 rounded-2xl border-2 border-brand-cyan/30 hover:border-brand-cyan hover:shadow-lg hover:-translate-y-0.5 transition-all relative overflow-hidden"
+          >
             <div className="absolute top-2 left-2 text-[10px] text-brand-gold font-bold tracking-wider">
-              قريبًا ✦
+              جديد ✦
             </div>
             <div className="text-3xl mb-2">📊</div>
-            <h3 className="font-bold font-cairo mb-1">التقارير + Bridge</h3>
-            <p className="text-xs text-slate-500">الجوهرة بتاعتنا</p>
+            <h3 className="font-bold font-cairo mb-1 text-slate-800">تقرير الحضور الشهري</h3>
+            <p className="text-xs text-brand-cyan-dark font-bold">جاهز ✓</p>
+          </Link>
+
+          <div className="bg-white p-6 rounded-2xl border border-slate-100 opacity-60">
+            <div className="text-3xl mb-2">💼</div>
+            <h3 className="font-bold font-cairo mb-1">العملاء + Bridge</h3>
+            <p className="text-xs text-slate-500">قريبًا</p>
           </div>
         </div>
 
         {/* Status note */}
         <div className="mt-8 p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800 font-cairo text-center">
-          🚧 نسخة Beta · Multi-Tenancy مفعّل · موديول الموظفين شغّال · العملاء جاي
+          🚧 نسخة Beta · موديولات شغّالة: الموظفين + الحضور + تقرير الحضور · العملاء + Bridge جايين
         </div>
       </div>
     </main>
