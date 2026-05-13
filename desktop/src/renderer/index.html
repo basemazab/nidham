@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>إعداد Nidham</title>
+    <!-- Prevent Electron from loading remote resources we didn't ship. -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self';"
+    />
+    <link rel="stylesheet" href="./setup.css" />
+  </head>
+  <body>
+    <main class="card">
+      <header>
+        <div class="logo">
+          <div class="logo-square">ن</div>
+          <div class="logo-text">
+            <h1>نِظام</h1>
+            <span>NIDHAM DESKTOP</span>
+          </div>
+        </div>
+        <h2>الإعداد لأول مرة</h2>
+        <p>اكتب رابط سيرفر نِظام بتاع شركتك عشان البرنامج يعرف يوصله.</p>
+      </header>
+
+      <form id="setup-form">
+        <label for="server-url">
+          رابط السيرفر
+          <span class="hint">(http أو https)</span>
+        </label>
+        <input
+          id="server-url"
+          name="serverUrl"
+          type="text"
+          dir="ltr"
+          placeholder="مثال: http://192.168.1.10:3001"
+          autocomplete="off"
+          autocorrect="off"
+          spellcheck="false"
+          required
+        />
+
+        <div class="examples">
+          <button
+            type="button"
+            class="example"
+            data-url="https://nidham-seven.vercel.app"
+          >
+            استخدم نسخة Nidham السحابية
+          </button>
+        </div>
+
+        <div id="status" class="status hidden"></div>
+
+        <div class="actions">
+          <button id="test-btn" type="button" class="secondary">
+            اختبر الاتصال
+          </button>
+          <button id="save-btn" type="submit" class="primary">
+            احفظ وادخل ←
+          </button>
+        </div>
+      </form>
+
+      <footer>
+        <p>
+          💡 لو السيرفر داخل شبكة شركتك، استخدم الـ IP المحلي.<br />
+          مش عارف؟ اتصل بمسؤول الـ IT أو اضغط
+          <a href="https://wa.me/201553641615" target="_blank" rel="noopener">
+            واتساب الدعم
+          </a>
+        </p>
+      </footer>
+    </main>
+
+    <script type="module" src="./setup.ts"></script>
+  </body>
+</html>

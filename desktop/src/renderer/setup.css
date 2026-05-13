@@ -1,0 +1,287 @@
+/* Nidham Desktop -- first-run setup screen */
+
+:root {
+  --brand-navy: #0a1428;
+  --brand-navy-light: #152540;
+  --brand-cyan: #22d3ee;
+  --brand-cyan-dark: #0891b2;
+  --brand-gold: #c9a84c;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  height: 100%;
+  font-family:
+    "Cairo",
+    "Segoe UI",
+    Tahoma,
+    "Tajawal",
+    Arial,
+    sans-serif;
+  background:
+    radial-gradient(circle at top right, #22d3ee20, transparent 50%),
+    radial-gradient(circle at bottom left, #0891b220, transparent 50%),
+    linear-gradient(135deg, var(--brand-navy) 0%, var(--brand-navy-light) 100%);
+  color: #f1f5f9;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  overflow: hidden;
+}
+
+.card {
+  background: #ffffff;
+  color: #0f172a;
+  width: 100%;
+  max-width: 540px;
+  border-radius: 20px;
+  padding: 32px 36px;
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+/* Header --------------------------------------------------------------- */
+
+header {
+  margin-bottom: 24px;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.logo-square {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, var(--brand-cyan), var(--brand-navy));
+  display: grid;
+  place-items: center;
+  font-size: 28px;
+  font-weight: 900;
+  color: #fff;
+  box-shadow: 0 6px 20px rgba(34, 211, 238, 0.3);
+}
+
+.logo-text h1 {
+  font-size: 26px;
+  font-weight: 900;
+  background: linear-gradient(90deg, var(--brand-cyan-dark), var(--brand-navy));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  line-height: 1;
+}
+
+.logo-text span {
+  font-size: 11px;
+  letter-spacing: 0.25em;
+  color: var(--brand-gold);
+  font-weight: 700;
+}
+
+header h2 {
+  font-size: 22px;
+  font-weight: 800;
+  color: #0f172a;
+  margin-bottom: 6px;
+}
+
+header p {
+  font-size: 14px;
+  color: #64748b;
+  line-height: 1.6;
+}
+
+/* Form ----------------------------------------------------------------- */
+
+label {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  color: #334155;
+  margin-bottom: 8px;
+}
+
+.hint {
+  font-weight: 400;
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+input[type="text"] {
+  width: 100%;
+  padding: 12px 14px;
+  border: 2px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 15px;
+  font-family: "Consolas", "Monaco", monospace;
+  color: #0f172a;
+  transition: all 0.15s ease;
+}
+
+input[type="text"]:focus {
+  outline: none;
+  border-color: var(--brand-cyan);
+  box-shadow: 0 0 0 4px rgba(34, 211, 238, 0.15);
+}
+
+.examples {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.example {
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: #475569;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s ease;
+}
+
+.example:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+/* Status messages ------------------------------------------------------ */
+
+.status {
+  margin-top: 18px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status.hidden {
+  display: none;
+}
+
+.status.ok {
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+
+.status.error {
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+.status.loading {
+  background: #f0f9ff;
+  color: #075985;
+  border: 1px solid #bae6fd;
+}
+
+/* Actions -------------------------------------------------------------- */
+
+.actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+button.primary,
+button.secondary {
+  flex: 1;
+  padding: 12px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 800;
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  transition: all 0.15s ease;
+}
+
+button.primary {
+  background: linear-gradient(135deg, var(--brand-cyan), var(--brand-cyan-dark));
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(34, 211, 238, 0.3);
+}
+
+button.primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(34, 211, 238, 0.45);
+}
+
+button.secondary {
+  background: #fff;
+  color: #334155;
+  border: 2px solid #e2e8f0;
+}
+
+button.secondary:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+/* Footer --------------------------------------------------------------- */
+
+footer {
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid #e2e8f0;
+}
+
+footer p {
+  font-size: 12px;
+  color: #64748b;
+  line-height: 1.8;
+}
+
+footer a {
+  color: var(--brand-cyan-dark);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+footer a:hover {
+  text-decoration: underline;
+}
+
+/* Tiny spinner --------------------------------------------------------- */
+
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  display: inline-block;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
