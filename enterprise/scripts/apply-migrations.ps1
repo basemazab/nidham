@@ -1,5 +1,5 @@
 # ============================================================================
-# apply-migrations.ps1 — runs the 14 Nidham SQL files against the live DB
+# apply-migrations.ps1 -- runs the 14 Nidham SQL files against the live DB
 #
 # Idempotent-ish: skips files whose marker row already exists in
 # public._nidham_migrations. Run anytime; only new files are applied.

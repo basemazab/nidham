@@ -1,5 +1,5 @@
 # ============================================================================
-# backup.ps1 — pg_dump the Nidham database to a timestamped file
+# backup.ps1 -- pg_dump the Nidham database to a timestamped file
 #
 # Default destination:  ../backups/nidham-YYYYMMDD-HHMMSS.sql.gz
 # Override with:        -OutputDir D:\nidham-backups
@@ -36,7 +36,7 @@ $gzFile  = "$outFile.gz"
 
 Write-Host "Backing up Nidham database..." -ForegroundColor Yellow
 
-# pg_dump to stdout → write into outFile from the host side
+# pg_dump to stdout -> write into outFile from the host side
 docker exec -e PGPASSWORD=$pgPassword nidham-db `
   pg_dump -U postgres -d postgres `
   --no-owner --no-privileges --quote-all-identifiers `
@@ -64,7 +64,7 @@ Remove-Item $outFile
 $size = [Math]::Round((Get-Item $gzFile).Length / 1KB, 1)
 Write-Host "OK Backup written: $gzFile  ($size KB)" -ForegroundColor Green
 
-# Prune — keep the most recent $KeepLastN files
+# Prune -- keep the most recent $KeepLastN files
 $existing = Get-ChildItem -Path $OutputDir -Filter "nidham-*.sql.gz" | Sort-Object LastWriteTime -Descending
 if ($existing.Count -gt $KeepLastN) {
   $toPrune = $existing | Select-Object -Skip $KeepLastN

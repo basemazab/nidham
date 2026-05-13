@@ -1,5 +1,5 @@
 # ============================================================================
-# restore.ps1 — restore the Nidham database from a backup file
+# restore.ps1 -- restore the Nidham database from a backup file
 #
 # DESTRUCTIVE: wipes the existing public/auth/storage data first.
 # Confirms before proceeding (skip with -Force).
@@ -72,6 +72,6 @@ if ($LASTEXITCODE -eq 0) {
   Write-Host "   You may need to restart the app to clear caches:" -ForegroundColor DarkGray
   Write-Host "   docker compose restart app" -ForegroundColor DarkGray
 } else {
-  Write-Host "X  Restore failed — check the output above." -ForegroundColor Red
+  Write-Host "X  Restore failed -- check the output above." -ForegroundColor Red
   exit 1
 }

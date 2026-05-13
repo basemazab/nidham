@@ -1,5 +1,5 @@
 # ============================================================================
-# install.ps1 — one-shot install for Nidham Enterprise Edition (Windows)
+# install.ps1 -- one-shot install for Nidham Enterprise Edition (Windows)
 #
 # What it does:
 #   1. Verifies Docker Desktop is installed and running
@@ -24,7 +24,7 @@ Set-Location $enterpriseDir
 
 Write-Host ""
 Write-Host "===========================================" -ForegroundColor Cyan
-Write-Host " Nidham Enterprise Edition — Installer" -ForegroundColor Cyan
+Write-Host " Nidham Enterprise Edition -- Installer" -ForegroundColor Cyan
 Write-Host "===========================================" -ForegroundColor Cyan
 Write-Host ""
 
