@@ -56,6 +56,13 @@ function createWindow(loadUrl: string, isSetup: boolean): BrowserWindow {
   window.once("ready-to-show", () => {
     window.show();
     window.webContents.setZoomLevel(getZoomLevel());
+
+    // Auto-open DevTools when running via `npm start` (not when packaged).
+    // Makes it trivial to spot a typo in the renderer without forcing the
+    // HR user to learn keyboard shortcuts in production.
+    if (!app.isPackaged && isSetup) {
+      window.webContents.openDevTools({ mode: "detach" });
+    }
   });
 
   // Persist size/position as the user moves the window
