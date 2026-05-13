@@ -235,7 +235,7 @@ export async function POST(req: Request) {
   const systemPrompt = await buildCompanyContext(supabase);
 
   const result = streamText({
-    model: google("gemini-2.0-flash-exp"),
+    model: google("gemini-2.0-flash"),
     system: systemPrompt,
     messages,
   });
