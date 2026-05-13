@@ -17,6 +17,7 @@ const NAV_ITEMS = [
   { href: "/dashboard/employees", label: "الموظفين", icon: "👥", section: "main" },
   { href: "/dashboard/attendance", label: "الحضور", icon: "⏰", section: "main" },
   { href: "/dashboard/payroll", label: "الرواتب", icon: "💰", section: "main" },
+  { href: "/dashboard/requests", label: "طلبات الموظفين", icon: "📨", section: "main" },
   { href: "/dashboard/jobs", label: "التوظيف ✦", icon: "🎯", section: "main" },
   { href: "/dashboard/customers", label: "العملاء", icon: "💼", section: "main" },
   { href: "/dashboard/interactions", label: "التفاعلات", icon: "💬", section: "main" },
@@ -25,6 +26,7 @@ const NAV_ITEMS = [
   { href: "/dashboard/ai", label: "المساعد الذكي ✦", icon: "🤖", section: "ai" },
   { href: "/dashboard/reports/attendance", label: "تقرير الحضور", icon: "📊", section: "reports" },
   { href: "/dashboard/reports/bridge", label: "Bridge ✦", icon: "✦", section: "reports" },
+  { href: "/dashboard/settings/office-location", label: "موقع المكتب 📍", icon: "⚙", section: "settings" },
 ] as const;
 
 export function DashboardSidebar({ userName, companyName, userEmail, isSuperAdmin }: Props) {
@@ -44,6 +46,7 @@ export function DashboardSidebar({ userName, companyName, userEmail, isSuperAdmi
   const mainItems = NAV_ITEMS.filter((i) => i.section === "main");
   const aiItems = NAV_ITEMS.filter((i) => i.section === "ai");
   const reportItems = NAV_ITEMS.filter((i) => i.section === "reports");
+  const settingsItems = NAV_ITEMS.filter((i) => i.section === "settings");
 
   const NavSection = ({ label, items }: { label: string; items: typeof NAV_ITEMS[number][] }) => (
     <>
@@ -187,6 +190,7 @@ export function DashboardSidebar({ userName, companyName, userEmail, isSuperAdmi
               <NavSection label="الموديولات" items={[...mainItems]} />
               <NavSection label="✦ ذكاء" items={[...aiItems]} />
               <NavSection label="التقارير" items={[...reportItems]} />
+              <NavSection label="الإعدادات" items={[...settingsItems]} />
             </nav>
             <UserFooter />
           </aside>
