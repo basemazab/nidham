@@ -2,6 +2,10 @@
 out/
 .vite/
 
+# Binary icon outputs are committed (so contributors don't need sharp)
+!assets/icon.png
+!assets/icon.ico
+
 # Dependencies
 node_modules/
 
