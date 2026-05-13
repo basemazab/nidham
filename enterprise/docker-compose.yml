@@ -141,11 +141,7 @@ services:
       - "${KONG_HTTPS_PORT:-8443}:8443"
     volumes:
       - ./kong/kong.yml:/home/kong/temp.yml:ro
-    entrypoint: >
-      bash -c '
-        eval "echo \"$$(cat ~/temp.yml)\"" > ~/kong.yml
-        && /docker-entrypoint.sh kong docker-start
-      '
+    entrypoint: ["bash", "-c", "eval \"echo \\\"$$(cat ~/temp.yml)\\\"\" > ~/kong.yml && /docker-entrypoint.sh kong docker-start"]
 
   # --------------------------------------------------------------------------
   # Nidham Next.js app
