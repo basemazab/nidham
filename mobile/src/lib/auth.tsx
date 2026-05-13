@@ -105,11 +105,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     inviteToken,
   ) => {
     const trimmedEmail = email.trim();
+    const trimmedToken = inviteToken.trim();
 
-    // Try the happy-path signup first.
+    // Pass the invite token in raw_user_meta_data so migration 021's
+    // handle_new_user "Path 0" can link the employee row + create the
+    // employee-role profile in one atomic trigger run. The standalone
+    // claim_employee_invitation RPC is now a fallback for edge cases
+    // (e.g. user already had an account, didn't go through signup).
     const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
       email: trimmedEmail,
       password,
+      options: {
+        data: { employee_invite_token: trimmedToken },
+      },
     });
 
     let hasSession = !!signUpData?.session;
@@ -118,7 +126,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // The email might be left over from a previous failed attempt --
       // signup throws 'user_already_exists' even though the row isn't
       // linked to any employee. Fall back to signing in with the same
-      // password and let the claim RPC finish the linking.
+      // password and let the fallback claim RPC finish the linking.
       const msg = signUpErr.message.toLowerCase();
       const alreadyExists =
         msg.includes("already registered") ||
@@ -155,9 +163,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
 
+    // Did handle_new_user's Path 0 already link the employee? If so we
+    // can skip the RPC entirely. Refresh + check.
+    await refreshEmployee();
+    const { data: sessAfter } = await supabase.auth.getSession();
+    const linkedNow = await supabase
+      .from("employees")
+      .select("id")
+      .eq("user_id", sessAfter.session?.user.id ?? "")
+      .maybeSingle();
+
+    if (linkedNow.data) {
+      return {};
+    }
+
+    // Fallback: token didn't make it through the trigger (signup
+    // already existed, token malformed, etc.). Call the strict RPC.
     const { error: claimErr } = await supabase.rpc(
       "claim_employee_invitation",
-      { p_token: inviteToken.trim() },
+      { p_token: trimmedToken },
     );
     if (claimErr) {
       return { error: claimErr.message };

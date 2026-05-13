@@ -10,7 +10,7 @@ import {
   emailAdvanceDecision,
   emailAdvancePaid,
 } from "@/lib/email";
-import { LEAVE_TYPE_LABELS_AR } from "@/lib/requests-labels";
+import { LEAVE_TYPE_LABELS_AR, type LeaveType } from "@/lib/requests";
 
 type RequestKind = "leave" | "advance" | "permission";
 
@@ -106,7 +106,7 @@ async function notifyDecision(
           to: email,
           employeeName: data.employees.full_name,
           leaveTypeAr:
-            LEAVE_TYPE_LABELS_AR[data.leave_type] ?? data.leave_type,
+            LEAVE_TYPE_LABELS_AR[data.leave_type as LeaveType] ?? data.leave_type,
           startDate: data.start_date,
           endDate: data.end_date,
           daysCount: Number(data.days_count),
