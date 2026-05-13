@@ -2,6 +2,7 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { CopyButton } from "@/components/copy-button";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -54,7 +55,9 @@ export default async function InvitedPage({ params }: PageProps) {
   const emailBody = encodeURIComponent(
     `أهلًا ${invitation.full_name ?? ""}،\n\nتم دعوتك للانضمام لشركتنا على نِظام بصلاحية ${ROLE_LABELS[invitation.role]}.\n\nاضغط اللينك ده عشان تعمل حسابك:\n${acceptUrl}\n\n(اللينك صالح لمدة 7 أيام)`,
   );
-  const mailtoLink = `mailto:${invitation.email}?subject=${emailSubject}&body=${emailBody}`;
+  // Open Gmail web compose directly (works for any user with a Gmail account,
+  // no need for a desktop mail client to be configured).
+  const gmailLink = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(invitation.email)}&su=${emailSubject}&body=${emailBody}`;
 
   return (
     <main className="flex-1 px-6 py-8 bg-gradient-to-b from-slate-50 via-white to-cyan-50/30 min-h-screen">
@@ -86,7 +89,7 @@ export default async function InvitedPage({ params }: PageProps) {
             ⏰ صالح لمدة 7 أيام · 👤 الصلاحية: <strong>{ROLE_LABELS[invitation.role]}</strong> · 📧 للإيميل: <strong className="font-mono">{invitation.email}</strong>
           </p>
 
-          <div className="grid md:grid-cols-2 gap-3">
+          <div className="grid md:grid-cols-3 gap-3">
             <a
               href={whatsappLink}
               target="_blank"
@@ -94,15 +97,22 @@ export default async function InvitedPage({ params }: PageProps) {
               className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-md transition font-cairo"
             >
               <span>💬</span>
-              <span>ابعت على واتساب</span>
+              <span>واتساب</span>
             </a>
             <a
-              href={mailtoLink}
-              className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl border-2 border-slate-200 text-slate-700 font-bold hover:bg-slate-50 transition font-cairo"
+              href={gmailLink}
+              target="_blank"
+              rel="noopener"
+              className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-red-500 hover:bg-red-600 text-white font-bold shadow-md transition font-cairo"
             >
               <span>✉️</span>
-              <span>ابعت بإيميل</span>
+              <span>Gmail</span>
             </a>
+            <CopyButton
+              text={acceptUrl}
+              className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl border-2 border-slate-200 text-slate-700 font-bold hover:bg-slate-50 transition font-cairo"
+              copiedClassName="flex items-center justify-center gap-2 px-5 py-3 rounded-xl border-2 border-emerald-400 bg-emerald-50 text-emerald-700 font-bold transition font-cairo"
+            />
           </div>
         </section>
 
