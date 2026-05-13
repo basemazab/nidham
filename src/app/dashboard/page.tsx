@@ -199,7 +199,7 @@ export default async function DashboardPage() {
         <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 font-cairo">
           الموديولات
         </h2>
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 mb-8">
           <Link
             href="/dashboard/employees"
             className="bg-white p-6 rounded-2xl border border-slate-100 hover:border-brand-cyan/40 hover:shadow-lg hover:-translate-y-0.5 transition-all"
@@ -229,14 +229,23 @@ export default async function DashboardPage() {
 
           <Link
             href="/dashboard/interactions"
-            className="bg-gradient-to-br from-amber-50 to-cyan-50 p-6 rounded-2xl border-2 border-amber-200 hover:border-amber-400 hover:shadow-lg hover:-translate-y-0.5 transition-all relative overflow-hidden"
+            className="bg-gradient-to-br from-amber-50 to-cyan-50 p-6 rounded-2xl border-2 border-amber-200 hover:border-amber-400 hover:shadow-lg hover:-translate-y-0.5 transition-all"
+          >
+            <div className="text-3xl mb-2">💬</div>
+            <h3 className="font-bold font-cairo mb-1 text-slate-800">التفاعلات</h3>
+            <p className="text-xs text-amber-700 font-bold">قلب Bridge</p>
+          </Link>
+
+          <Link
+            href="/dashboard/contracts"
+            className="bg-white p-6 rounded-2xl border border-slate-100 hover:border-brand-cyan/40 hover:shadow-lg hover:-translate-y-0.5 transition-all relative overflow-hidden"
           >
             <div className="absolute top-2 left-2 text-[10px] text-brand-gold font-bold tracking-wider">
               جديد ✦
             </div>
-            <div className="text-3xl mb-2">💬</div>
-            <h3 className="font-bold font-cairo mb-1 text-slate-800">التفاعلات</h3>
-            <p className="text-xs text-amber-700 font-bold">قلب Bridge</p>
+            <div className="text-3xl mb-2">📋</div>
+            <h3 className="font-bold font-cairo mb-1 text-slate-800">العقود</h3>
+            <p className="text-xs text-slate-500">تنبيه قبل التجديد</p>
           </Link>
         </div>
 

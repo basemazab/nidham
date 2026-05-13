@@ -17,6 +17,7 @@ const NAV_ITEMS = [
   { href: "/dashboard/attendance", label: "الحضور", icon: "⏰", section: "main" },
   { href: "/dashboard/customers", label: "العملاء", icon: "💼", section: "main" },
   { href: "/dashboard/interactions", label: "التفاعلات", icon: "💬", section: "main" },
+  { href: "/dashboard/contracts", label: "العقود", icon: "📋", section: "main" },
   { href: "/dashboard/reports/attendance", label: "تقرير الحضور", icon: "📊", section: "reports" },
   { href: "/dashboard/reports/bridge", label: "Bridge ✦", icon: "✦", section: "reports" },
 ] as const;
