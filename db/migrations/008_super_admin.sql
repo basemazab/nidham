@@ -41,8 +41,9 @@ create policy "super_admin_update_subscriptions"
   using (public.is_super_admin())
   with check (public.is_super_admin());
 
--- Seed: basemazab is super admin (looked up by email at migration time)
+-- Seed: basemazab (basemazab640@gmail.com) is the sole super admin of Nidham SaaS.
+-- Looked up by email at migration time — the email must already be a signed-up user.
 insert into public.super_admins (user_id)
 select id from auth.users
-where email in ('basemazab644@gmail.com', 'basemazab640@gmail.com')
+where email = 'basemazab640@gmail.com'
 on conflict (user_id) do nothing;
