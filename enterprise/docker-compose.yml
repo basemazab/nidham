@@ -50,6 +50,12 @@ services:
       # and schemas first. Initdb scripts only run once on volume creation;
       # this two-step flow is easier to debug and idempotent across upgrades.
       - ./migrations:/migrations:ro
+      # 99-roles.sql IS an init script: supabase/postgres pre-creates the
+      # authenticator + supabase_auth_admin + supabase_storage_admin roles
+      # without passwords, and supautils blocks ALTER USER on them after
+      # boot. We have to set their passwords during initdb -- this volume
+      # mount handles that on first volume creation.
+      - ./initdb/99-roles.sql:/docker-entrypoint-initdb.d/99-roles.sql:ro
 
   # --------------------------------------------------------------------------
   # GoTrue — Supabase Auth, self-hosted

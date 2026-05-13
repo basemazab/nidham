@@ -9,3 +9,4 @@ backups/
 *.sql
 *.sql.gz
 !migrations/*.sql
+!initdb/*.sql
