@@ -104,25 +104,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     password,
     inviteToken,
   ) => {
-    const { data, error: signUpErr } = await supabase.auth.signUp({
-      email: email.trim(),
+    const trimmedEmail = email.trim();
+
+    // Try the happy-path signup first.
+    const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
+      email: trimmedEmail,
       password,
     });
-    if (signUpErr) return { error: arabicizeAuthError(signUpErr.message) };
 
-    // GoTrue might require email confirmation; in autoconfirm mode the
-    // session is already populated. Either way, the new user's auth.uid()
-    // is available to the RPC.
-    if (!data.session) {
-      // Try signing in to grab a session (autoconfirm mode)
+    let hasSession = !!signUpData?.session;
+
+    if (signUpErr) {
+      // The email might be left over from a previous failed attempt --
+      // signup throws 'user_already_exists' even though the row isn't
+      // linked to any employee. Fall back to signing in with the same
+      // password and let the claim RPC finish the linking.
+      const msg = signUpErr.message.toLowerCase();
+      const alreadyExists =
+        msg.includes("already registered") ||
+        msg.includes("user already") ||
+        signUpErr.code === "user_already_exists";
+      if (!alreadyExists) {
+        return { error: arabicizeAuthError(signUpErr.message) };
+      }
+      const { error: signInErr } = await supabase.auth.signInWithPassword({
+        email: trimmedEmail,
+        password,
+      });
+      if (signInErr) {
+        return {
+          error:
+            "الإيميل ده مسجّل قبل كده وكلمة السر مش مطابقة. جرّب إيميل جديد أو نفس كلمة السر اللي حطيتها قبل.",
+        };
+      }
+      hasSession = true;
+    }
+
+    // Even on a clean signup the session may be missing if auto-confirm
+    // isn't on. One more login attempt covers that case.
+    if (!hasSession) {
       const { error: siErr } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
+        email: trimmedEmail,
         password,
       });
       if (siErr) {
         return {
           error:
-            "تم إنشاء الحساب — راجع إيميلك وفعّله، ثم سجّل دخول",
+            "تم إنشاء الحساب لكن الإيميل لازم يتأكد. ادخل إعدادات Supabase وقفّل Confirm Email.",
         };
       }
     }
@@ -131,7 +159,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       "claim_employee_invitation",
       { p_token: inviteToken.trim() },
     );
-
     if (claimErr) {
       return { error: claimErr.message };
     }
