@@ -198,6 +198,7 @@ export function DashboardSidebar({ userName, companyName, userEmail, isSuperAdmi
         </div>
         <nav className="flex-1 overflow-y-auto p-3">
           <NavSection label="الموديولات" items={[...mainItems]} />
+          <NavSection label="✦ ذكاء" items={[...aiItems]} />
           <NavSection label="التقارير" items={[...reportItems]} />
         </nav>
         <UserFooter />
