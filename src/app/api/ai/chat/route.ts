@@ -1,6 +1,12 @@
-import { google } from "@ai-sdk/google";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { streamText } from "ai";
 import { createClient } from "@/lib/supabase/server";
+
+// Use our env var name (GEMINI_API_KEY) instead of the SDK's default
+// (GOOGLE_GENERATIVE_AI_API_KEY). One provider instance for the whole route.
+const google = createGoogleGenerativeAI({
+  apiKey: process.env.GEMINI_API_KEY,
+});
 
 type UIMessagePart = { type: string; text?: string };
 type IncomingMessage = {
