@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { requireHR } from "@/lib/permissions";
+import { requireHR, requireAdmin } from "@/lib/permissions";
 import { bustDashboardCache } from "@/lib/cache";
 
 const VALID_STATUSES = [
@@ -21,6 +21,11 @@ type AttendanceStatus = (typeof VALID_STATUSES)[number];
 // knees. 60 days × 200 employees = 12,000 rows, which is still ~one
 // round-trip via Supabase's batch insert.
 const BULK_MAX_DAYS = 60;
+
+// Deletion is a single DELETE statement in Postgres, no per-row work,
+// so the cap can be much larger. A full year is plenty for "wipe and
+// re-import" scenarios.
+const BULK_DELETE_MAX_DAYS = 365;
 
 export async function saveAttendance(formData: FormData) {
   await requireHR();
@@ -258,6 +263,134 @@ export async function bulkSaveAttendance(formData: FormData) {
         `${inserted}|${dates.length}|${empIds.length}`,
       ),
   );
+}
+
+// ----------------------------------------------------------------------------
+// Bulk delete -- wipe attendance for a date or a date range.
+//
+// Admin-only because deletion is destructive: cascades nothing (it's
+// just attendance rows), but losing a month of recorded clock-ins
+// would be painful to redo. The confirm-phrase below is parsed by the
+// modal client which posts "حذف" once the user types it.
+//
+// Whole-company by date range: simple DELETE FROM attendance with a
+// date filter, scoped by RLS to the caller's company.
+// ----------------------------------------------------------------------------
+export async function bulkDeleteAttendance(formData: FormData) {
+  const { supabase, profile } = await requireAdmin();
+
+  const startDate = String(formData.get("start_date") ?? "").trim();
+  const endDateRaw = String(formData.get("end_date") ?? "").trim();
+  const endDate = endDateRaw || startDate;
+  const confirm = String(formData.get("confirm") ?? "").trim();
+
+  if (!startDate) {
+    redirect(
+      "/dashboard/attendance?error=" + encodeURIComponent("التاريخ مطلوب"),
+    );
+  }
+  if (confirm !== "حذف") {
+    redirect(
+      "/dashboard/attendance?error=" +
+        encodeURIComponent("لازم تكتب 'حذف' في خانة التأكيد عشان نمسح."),
+    );
+  }
+
+  const dates = datesBetween(startDate, endDate);
+  if (dates.length === 0) {
+    redirect(
+      "/dashboard/attendance?error=" +
+        encodeURIComponent("تاريخ النهاية لازم يكون بعد أو يساوي تاريخ البداية"),
+    );
+  }
+  if (dates.length > BULK_DELETE_MAX_DAYS) {
+    redirect(
+      "/dashboard/attendance?error=" +
+        encodeURIComponent(
+          `الفترة كبيرة جدًا (${dates.length} يوم). الحد الأقصى ${BULK_DELETE_MAX_DAYS} يوم في المرة الواحدة.`,
+        ),
+    );
+  }
+
+  // Count first so the success banner is specific.
+  const { count: beforeCount } = await supabase
+    .from("attendance")
+    .select("id", { count: "exact", head: true })
+    .eq("company_id", profile.company_id)
+    .gte("date", startDate)
+    .lte("date", endDate);
+
+  const willDelete = beforeCount ?? 0;
+  if (willDelete === 0) {
+    redirect(
+      "/dashboard/attendance?date=" +
+        encodeURIComponent(endDate) +
+        "&error=" +
+        encodeURIComponent("مفيش سجلات حضور في الفترة دي عشان تتمسح."),
+    );
+  }
+
+  const { error } = await supabase
+    .from("attendance")
+    .delete()
+    .eq("company_id", profile.company_id)
+    .gte("date", startDate)
+    .lte("date", endDate);
+
+  if (error) {
+    redirect(
+      "/dashboard/attendance?error=" + encodeURIComponent(error.message),
+    );
+  }
+
+  revalidatePath("/dashboard/attendance");
+  revalidatePath("/dashboard/reports/attendance");
+  bustDashboardCache();
+
+  redirect(
+    "/dashboard/attendance?date=" +
+      encodeURIComponent(endDate) +
+      "&deleted=" +
+      encodeURIComponent(`${willDelete}|${dates.length}`),
+  );
+}
+
+// ----------------------------------------------------------------------------
+// Single-employee, single-day delete. Triggered from the per-row "✕"
+// button on the attendance page so HR can fix an individual mistake
+// without nuking the whole day.
+// ----------------------------------------------------------------------------
+export async function deleteOneAttendance(formData: FormData) {
+  await requireHR();
+  const supabase = await createClient();
+  const employeeId = String(formData.get("employee_id") ?? "").trim();
+  const date = String(formData.get("date") ?? "").trim();
+
+  if (!employeeId || !date) {
+    redirect(
+      "/dashboard/attendance?error=" +
+        encodeURIComponent("الموظف والتاريخ مطلوبين للحذف"),
+    );
+  }
+
+  const { error } = await supabase
+    .from("attendance")
+    .delete()
+    .eq("employee_id", employeeId)
+    .eq("date", date);
+
+  if (error) {
+    redirect(
+      "/dashboard/attendance?date=" +
+        encodeURIComponent(date) +
+        "&error=" +
+        encodeURIComponent(error.message),
+    );
+  }
+
+  revalidatePath("/dashboard/attendance");
+  revalidatePath("/dashboard/reports/attendance");
+  redirect("/dashboard/attendance?date=" + encodeURIComponent(date));
 }
 
 // Parse and clamp a tardiness / early-leave minute value to the DB

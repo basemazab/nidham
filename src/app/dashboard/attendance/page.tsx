@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { saveAttendance, bulkSaveAttendance } from "./actions";
+import {
+  saveAttendance,
+  bulkSaveAttendance,
+  bulkDeleteAttendance,
+} from "./actions";
 import { BulkAttendanceModal } from "./bulk-attendance-modal";
 
 type SearchParams = Promise<{
@@ -9,6 +13,7 @@ type SearchParams = Promise<{
   error?: string;
   saved?: string;
   bulk?: string;
+  deleted?: string;
 }>;
 
 type Employee = {
@@ -107,6 +112,7 @@ export default async function AttendancePage({
             <BulkAttendanceModal
               defaultDate={selectedDate}
               action={bulkSaveAttendance}
+              deleteAction={bulkDeleteAttendance}
             />
             <Link
               href="/dashboard/attendance/import"
@@ -173,6 +179,21 @@ export default async function AttendancePage({
                     </span>
                   </>
                 )}
+              </div>
+            </div>
+          );
+        })()}
+        {params.deleted && (() => {
+          const [recordsStr, daysStr] = decodeURIComponent(params.deleted).split("|");
+          const records = parseInt(recordsStr, 10) || 0;
+          const days = parseInt(daysStr, 10) || 0;
+          return (
+            <div className="mb-4 p-4 rounded-xl bg-red-50 border-2 border-red-200 text-red-900 font-cairo">
+              <div className="font-bold text-base mb-1">🗑 تم الحذف الجماعي</div>
+              <div className="text-sm leading-relaxed">
+                اتمسح <b>{records.toLocaleString("ar-EG")}</b> سجل حضور عبر{" "}
+                <b>{days.toLocaleString("ar-EG")}</b> يوم. الـ payroll و
+                التقارير اللي على الفترة دي هتعكس التغيير.
               </div>
             </div>
           );
