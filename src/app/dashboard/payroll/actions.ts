@@ -53,6 +53,8 @@ type EmployeeRow = {
 type AttendanceRecord = {
   employee_id: string;
   status: string;
+  tardiness_minutes: number | null;
+  early_leave_minutes: number | null;
 };
 
 /**
@@ -158,7 +160,9 @@ export async function generatePayrollPeriod(formData: FormData) {
       .returns<EmployeeRow[]>(),
     supabase
       .from("attendance")
-      .select("employee_id, status")
+      .select(
+        "employee_id, status, tardiness_minutes, early_leave_minutes",
+      )
       .gte("date", startDate)
       .lte("date", endDate)
       .returns<AttendanceRecord[]>(),
@@ -217,7 +221,24 @@ export async function generatePayrollPeriod(formData: FormData) {
     const absent = empAttendance.filter((a) => a.status === "absent").length;
     const leave = Math.max(0, empAttendance.length - attended - halfDay - absent);
 
-    const breakdown: AttendanceBreakdown = { attended, halfDay, leave, absent };
+    // Sum tardiness + early-leave minutes across only workday rows
+    // (present + half_day). A "weekend" or "leave" row carrying a stray
+    // non-zero value shouldn't count toward a deduction.
+    const tardinessMinutes = empAttendance
+      .filter((a) => a.status === "present" || a.status === "half_day")
+      .reduce((s, a) => s + (a.tardiness_minutes ?? 0), 0);
+    const earlyLeaveMinutes = empAttendance
+      .filter((a) => a.status === "present" || a.status === "half_day")
+      .reduce((s, a) => s + (a.early_leave_minutes ?? 0), 0);
+
+    const breakdown: AttendanceBreakdown = {
+      attended,
+      halfDay,
+      leave,
+      absent,
+      tardinessMinutes,
+      earlyLeaveMinutes,
+    };
     const loanDeduction = advanceDeductions.get(emp.id) ?? 0;
 
     const result = calculatePayroll(
@@ -251,6 +272,7 @@ export async function generatePayrollPeriod(formData: FormData) {
       overtime: 0,
       gross_salary: result.grossSalary,
       absence_deduction: result.absenceDeduction,
+      tardiness_deduction: result.tardinessDeduction,
       social_insurance: result.socialInsurance,
       income_tax: result.incomeTax,
       loan_deduction: loanDeduction,

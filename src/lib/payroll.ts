@@ -92,7 +92,18 @@ export type AttendanceBreakdown = {
   halfDay: number;    // أيام نصف يوم
   leave: number;      // أيام إجازة (مدفوعة الأجر)
   absent: number;     // أيام غياب بدون أجر
+  /** Sum of tardiness_minutes across the period. Default 0. */
+  tardinessMinutes?: number;
+  /** Sum of early_leave_minutes across the period. Default 0. */
+  earlyLeaveMinutes?: number;
 };
+
+/**
+ * Minutes in a single workday. Used to convert tardiness + early-leave
+ * minutes into a fractional-day deduction. 480 = 8h, the Egyptian
+ * Labour Code standard for office work.
+ */
+export const WORKDAY_MINUTES = 480;
 
 export type SalaryStructure = {
   basicSalary: number;
@@ -138,6 +149,8 @@ export type PayrollResult = {
   incomeTax: number;
   loanDeduction: number;
   otherDeductions: number;
+  /** Deduction for tardiness + early-leave (minutes -> fractional day). */
+  tardinessDeduction: number;
   totalDeductions: number;
 
   // Result
@@ -168,14 +181,25 @@ export function calculatePayroll(
   // 3. Daily rate
   const dailyRate = monthlyBase / workingDays;
 
-  // 4. Absence deduction (only for unpaid absences)
+  // 4a. Absence deduction (only for unpaid absences)
   const absenceDeduction =
     Math.round(attendance.absent * dailyRate * 100) / 100;
 
-  // 5. Gross = base + bonuses + overtime - absence
+  // 4b. Tardiness + early-leave deduction. The minutes captured in
+  //     attendance.tardiness_minutes / early_leave_minutes get converted
+  //     to a fractional-day deduction at the per-minute rate.
+  //     per_minute = dailyRate / 480 (8h workday).
+  const tardyMins =
+    (attendance.tardinessMinutes ?? 0) +
+    (attendance.earlyLeaveMinutes ?? 0);
+  const tardinessDeduction =
+    Math.round((tardyMins * (dailyRate / WORKDAY_MINUTES)) * 100) / 100;
+
+  // 5. Gross = base + bonuses + overtime - absence - tardiness
   const bonuses = salary.bonuses ?? 0;
   const overtime = salary.overtime ?? 0;
-  const grossSalary = monthlyBase + bonuses + overtime - absenceDeduction;
+  const grossSalary =
+    monthlyBase + bonuses + overtime - absenceDeduction - tardinessDeduction;
 
   // 6. Social insurance (on insurable wage, capped) -- opt-in per company.
   //    Most SMBs don't file with NOSI; default off keeps net = gross.
@@ -200,6 +224,7 @@ export function calculatePayroll(
   const totalDeductions =
     Math.round(
       (absenceDeduction +
+        tardinessDeduction +
         socialInsurance +
         incomeTax +
         loanDeduction +
@@ -231,6 +256,7 @@ export function calculatePayroll(
     incomeTax,
     loanDeduction,
     otherDeductions,
+    tardinessDeduction,
     totalDeductions,
 
     netSalary,

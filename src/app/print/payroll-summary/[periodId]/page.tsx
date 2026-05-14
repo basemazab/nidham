@@ -36,6 +36,7 @@ type Entry = {
   overtime: number;
   gross_salary: number;
   absence_deduction: number;
+  tardiness_deduction: number;
   social_insurance: number;
   income_tax: number;
   loan_deduction: number;
@@ -88,7 +89,7 @@ export default async function PayrollSummaryPrint({ params }: PageProps) {
   const { data: entries } = await supabase
     .from("payroll_entries")
     .select(
-      "id, basic_salary, housing_allowance, transport_allowance, other_allowances, incentive_allowance, bonuses, overtime, gross_salary, absence_deduction, social_insurance, income_tax, loan_deduction, other_deductions, total_deductions, net_salary, attended_days, absent_days, employees(full_name, employee_code, job_title, department, bank_name, bank_account_number)",
+      "id, basic_salary, housing_allowance, transport_allowance, other_allowances, incentive_allowance, bonuses, overtime, gross_salary, absence_deduction, tardiness_deduction, social_insurance, income_tax, loan_deduction, other_deductions, total_deductions, net_salary, attended_days, absent_days, employees(full_name, employee_code, job_title, department, bank_name, bank_account_number)",
     )
     .eq("period_id", periodId)
     .order("employees(full_name)", { ascending: true })
@@ -244,7 +245,8 @@ export default async function PayrollSummaryPrint({ params }: PageProps) {
                   const otherDed =
                     Number(r.loan_deduction) +
                     Number(r.other_deductions) +
-                    Number(r.absence_deduction);
+                    Number(r.absence_deduction) +
+                    Number(r.tardiness_deduction ?? 0);
                   return (
                     <tr key={r.id} className="hover:bg-slate-50">
                       <td className="px-2 py-2 border border-slate-200 text-slate-500">{i + 1}</td>

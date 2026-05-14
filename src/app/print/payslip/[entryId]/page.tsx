@@ -29,6 +29,7 @@ type Entry = {
   overtime: number;
   gross_salary: number;
   absence_deduction: number;
+  tardiness_deduction: number;
   social_insurance: number;
   income_tax: number;
   loan_deduction: number;
@@ -224,6 +225,12 @@ export default async function PrintPayslipPage({ params }: PageProps) {
             <div className="space-y-2 text-sm font-cairo">
               {entry.absence_deduction > 0 && (
                 <LineItem label="خصم الغياب" value={entry.absence_deduction} />
+              )}
+              {entry.tardiness_deduction > 0 && (
+                <LineItem
+                  label="خصم تأخير / انصراف مبكر"
+                  value={entry.tardiness_deduction}
+                />
               )}
               {entry.social_insurance > 0 && (
                 <LineItem label="التأمينات (14%)" value={entry.social_insurance} />
