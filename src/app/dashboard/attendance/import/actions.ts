@@ -582,6 +582,11 @@ export async function importAttendance(formData: FormData) {
   }
 
   // Walk the data rows (everything below the header).
+  // Generate one batch UUID for this entire upload so HR can later
+  // review "everything from this import" on /dashboard/attendance/review.
+  const batchId = crypto.randomUUID();
+  const importedAt = new Date().toISOString();
+
   const records: Array<{
     company_id: string;
     employee_id: string;
@@ -593,6 +598,8 @@ export async function importAttendance(formData: FormData) {
     early_leave_minutes: number;
     notes: string | null;
     created_by: string;
+    import_batch_id: string;
+    imported_at: string;
   }> = [];
   const errors: string[] = [];
   let skipped = 0;
@@ -716,6 +723,8 @@ export async function importAttendance(formData: FormData) {
             })()
           : null,
       created_by: user.id,
+      import_batch_id: batchId,
+      imported_at: importedAt,
     });
   }
 
@@ -755,11 +764,15 @@ export async function importAttendance(formData: FormData) {
   revalidatePath("/dashboard/reports/attendance");
   bustDashboardCache();
 
-  const errorSummary =
+  // Redirect to the review page so HR can audit the batch they just
+  // uploaded before it shows up in reports / payroll. Carry the
+  // import summary (mode, filtered, errors) so the review banner can
+  // explain what got through and what didn't.
+  const errSummary =
     errors.length > 0
       ? `&errors=${encodeURIComponent(errors.slice(0, 10).join("\n"))}`
       : "";
   redirect(
-    `/dashboard/attendance/import?imported=${records.length}&skipped=${skipped}&filtered=${modeFiltered}&mode=${mode}${errorSummary}`,
+    `/dashboard/attendance/review?batch=${batchId}&just_imported=1&imported=${records.length}&skipped=${skipped}&filtered=${modeFiltered}&mode=${mode}${errSummary}`,
   );
 }

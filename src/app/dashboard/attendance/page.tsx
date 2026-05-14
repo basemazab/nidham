@@ -58,6 +58,14 @@ export default async function AttendancePage({
 
   const employees = employeesData ?? [];
 
+  // Count of attendance rows imported in the last 24h that haven't
+  // been confirmed yet -- drives the review banner below.
+  const { data: recentImportCount } = await supabase.rpc(
+    "count_recent_import_rows",
+  );
+  const recentImports =
+    typeof recentImportCount === "number" ? recentImportCount : 0;
+
   // Existing attendance for this date -- pulled with tardiness +
   // early-leave so the form defaults reflect what's already saved.
   const { data: existing } = await supabase
@@ -201,6 +209,32 @@ export default async function AttendancePage({
         {params.error && (
           <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm font-cairo">
             ⚠ {decodeURIComponent(params.error)}
+          </div>
+        )}
+
+        {/* Recent-import review banner: shown when fingerprint data was
+            imported in the last 24h and HR hasn't clicked "اعتمد" yet. */}
+        {recentImports > 0 && (
+          <div className="mb-4 p-4 rounded-xl bg-amber-50 border-2 border-amber-200 font-cairo flex flex-wrap items-start justify-between gap-3">
+            <div className="flex items-start gap-3 flex-1 min-w-0">
+              <span className="text-2xl">📥</span>
+              <div>
+                <div className="font-bold text-amber-900 mb-0.5">
+                  {recentImports.toLocaleString("ar-EG")} سجل حضور تم استيراده
+                  مؤخرًا — راجعهم قبل اعتماد المرتب
+                </div>
+                <p className="text-sm text-amber-800 leading-relaxed">
+                  لما ترفع شيت من البصمة، السجلات بتظهر هنا كـ "دفعة". افتح
+                  المراجعة، عدّل اللي محتاج تعديل، احذف الغلط، واعتمد.
+                </p>
+              </div>
+            </div>
+            <Link
+              href="/dashboard/attendance/review"
+              className="px-4 py-2 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 text-white font-bold text-sm shadow-md hover:shadow-lg transition whitespace-nowrap"
+            >
+              🔍 افتح المراجعة →
+            </Link>
           </div>
         )}
 
