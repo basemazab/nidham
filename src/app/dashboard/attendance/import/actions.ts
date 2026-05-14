@@ -43,59 +43,154 @@ const STATUS_ALIASES: Record<string, string> = {
   "اجازة اسبوعية": "weekend",
 };
 
-// Header-aliases per logical column. Each row's headers are matched
-// case-insensitively for English, trimmed for Arabic. ZKTeco exports
-// use shorter Arabic labels (رقم البصمة / الإسم / الإدارة / التاريخ /
-// الوقت), so those are in here too.
+// Header-aliases per logical column. Permissive on purpose -- ZK has
+// at least 6 product lines (ZKTime 5/8, ZKBio, BioTime, IClock, Attendance
+// Management, Standalone) and each emits Arabic OR English headers with
+// slightly different spellings. The normalizer below also folds Arabic
+// variants (ة/ه, ى/ي, alif forms, tashkeel) so we don't have to list
+// every spelling.
 const HEADER_ALIASES: Record<string, string> = {
-  // employee_code (ZKTeco fingerprint id)
+  // ----- employee_code (the ZKTeco fingerprint id) -----
   "رقم البصمة": "code",
+  "رقم البصمه": "code",
+  "كود البصمة": "code",
+  "كود البصمه": "code",
   "كود الموظف": "code",
   كود: "code",
   الكود: "code",
-  "كود البصمة": "code",
-  "رقم البصمه": "code",
+  بصمة: "code",
+  بصمه: "code",
+  "رقم بصمة": "code",
+  "رقم بصمه": "code",
+  "كود بصمة": "code",
+  "كود بصمه": "code",
+  "رقم تعريف": "code",
+  "رقم تعريفي": "code",
+  "id رقم": "code",
   employee_code: "code",
   code: "code",
   id: "code",
+  "ac-no": "code",
+  "ac no": "code",
+  acno: "code",
+  no: "code",
+  num: "code",
+  number: "code",
+  enrollno: "code",
+  "enroll no": "code",
+  enroll_no: "code",
+  "personnel id": "code",
+  "person id": "code",
+  personid: "code",
   fingerprint: "code",
   "fingerprint id": "code",
-  // name (display only)
+  "fingerprint number": "code",
+  // ----- name (display only) -----
   الإسم: "name",
   الاسم: "name",
+  اسم: "name",
   "اسم الموظف": "name",
   "اسم الموظفه": "name",
+  "اسم العامل": "name",
+  "اسم الفرد": "name",
+  "اسم الشخص": "name",
+  "الاسم الكامل": "name",
+  "الاسم رباعي": "name",
   full_name: "name",
   name: "name",
   employee_name: "name",
-  // department (display only)
+  "employee name": "name",
+  "person name": "name",
+  "staff name": "name",
+  "full name": "name",
+  // ----- department (display only) -----
   الإدارة: "department",
   الادارة: "department",
+  الاداره: "department",
+  الإداره: "department",
+  إدارة: "department",
+  اداره: "department",
+  ادارة: "department",
   القسم: "department",
+  قسم: "department",
+  الجهة: "department",
+  جهة: "department",
+  جهه: "department",
+  المجموعة: "department",
+  مجموعة: "department",
   department: "department",
-  // date
+  dept: "department",
+  division: "department",
+  group: "department",
+  unit: "department",
+  // ----- date -----
   التاريخ: "date",
+  تاريخ: "date",
+  "تاريخ الحضور": "date",
+  "تاريخ الإنصراف": "date",
+  "تاريخ البصمة": "date",
+  "تاريخ السجل": "date",
   date: "date",
   day: "date",
-  "تاريخ الحضور": "date",
-  // time(s) -- ZKTeco bundles in/out in one cell separated by space
+  "att date": "date",
+  attendancedate: "date",
+  "attendance date": "date",
+  punch_date: "date",
+  punchdate: "date",
+  // ----- bundled time(s) -- ZK puts both punches in one cell -----
   الوقت: "time",
+  وقت: "time",
+  "وقت الحضور والإنصراف": "time",
+  "أوقات البصمة": "time",
+  البصمات: "time",
   time: "time",
+  times: "time",
+  punch: "time",
+  punches: "time",
+  "punch time": "time",
+  punchtime: "time",
+  inout: "time",
+  "in/out": "time",
+  "in out": "time",
+  // ----- separate check_in -----
   "وقت الحضور": "check_in",
+  "ساعة الحضور": "check_in",
+  "وقت الدخول": "check_in",
+  دخول: "check_in",
+  حضور: "check_in",
   check_in: "check_in",
+  "check in": "check_in",
   checkin: "check_in",
   in: "check_in",
+  "in time": "check_in",
+  "time in": "check_in",
+  "first in": "check_in",
+  // ----- separate check_out -----
   "وقت الانصراف": "check_out",
+  "وقت الإنصراف": "check_out",
+  "ساعة الانصراف": "check_out",
+  "وقت الخروج": "check_out",
+  انصراف: "check_out",
+  خروج: "check_out",
   check_out: "check_out",
+  "check out": "check_out",
   checkout: "check_out",
   out: "check_out",
-  // status (when present)
+  "out time": "check_out",
+  "time out": "check_out",
+  "last out": "check_out",
+  // ----- status (when present) -----
   الحالة: "status",
+  حالة: "status",
   status: "status",
-  // notes
+  state: "status",
+  // ----- notes -----
   ملاحظات: "notes",
+  ملاحظة: "notes",
   notes: "notes",
-  note: "note",
+  note: "notes",
+  remark: "notes",
+  remarks: "notes",
 };
 
 // Arabic normalizer: ZKTeco exports use "الإداره" (with هـ ending)
@@ -283,30 +378,47 @@ export async function importAttendance(formData: FormData) {
   const mode: ImportMode =
     modeRaw === "weekly" ? "weekly" : modeRaw === "all" ? "all" : "monthly";
 
-  // Parse the workbook. The `codepage: 1256` option tells xlsx to
-  // decode legacy BIFF8 Arabic .xls files correctly -- without it,
-  // ZKTeco exports come back as garbled latin1 (ÑÞã ÇáÈÕãå ...).
-  let matrix: unknown[][];
+  // Parse the workbook. ZK products span multiple language packs +
+  // codepages: Arabic builds emit BIFF8 with cp1256, modern Chinese
+  // builds with cp936, English/Western with cp1252, and newer UTF-8
+  // exports with cp65001. We try each codepage in turn and keep the
+  // FIRST one where findHeaderRow can locate a real header row -- so
+  // HR doesn't have to know which ZK product they're running.
+  let matrix: unknown[][] = [];
+  let parseError: string | null = null;
+  const CODEPAGE_FALLBACKS = [1256, 65001, 1252, 0]; // 0 = autodetect
   try {
     const buffer = await file.arrayBuffer();
-    const wb = XLSX.read(buffer, {
-      type: "array",
-      cellDates: false,
-      codepage: 1256,
-    });
-    const sheet = wb.Sheets[wb.SheetNames[0]];
-    matrix = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
-      header: 1,
-      raw: true,
-      defval: null,
-      blankrows: false,
-    });
+    for (const cp of CODEPAGE_FALLBACKS) {
+      const wb = XLSX.read(buffer, {
+        type: "array",
+        cellDates: false,
+        codepage: cp || undefined,
+      });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const candidate = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
+        header: 1,
+        raw: true,
+        defval: null,
+        blankrows: false,
+      });
+      // If THIS codepage gives us a recognisable header row, keep it.
+      const candidateHeader = findHeaderRow(candidate);
+      if (candidateHeader !== -1) {
+        matrix = candidate;
+        break;
+      }
+      // Otherwise hold onto the first parsed matrix so the diagnostic
+      // below can still show something useful.
+      if (matrix.length === 0) matrix = candidate;
+    }
   } catch (e) {
+    parseError = e instanceof Error ? e.message : "error";
+  }
+  if (parseError) {
     redirect(
       "/dashboard/attendance/import?error=" +
-        encodeURIComponent(
-          "ملف Excel غير صالح: " + (e instanceof Error ? e.message : "error"),
-        ),
+        encodeURIComponent("ملف Excel غير صالح: " + parseError),
     );
   }
 
@@ -318,10 +430,24 @@ export async function importAttendance(formData: FormData) {
 
   const headerRowIdx = findHeaderRow(matrix);
   if (headerRowIdx === -1) {
+    // Show the user the first 3 rows so they can tell us what headers
+    // their ZK export actually uses. Encoding/decoding bugs surface
+    // here as garbled cells (ÑÞã ÇáÈÕãå...).
+    const preview = matrix
+      .slice(0, 3)
+      .map((row, i) => {
+        if (!Array.isArray(row)) return `صف ${i + 1}: (فاضي)`;
+        const cells = row
+          .map((c) => (c === null || c === undefined ? "(فاضي)" : String(c).trim()))
+          .filter((c) => c && c !== "(فاضي)")
+          .slice(0, 6);
+        return `صف ${i + 1}: ${cells.join(" · ") || "(فاضي)"}`;
+      })
+      .join("\n");
     redirect(
       "/dashboard/attendance/import?error=" +
         encodeURIComponent(
-          "مش لاقي صف هيدر فيه أعمدة معروفة (زي 'رقم البصمة' أو 'التاريخ' أو 'الوقت'). تأكد إن الـ encoding عربي.",
+          `مش لاقي صف هيدر فيه أعمدة معروفة. شفت السطور دي في الملف:\n${preview}\n\nلو الحروف العربية ظاهرة غريبة (ÑÞã)، الـ encoding مش 1256. لو ظاهرة صح، ابعت screenshot عشان نضيف الأسماء دي للنظام.`,
         ),
     );
   }
