@@ -15,6 +15,7 @@ import {
   confirmPdfImport,
   type EmployeeImportRow,
 } from "@/app/dashboard/employees/import/actions";
+import { FileDropZone } from "./file-drop-zone";
 
 type ParseResponse = {
   ok: true;
@@ -122,20 +123,19 @@ export function PDFImportFlow() {
           </div>
         )}
 
-        <div>
-          <input
-            type="file"
-            accept=".pdf,application/pdf"
-            onChange={(e) => {
-              setFile(e.target.files?.[0] ?? null);
-              setError(null);
-            }}
-            className="block w-full text-sm text-slate-700 file:ml-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-bold file:bg-amber-50 file:text-amber-700 hover:file:bg-amber-100 file:cursor-pointer cursor-pointer"
-          />
-          <p className="text-xs text-slate-500 mt-2 font-cairo">
-            الحد الأقصى: 5 ميجا · 30 صفحة · الـ AI بياخد 5-15 ثانية في القراءة
-          </p>
-        </div>
+        <FileDropZone
+          accept=".pdf,application/pdf"
+          hint="ملف PDF · حد أقصى 5 ميجا · 30 صفحة"
+          label="ارفع ملف PDF فيه بيانات الموظفين"
+          maxBytes={5 * 1024 * 1024}
+          onFileSelected={(f) => {
+            setFile(f);
+            setError(null);
+          }}
+        />
+        <p className="text-xs text-slate-500 font-cairo">
+          الـ AI بياخد 5-15 ثانية في القراءة بعد ما تدوس الزرار تحت.
+        </p>
 
         <button
           type="button"

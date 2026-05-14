@@ -2,6 +2,7 @@ import Link from "next/link";
 import { importEmployees } from "./actions";
 import { requireHRPage } from "@/lib/permissions";
 import { PDFImportFlow } from "@/components/pdf-import-flow";
+import { FileDropZone } from "@/components/file-drop-zone";
 
 type Params = Promise<{
   inserted?: string;
@@ -138,15 +139,15 @@ export default async function ImportEmployeesPage({
             الطريقة الأسرع لو عندك شيت منظّم بصفوف وأعمدة محددة.
           </p>
           <form action={importEmployees} className="space-y-4">
-            <input
-              type="file"
+            <FileDropZone
               name="file"
               accept=".xlsx,.xls,.csv"
               required
-              className="block w-full text-sm text-slate-700 file:ml-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-bold file:bg-brand-cyan/10 file:text-brand-cyan-dark hover:file:bg-brand-cyan/20 file:cursor-pointer cursor-pointer"
+              hint=".xlsx أو .xls أو .csv · حد أقصى 5 ميجا"
+              maxBytes={5 * 1024 * 1024}
             />
             <p className="text-xs text-slate-500 font-cairo">
-              الحد الأقصى: 5 ميجا · 2000 موظف لكل رفعة
+              2000 موظف لكل رفعة
             </p>
             <button
               type="submit"
