@@ -1,16 +1,15 @@
 "use client";
 
-// Big, friendly file picker. Replaces bare <input type="file"> calls in
+// Big, friendly file picker. Replaces bare <input type="file"> in
 // places where the user is uploading something important (employee
 // import, PDF parse, ...).
 //
-// - Click anywhere on the zone to open the OS file dialog.
-// - Drag-and-drop from desktop also works.
-// - Shows the picked filename + size + "remove" affordance so the user
-//   knows the file was registered.
-// - When used inside a server-action <form>, set `name=` and we render
-//   a hidden <input> with the selected file via DataTransfer trickery so
-//   the form submit picks it up exactly like a bare input would.
+// Pattern: a <label> wraps the visually-hidden <input type="file">.
+// Browsers natively forward any click inside the label to the input,
+// so we don't have to call .click() programmatically -- that path was
+// blocked by iOS Safari when the synthetic click was overlapped by an
+// absolute-positioned input. With the label pattern the tap always
+// fires the native file dialog, on every device.
 
 import { useRef, useState, type ChangeEvent, type DragEvent } from "react";
 
@@ -62,14 +61,12 @@ export function FileDropZone({
     onFileSelected?.(f);
   };
 
-  const onPick = () => inputRef.current?.click();
-
   const onChange = (e: ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0] ?? null;
     setFromFile(f);
   };
 
-  const onDrop = (e: DragEvent<HTMLDivElement>) => {
+  const onDrop = (e: DragEvent<HTMLLabelElement>) => {
     e.preventDefault();
     setDragOver(false);
     const f = e.dataTransfer.files?.[0] ?? null;
@@ -103,40 +100,33 @@ export function FileDropZone({
     setFromFile(f);
   };
 
-  const onClear = () => {
+  const onClear = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     if (inputRef.current) inputRef.current.value = "";
     setFromFile(null);
   };
 
   return (
     <div>
-      <div
-        onClick={onPick}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            onPick();
-          }
-        }}
+      <label
         onDragOver={(e) => {
           e.preventDefault();
           setDragOver(true);
         }}
         onDragLeave={() => setDragOver(false)}
         onDrop={onDrop}
-        role="button"
-        tabIndex={0}
-        aria-label={label}
-        className={`relative cursor-pointer rounded-2xl border-2 border-dashed p-6 text-center transition-all ${
+        className={`block cursor-pointer rounded-2xl border-2 border-dashed p-6 text-center transition-all ${
           dragOver
             ? "border-brand-cyan bg-brand-cyan/5"
             : file
             ? "border-emerald-300 bg-emerald-50/40"
-            : "border-slate-300 bg-slate-50 hover:border-brand-cyan/50 hover:bg-slate-100/50"
+            : "border-slate-300 bg-slate-50 hover:border-brand-cyan/50 hover:bg-slate-100/50 active:bg-slate-100"
         }`}
       >
-        {/* Real input lives inside but is visually hidden -- the whole
-            card is the click target. We keep it focusable for a11y. */}
+        {/* The input is visually hidden but still focusable + clickable
+            via the <label> wrap. Browser natively forwards label clicks
+            to it -- no JS .click() needed (which iOS Safari blocked). */}
         <input
           ref={inputRef}
           type="file"
@@ -144,8 +134,7 @@ export function FileDropZone({
           accept={accept}
           required={required && !file}
           onChange={onChange}
-          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-          tabIndex={-1}
+          className="sr-only"
         />
 
         {file ? (
@@ -168,17 +157,14 @@ export function FileDropZone({
             </div>
             <button
               type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onClear();
-              }}
+              onClick={onClear}
               className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-600 text-xs font-bold hover:bg-slate-50 transition font-cairo shrink-0"
             >
               تغيير
             </button>
           </div>
         ) : (
-          <div className="pointer-events-none">
+          <div>
             <div className="text-4xl mb-2">⬆</div>
             <div className="font-bold text-slate-700 font-cairo mb-1">
               {label}
@@ -186,12 +172,12 @@ export function FileDropZone({
             {hint && (
               <div className="text-xs text-slate-500 font-cairo">{hint}</div>
             )}
-            <div className="text-[11px] text-slate-400 mt-2 font-cairo">
-              اضغط هنا أو اسحب الملف للداخل
+            <div className="text-[11px] text-slate-400 mt-3 font-cairo inline-block px-3 py-1 rounded-full bg-white border border-slate-200">
+              اضغط هنا لاختيار ملف
             </div>
           </div>
         )}
-      </div>
+      </label>
 
       {error && (
         <div className="mt-3 px-3 py-2 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs font-cairo">
