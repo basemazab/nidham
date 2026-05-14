@@ -50,6 +50,7 @@ const NAV_ITEMS: readonly NavItem[] = [
   { href: "/dashboard/reports/bridge", label: "Bridge ✦", icon: "✦", section: "reports", feature: "bridge_analytics" },
   { href: "/dashboard/audit-log", label: "سجل النشاط", icon: "📋", section: "reports", visibleTo: ["admin"], feature: "audit_log" },
   { href: "/dashboard/settings/office-location", label: "موقع المكتب 📍", icon: "⚙", section: "settings", visibleTo: ["admin"] },
+  { href: "/dashboard/settings/leave-rollover", label: "ترحيل الإجازات", icon: "🗓", section: "settings", visibleTo: ["admin"] },
 ];
 
 export function DashboardSidebar({
