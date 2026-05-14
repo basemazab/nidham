@@ -18,6 +18,7 @@ type Entry = {
   housing_allowance: number;
   transport_allowance: number;
   other_allowances: number;
+  incentive_allowance: number;
   bonuses: number;
   overtime: number;
   gross_salary: number;
@@ -43,6 +44,9 @@ type Entry = {
   payroll_periods: {
     year: number;
     month: number;
+    frequency: "monthly" | "weekly" | null;
+    start_date: string | null;
+    end_date: string | null;
     working_days: number;
     status: string;
     paid_at: string | null;
@@ -58,6 +62,11 @@ const ARABIC_MONTHS = [
   "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر",
 ];
 
+function formatIsoDate(iso: string): string {
+  const [y, m, d] = iso.split("-");
+  return `${d}/${m}/${y}`;
+}
+
 export default async function PayslipPage({ params }: PageProps) {
   const { id, entryId } = await params;
 
@@ -70,7 +79,7 @@ export default async function PayslipPage({ params }: PageProps) {
   const { data: entry } = await supabase
     .from("payroll_entries")
     .select(
-      "*, employees(full_name, employee_code, job_title, department, national_id, social_insurance_number, bank_name, bank_account_number, hire_date), payroll_periods(year, month, working_days, status, paid_at)",
+      "*, employees(full_name, employee_code, job_title, department, national_id, social_insurance_number, bank_name, bank_account_number, hire_date), payroll_periods(year, month, frequency, start_date, end_date, working_days, status, paid_at)",
     )
     .eq("id", entryId)
     .single<Entry>();
@@ -96,9 +105,14 @@ export default async function PayslipPage({ params }: PageProps) {
 
   const period = entry.payroll_periods;
   const emp = entry.employees;
+  // Prefer the explicit cycle window (migration 026). Fall back to
+  // year+month for any pre-026 row that wasn't backfilled.
   const monthLabel = period
-    ? `${ARABIC_MONTHS[period.month - 1]} ${period.year}`
+    ? period.start_date && period.end_date
+      ? `${formatIsoDate(period.start_date)} → ${formatIsoDate(period.end_date)}`
+      : `${ARABIC_MONTHS[period.month - 1]} ${period.year}`
     : "—";
+  const cycleTypeLabel = period?.frequency === "weekly" ? "أسبوعي" : "شهري";
 
   return (
     <main className="flex-1 bg-slate-100 min-h-screen py-8 px-4 print:bg-white print:p-0">
@@ -127,7 +141,7 @@ export default async function PayslipPage({ params }: PageProps) {
               </div>
               <h1 className="text-2xl font-black font-cairo">{companyName}</h1>
               <p className="text-xs text-cyan-100 mt-1 font-cairo">
-                قسيمة راتب شهر {monthLabel}
+                قسيمة راتب {cycleTypeLabel} · {monthLabel}
               </p>
             </div>
             <div className="text-left text-xs font-cairo">
@@ -206,6 +220,7 @@ export default async function PayslipPage({ params }: PageProps) {
               <LineItem label="بدل سكن" value={entry.housing_allowance} />
               <LineItem label="بدل انتقال" value={entry.transport_allowance} />
               <LineItem label="بدلات أخرى" value={entry.other_allowances} />
+              <LineItem label="حافز" value={entry.incentive_allowance} />
               <LineItem label="مكافأة" value={entry.bonuses} />
               <LineItem label="أوفر تايم" value={entry.overtime} />
               <div className="pt-2 mt-2 border-t border-slate-200 flex justify-between font-bold text-emerald-700">
@@ -216,6 +231,7 @@ export default async function PayslipPage({ params }: PageProps) {
                       entry.housing_allowance +
                       entry.transport_allowance +
                       entry.other_allowances +
+                      entry.incentive_allowance +
                       entry.bonuses +
                       entry.overtime,
                   )}

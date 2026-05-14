@@ -11,6 +11,9 @@ export type PayslipSummary = {
   period_id: string;
   year: number;
   month: number;
+  frequency: "monthly" | "weekly" | null;
+  start_date: string | null;
+  end_date: string | null;
   period_status: "draft" | "approved" | "paid" | "cancelled";
   paid_at: string | null;
   net_salary: number;
@@ -24,6 +27,7 @@ export type PayslipDetail = PayslipSummary & {
   housing_allowance: number;
   transport_allowance: number;
   other_allowances: number;
+  incentive_allowance: number;
   bonuses: number;
   overtime: number;
   absence_deduction: number;
@@ -48,6 +52,7 @@ type RawEntry = {
   housing_allowance?: number;
   transport_allowance?: number;
   other_allowances?: number;
+  incentive_allowance?: number;
   bonuses?: number;
   overtime?: number;
   absence_deduction?: number;
@@ -62,6 +67,9 @@ type RawEntry = {
   payroll_periods: {
     year: number;
     month: number;
+    frequency: "monthly" | "weekly" | null;
+    start_date: string | null;
+    end_date: string | null;
     status: "draft" | "approved" | "paid" | "cancelled";
     paid_at: string | null;
   };
@@ -74,7 +82,7 @@ export async function listMyPayslips(
     .from("payroll_entries")
     .select(
       `id, period_id, net_salary, gross_salary, attended_days, absent_days,
-       payroll_periods(year, month, status, paid_at)`,
+       payroll_periods(year, month, frequency, start_date, end_date, status, paid_at)`,
     )
     .eq("employee_id", employeeId)
     .order("created_at", { ascending: false });
@@ -89,6 +97,9 @@ export async function listMyPayslips(
       period_id: r.period_id,
       year: r.payroll_periods.year,
       month: r.payroll_periods.month,
+      frequency: r.payroll_periods.frequency,
+      start_date: r.payroll_periods.start_date,
+      end_date: r.payroll_periods.end_date,
       period_status: r.payroll_periods.status,
       paid_at: r.payroll_periods.paid_at,
       net_salary: Number(r.net_salary),
@@ -107,10 +118,10 @@ export async function getMyPayslip(
     .select(
       `id, period_id, net_salary, gross_salary, attended_days, absent_days,
        basic_salary, housing_allowance, transport_allowance, other_allowances,
-       bonuses, overtime, absence_deduction, social_insurance, income_tax,
-       loan_deduction, other_deductions, total_deductions, half_day_days,
-       leave_days, notes,
-       payroll_periods(year, month, status, paid_at)`,
+       incentive_allowance, bonuses, overtime, absence_deduction,
+       social_insurance, income_tax, loan_deduction, other_deductions,
+       total_deductions, half_day_days, leave_days, notes,
+       payroll_periods(year, month, frequency, start_date, end_date, status, paid_at)`,
     )
     .eq("id", entryId)
     .eq("employee_id", employeeId)
@@ -123,6 +134,9 @@ export async function getMyPayslip(
     period_id: data.period_id,
     year: data.payroll_periods.year,
     month: data.payroll_periods.month,
+    frequency: data.payroll_periods.frequency,
+    start_date: data.payroll_periods.start_date,
+    end_date: data.payroll_periods.end_date,
     period_status: data.payroll_periods.status,
     paid_at: data.payroll_periods.paid_at,
     net_salary: Number(data.net_salary),
@@ -133,6 +147,7 @@ export async function getMyPayslip(
     housing_allowance: Number(data.housing_allowance ?? 0),
     transport_allowance: Number(data.transport_allowance ?? 0),
     other_allowances: Number(data.other_allowances ?? 0),
+    incentive_allowance: Number(data.incentive_allowance ?? 0),
     bonuses: Number(data.bonuses ?? 0),
     overtime: Number(data.overtime ?? 0),
     absence_deduction: Number(data.absence_deduction ?? 0),
@@ -153,4 +168,24 @@ const MONTH_NAMES_AR = [
 ];
 export function monthLabel(year: number, month: number): string {
   return `${MONTH_NAMES_AR[month - 1] ?? month} ${year}`;
+}
+
+// Prefer the cycle window (e.g. "21/04/2026 → 20/05/2026") when the
+// period has explicit start/end dates (migration 026+). Fall back to
+// the legacy calendar-month label otherwise.
+export function cycleLabel(p: {
+  year: number;
+  month: number;
+  start_date: string | null;
+  end_date: string | null;
+}): string {
+  if (p.start_date && p.end_date) {
+    return `${formatIsoDate(p.start_date)} → ${formatIsoDate(p.end_date)}`;
+  }
+  return monthLabel(p.year, p.month);
+}
+
+function formatIsoDate(iso: string): string {
+  const [y, m, d] = iso.split("-");
+  return `${d}/${m}/${y}`;
 }

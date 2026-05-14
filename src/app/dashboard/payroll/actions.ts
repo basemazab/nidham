@@ -181,15 +181,21 @@ export async function generatePayrollPeriod(formData: FormData) {
   const attendance = attendanceRes.data ?? [];
 
   // Auto-link advances: for each employee, ask the DB how much of their
-  // open advances should be deducted in this specific (year, month).
-  // compute_advance_deduction_for_month is referentially transparent --
-  // deleting / regenerating the period self-corrects. Migration 019.
+  // open advances should be deducted from this specific cycle window.
+  // compute_advance_deduction_for_period is referentially transparent --
+  // deleting / regenerating the period self-corrects.
+  // Migration 027 replaces the legacy (year, month) variant with a
+  // date-range one so 21->20 monthly cycles deduct correctly.
   const advanceDeductions = new Map<string, number>();
   await Promise.all(
     employees.map(async (emp) => {
       const { data } = await supabase.rpc(
-        "compute_advance_deduction_for_month",
-        { p_employee_id: emp.id, p_year: year, p_month: month },
+        "compute_advance_deduction_for_period",
+        {
+          p_employee_id: emp.id,
+          p_period_start: startDate,
+          p_period_end: endDate,
+        },
       );
       const value = typeof data === "number" ? data : 0;
       advanceDeductions.set(emp.id, value);

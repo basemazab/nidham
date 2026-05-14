@@ -48,6 +48,9 @@ type Entry = {
   payroll_periods: {
     year: number;
     month: number;
+    frequency: "monthly" | "weekly" | null;
+    start_date: string | null;
+    end_date: string | null;
     working_days: number;
     status: string;
     paid_at: string | null;
@@ -58,6 +61,11 @@ const ARABIC_MONTHS = [
   "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
   "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر",
 ];
+
+function formatIsoDate(iso: string): string {
+  const [y, m, d] = iso.split("-");
+  return `${d}/${m}/${y}`;
+}
 
 export const metadata = {
   title: "قسيمة راتب | نِظام",
@@ -75,7 +83,7 @@ export default async function PrintPayslipPage({ params }: PageProps) {
   const { data: entry } = await supabase
     .from("payroll_entries")
     .select(
-      "*, employees(full_name, employee_code, job_title, department, national_id, social_insurance_number, bank_name, bank_account_number, hire_date), payroll_periods(year, month, working_days, status, paid_at)",
+      "*, employees(full_name, employee_code, job_title, department, national_id, social_insurance_number, bank_name, bank_account_number, hire_date), payroll_periods(year, month, frequency, start_date, end_date, working_days, status, paid_at)",
     )
     .eq("id", entryId)
     .single<Entry>();
@@ -101,8 +109,11 @@ export default async function PrintPayslipPage({ params }: PageProps) {
   const period = entry.payroll_periods;
   const emp = entry.employees;
   const monthLabel = period
-    ? `${ARABIC_MONTHS[period.month - 1]} ${period.year}`
+    ? period.start_date && period.end_date
+      ? `${formatIsoDate(period.start_date)} → ${formatIsoDate(period.end_date)}`
+      : `${ARABIC_MONTHS[period.month - 1]} ${period.year}`
     : "—";
+  const cycleTypeLabel = period?.frequency === "weekly" ? "أسبوعي" : "شهري";
 
   return (
     <main className="min-h-screen bg-slate-100 print:bg-white py-6 px-4 print:p-0" dir="rtl">
@@ -134,7 +145,7 @@ export default async function PrintPayslipPage({ params }: PageProps) {
               </div>
               <h1 className="text-2xl font-black font-cairo">{companyName}</h1>
               <p className="text-xs text-cyan-100 mt-1 font-cairo">
-                قسيمة راتب شهر {monthLabel}
+                قسيمة راتب {cycleTypeLabel} · {monthLabel}
               </p>
             </div>
             <div className="text-left text-xs font-cairo">

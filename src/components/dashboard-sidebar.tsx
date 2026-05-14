@@ -66,9 +66,110 @@ export function DashboardSidebar({ userName, companyName, userEmail, isSuperAdmi
   const reportItems = NAV_ITEMS.filter((i) => i.section === "reports" && canSee(i));
   const settingsItems = NAV_ITEMS.filter((i) => i.section === "settings" && canSee(i));
 
-  const NavSection = ({ label, items }: { label: string; items: NavItem[] }) => {
-    if (items.length === 0) return null;
-    return (
+  return (
+    <>
+      {/* Mobile top bar — visible only on small screens */}
+      <header className="md:hidden sticky top-0 z-40 bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between">
+        <Logo />
+        <button
+          type="button"
+          onClick={() => setMobileOpen((v) => !v)}
+          aria-label="القائمة"
+          className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 transition"
+        >
+          {mobileOpen ? (
+            <svg className="w-6 h-6 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          ) : (
+            <svg className="w-6 h-6 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          )}
+        </button>
+      </header>
+
+      {/* Mobile drawer overlay */}
+      {mobileOpen && (
+        <>
+          <div
+            className="md:hidden fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40"
+            onClick={() => setMobileOpen(false)}
+          />
+          <aside className="md:hidden fixed top-0 right-0 bottom-0 w-72 bg-white z-50 flex flex-col shadow-2xl">
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+              <Logo />
+              <button
+                type="button"
+                onClick={() => setMobileOpen(false)}
+                className="p-1.5 rounded-lg hover:bg-slate-100"
+                aria-label="إغلاق"
+              >
+                <svg className="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <nav className="flex-1 overflow-y-auto p-3">
+              <NavSection label="الموديولات" items={mainItems} isActive={isActive} />
+              <NavSection label="✦ ذكاء" items={aiItems} isActive={isActive} />
+              <NavSection label="التقارير" items={reportItems} isActive={isActive} />
+              <NavSection label="الإعدادات" items={settingsItems} isActive={isActive} />
+            </nav>
+            <UserFooter
+              userName={userName}
+              userEmail={userEmail}
+              companyName={companyName}
+              isSuperAdmin={isSuperAdmin}
+              isActive={isActive}
+            />
+          </aside>
+        </>
+      )}
+
+      {/* Desktop sidebar — visible on md+ */}
+      <aside className="hidden md:flex w-64 bg-white border-l border-slate-200 flex-col shrink-0">
+        <div className="p-5 border-b border-slate-100">
+          <Logo />
+        </div>
+        <nav className="flex-1 overflow-y-auto p-3">
+          <NavSection label="الموديولات" items={mainItems} isActive={isActive} />
+          <NavSection label="✦ ذكاء" items={aiItems} isActive={isActive} />
+          <NavSection label="التقارير" items={reportItems} isActive={isActive} />
+          <NavSection label="الإعدادات" items={settingsItems} isActive={isActive} />
+        </nav>
+        <UserFooter
+          userName={userName}
+          userEmail={userEmail}
+          companyName={companyName}
+          isSuperAdmin={isSuperAdmin}
+          isActive={isActive}
+        />
+      </aside>
+    </>
+  );
+}
+
+// ----------------------------------------------------------------------------
+// Module-level helper components.
+//
+// Defining these inside DashboardSidebar (the previous shape) made React
+// rebuild them on every render, blowing away local state and triggering
+// the react-hooks/static-components lint rule. Hoisting them here keeps
+// them stable across renders.
+// ----------------------------------------------------------------------------
+
+function NavSection({
+  label,
+  items,
+  isActive,
+}: {
+  label: string;
+  items: NavItem[];
+  isActive: (href: string) => boolean;
+}) {
+  if (items.length === 0) return null;
+  return (
     <>
       <div className="text-[10px] text-slate-400 font-bold tracking-wider mb-2 px-3 font-cairo uppercase">
         {label}
@@ -96,10 +197,23 @@ export function DashboardSidebar({ userName, companyName, userEmail, isSuperAdmi
         })}
       </div>
     </>
-    );
-  };
+  );
+}
 
-  const UserFooter = () => (
+function UserFooter({
+  userName,
+  userEmail,
+  companyName,
+  isSuperAdmin,
+  isActive,
+}: {
+  userName: string;
+  userEmail: string;
+  companyName: string;
+  isSuperAdmin?: boolean;
+  isActive: (href: string) => boolean;
+}) {
+  return (
     <div className="p-3 border-t border-slate-100 bg-slate-50/50 space-y-1">
       {isSuperAdmin && (
         <Link
@@ -146,8 +260,10 @@ export function DashboardSidebar({ userName, companyName, userEmail, isSuperAdmi
       </form>
     </div>
   );
+}
 
-  const Logo = () => (
+function Logo() {
+  return (
     <Link href="/dashboard" className="flex items-center gap-3 group">
       <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-cyan to-brand-navy flex items-center justify-center shadow-md shadow-cyan-500/20 group-hover:shadow-cyan-500/40 transition">
         <span className="text-xl font-black text-white font-display">ن</span>
@@ -161,76 +277,5 @@ export function DashboardSidebar({ userName, companyName, userEmail, isSuperAdmi
         </div>
       </div>
     </Link>
-  );
-
-  return (
-    <>
-      {/* Mobile top bar — visible only on small screens */}
-      <header className="md:hidden sticky top-0 z-40 bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between">
-        <Logo />
-        <button
-          type="button"
-          onClick={() => setMobileOpen((v) => !v)}
-          aria-label="القائمة"
-          className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 transition"
-        >
-          {mobileOpen ? (
-            <svg className="w-6 h-6 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          ) : (
-            <svg className="w-6 h-6 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          )}
-        </button>
-      </header>
-
-      {/* Mobile drawer overlay */}
-      {mobileOpen && (
-        <>
-          <div
-            className="md:hidden fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40"
-            onClick={() => setMobileOpen(false)}
-          />
-          <aside className="md:hidden fixed top-0 right-0 bottom-0 w-72 bg-white z-50 flex flex-col shadow-2xl">
-            <div className="p-5 border-b border-slate-100 flex items-center justify-between">
-              <Logo />
-              <button
-                type="button"
-                onClick={() => setMobileOpen(false)}
-                className="p-1.5 rounded-lg hover:bg-slate-100"
-                aria-label="إغلاق"
-              >
-                <svg className="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <nav className="flex-1 overflow-y-auto p-3">
-              <NavSection label="الموديولات" items={mainItems} />
-              <NavSection label="✦ ذكاء" items={aiItems} />
-              <NavSection label="التقارير" items={reportItems} />
-              <NavSection label="الإعدادات" items={settingsItems} />
-            </nav>
-            <UserFooter />
-          </aside>
-        </>
-      )}
-
-      {/* Desktop sidebar — visible on md+ */}
-      <aside className="hidden md:flex w-64 bg-white border-l border-slate-200 flex-col shrink-0">
-        <div className="p-5 border-b border-slate-100">
-          <Logo />
-        </div>
-        <nav className="flex-1 overflow-y-auto p-3">
-          <NavSection label="الموديولات" items={mainItems} />
-          <NavSection label="✦ ذكاء" items={aiItems} />
-          <NavSection label="التقارير" items={reportItems} />
-          <NavSection label="الإعدادات" items={settingsItems} />
-        </nav>
-        <UserFooter />
-      </aside>
-    </>
   );
 }

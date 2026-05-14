@@ -15,7 +15,7 @@ import { colors, fontSize, radius, spacing } from "@/lib/theme";
 import {
   getMyPayslip,
   listMyPayslips,
-  monthLabel,
+  cycleLabel,
   type PayslipDetail,
   type PayslipSummary,
 } from "@/lib/payslips";
@@ -113,7 +113,7 @@ export default function PayslipsScreen() {
                 >
                   <View>
                     <Text style={styles.month}>
-                      {monthLabel(p.year, p.month)}
+                      {cycleLabel(p)}
                     </Text>
                     <Text style={styles.subline}>
                       {p.period_status === "paid"

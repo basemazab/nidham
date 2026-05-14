@@ -16,6 +16,9 @@ type Period = {
   id: string;
   year: number;
   month: number;
+  frequency: "monthly" | "weekly" | null;
+  start_date: string | null;
+  end_date: string | null;
   status: string;
   working_days: number;
 };
@@ -54,6 +57,11 @@ const ARABIC_MONTHS = [
   "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر",
 ];
 
+function formatIsoDate(iso: string): string {
+  const [y, m, d] = iso.split("-");
+  return `${d}/${m}/${y}`;
+}
+
 export const metadata = {
   title: "كشف المرتبات | نِظام",
 };
@@ -69,7 +77,7 @@ export default async function PayrollSummaryPrint({ params }: PageProps) {
 
   const { data: period } = await supabase
     .from("payroll_periods")
-    .select("id, year, month, status, working_days")
+    .select("id, year, month, frequency, start_date, end_date, status, working_days")
     .eq("id", periodId)
     .single<Period>();
 
@@ -125,7 +133,13 @@ export default async function PayrollSummaryPrint({ params }: PageProps) {
     },
   );
 
-  const monthLabel = `${ARABIC_MONTHS[period.month - 1]} ${period.year}`;
+  // Prefer explicit cycle window (migration 026). Fall back to year+month
+  // for any pre-026 row that wasn't backfilled for some reason.
+  const monthLabel =
+    period.start_date && period.end_date
+      ? `${formatIsoDate(period.start_date)} → ${formatIsoDate(period.end_date)}`
+      : `${ARABIC_MONTHS[period.month - 1]} ${period.year}`;
+  const cycleTypeLabel = period.frequency === "weekly" ? "أسبوعي" : "شهري";
   const statusLabel =
     period.status === "paid"
       ? "مدفوع"
@@ -165,7 +179,7 @@ export default async function PayrollSummaryPrint({ params }: PageProps) {
               </div>
               <h1 className="text-2xl font-black font-cairo">{companyName}</h1>
               <p className="text-xs text-cyan-100 mt-1 font-cairo">
-                كشف مرتبات شهر {monthLabel} · {rows.length} موظف ·{" "}
+                كشف مرتبات {cycleTypeLabel} · {monthLabel} · {rows.length} موظف ·{" "}
                 {period.working_days} يوم عمل
               </p>
             </div>
