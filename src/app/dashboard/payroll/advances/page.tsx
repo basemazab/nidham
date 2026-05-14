@@ -98,26 +98,35 @@ export default async function AdvancesPage({
               ÷ {26} يوم) بعد خصم السلف المفتوحة القديمة.
             </p>
           </div>
-          <form className="flex items-end gap-2">
-            <div>
-              <label className="block text-xs text-slate-500 mb-1 font-cairo">
-                التاريخ (اليوم اللي بتصرف فيه)
-              </label>
-              <input
-                type="date"
-                name="as_of"
-                defaultValue={asOf}
-                className="px-3 py-2 rounded-lg border border-slate-200 outline-none text-sm"
-                dir="ltr"
-              />
-            </div>
-            <button
-              type="submit"
-              className="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold font-cairo"
+          <div className="flex flex-wrap items-end gap-2">
+            <Link
+              href="/dashboard/payroll/advances/new"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-brand-cyan to-brand-cyan-dark text-white text-sm font-bold shadow-md hover:shadow-lg hover:-translate-y-0.5 transition font-cairo"
             >
-              تحديث
-            </button>
-          </form>
+              <span className="text-base leading-none">+</span>
+              <span>سلفة لموظف محدد</span>
+            </Link>
+            <form className="flex items-end gap-2">
+              <div>
+                <label className="block text-xs text-slate-500 mb-1 font-cairo">
+                  التاريخ
+                </label>
+                <input
+                  type="date"
+                  name="as_of"
+                  defaultValue={asOf}
+                  className="px-3 py-2 rounded-lg border border-slate-200 outline-none text-sm"
+                  dir="ltr"
+                />
+              </div>
+              <button
+                type="submit"
+                className="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold font-cairo"
+              >
+                تحديث
+              </button>
+            </form>
+          </div>
         </header>
 
         {issued && (

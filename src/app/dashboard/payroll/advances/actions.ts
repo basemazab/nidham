@@ -7,6 +7,44 @@ import { requireHR } from "@/lib/permissions";
 import { arabicizeDbError } from "@/lib/i18n";
 import { bustDashboardCache } from "@/lib/cache";
 
+// Per-employee eligibility lookup used by the "new advance" smart form.
+// Wraps compute_employee_accrued_net (migration 027) so the client
+// component doesn't need its own Supabase client.
+export type AccruedNetRow = {
+  full_name: string;
+  monthly_base: number;
+  working_days: number;
+  daily_rate: number;
+  attended_days: number;
+  half_day_days: number;
+  leave_days: number;
+  absent_days: number;
+  effective_days: number;
+  accrued_gross: number;
+  social_insurance: number;
+  income_tax: number;
+  accrued_net: number;
+  existing_open_advances: number;
+  available_headroom: number;
+  eligible_50pct: number;
+  eligible_70pct: number;
+};
+
+export async function getEmployeeAccruedNet(
+  employeeId: string,
+): Promise<AccruedNetRow | null> {
+  await requireHR();
+  const supabase = await createClient();
+  const { data } = await supabase.rpc("compute_employee_accrued_net", {
+    p_employee_id: employeeId,
+  });
+  // The RPC returns a SETOF -- the client typings collapse it to a
+  // single object, the runtime returns an array. Handle both shapes.
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row || typeof row !== "object") return null;
+  return row as AccruedNetRow;
+}
+
 // HR-initiated advance disbursement -- creates an advance_request
 // directly in `paid` status. The standard mobile flow creates them
 // in `pending` and HR approves; this skips that loop for the
