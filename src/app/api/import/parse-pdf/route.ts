@@ -1,21 +1,29 @@
 // PDF -> structured employee records via Gemini.
 //
-// Used by /dashboard/employees/import to let HR upload an arbitrary
-// "employee roster" PDF (printed from HR software, an offer letter
-// archive, an old Excel export converted to PDF, ...) and have the AI
-// extract the rows. The endpoint never writes to the DB -- it returns
-// the parsed array as JSON so the page can show a preview + confirm
-// table. A separate server action does the actual INSERT after the
-// user reviews.
+// Sends the PDF bytes directly to Gemini 2.5 Flash as a `file` content
+// part instead of pre-extracting text on our side. Three wins over the
+// old pdf-parse path:
+//
+//   1. No more DOMMatrix-is-not-defined crash on Vercel. pdf-parse v2
+//      pulls in pdfjs-dist which needs a browser-only DOM API our
+//      Node.js runtime doesn't ship.
+//   2. Works on scanned PDFs (images-only, no text layer). Gemini
+//      does the OCR step transparently.
+//   3. Better at messy table layouts -- Gemini sees the visual layout,
+//      not just the raw text stream.
+//
+// The endpoint never writes to the DB. It returns the parsed array as
+// JSON so the page can show a preview + confirm table; a separate
+// server action handles the actual INSERT.
 
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { generateObject } from "ai";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-import { extractPdfText } from "@/lib/pdf-extract";
 import { checkRateLimit } from "@/lib/rate-limit";
 
 const MODEL = "gemini-2.5-flash";
+const MAX_BYTES = 5 * 1024 * 1024; // 5 MB -- Gemini accepts up to 20
 
 // Schema we want the model to return. Every field except full_name
 // is optional -- the AI must use null when uncertain so we don't get
@@ -65,23 +73,19 @@ const responseSchema = z.object({
     ),
 });
 
-const PROMPT_TEMPLATE = `أنت مساعد لاستخراج بيانات الموظفين من ملفات PDF.
-المطلوب: تقرأ النص التالي وتستخرج كل صفوف الموظفين الموجودة فيه كـ JSON.
+const SYSTEM_INSTRUCTIONS = `أنت مساعد لاستخراج بيانات الموظفين من ملفات PDF لشركات مصرية.
+هتشوف الـ PDF بصريًا كصور / نصوص، استخرج كل صفوف الموظفين الموجودة كـ JSON.
 
-قواعد:
-1. استخرج الاسم الكامل بنفس الصياغة الموجودة (عربي زي ما هو).
-2. استخدم null لأي حقل غير موجود أو غير واضح - **متختلقش بيانات**.
-3. التاريخ بصيغة yyyy-mm-dd بس. لو في الـ PDF "15/3/2024" حوّله لـ "2024-03-15".
-4. التليفون بصيغة مصرية: 010xxxxxxxx أو 011 أو 012 أو 015. لو دولي شيل +20.
+قواعد دقيقة:
+1. استخرج الاسم الكامل بنفس الصياغة الموجودة (عربي زي ما هو، بدون تعديل).
+2. استعمل null لأي حقل مش موجود أو مش واضح في الـ PDF -- **متختلقش بيانات أبدًا**.
+3. التاريخ بصيغة yyyy-mm-dd حصرًا. لو في "15/3/2024" حوّله لـ "2024-03-15".
+4. التليفون بصيغة مصرية محلية: 010xxxxxxxx أو 011 أو 012 أو 015. شيل +20 لو موجود.
 5. الرقم القومي 14 رقم بالظبط. لو غير ده، خليه null.
-6. المرتب رقم بالجنيه. لو في "5,000" حوّله لـ 5000.
-7. لو الـ PDF فيه جدول رواتب فيه أسطر مش موظفين (مثل إجمالي / Total / متوسط) -- تجاهلها.
-8. لو ما لقيتش أي موظفين، رجّع array فاضية مع notes توضّح.
-
-نص الـ PDF:
----
-%TEXT%
----`;
+6. المرتب رقم بالجنيه. "5,000" -> 5000. لو في مدى "5000-7000" -> null.
+7. تجاهل الأسطر اللي مش موظفين: إجمالي، مجموع، متوسط، Total، Summary، Header.
+8. لو ما لقيتش أي موظفين، رجّع employees فاضي مع notes توضّح السبب.
+9. notes لازم تكون بالعربي وتحدد عدد الصفوف المستخرجة وأي ملاحظات (مثل: تم تجاهل صف الإجمالي).`;
 
 export async function POST(req: Request) {
   const supabase = await createClient();
@@ -129,46 +133,80 @@ export async function POST(req: Request) {
     );
   }
 
-  let pdfText: string;
+  // Read the uploaded PDF into a Buffer + run cheap sanity checks
+  // before paying for an AI call.
+  let pdfBytes: Uint8Array;
+  let fileName: string;
   try {
     const formData = await req.formData();
     const file = formData.get("file");
-    if (!(file instanceof File)) {
+    if (!(file instanceof File) || file.size === 0) {
       return Response.json({ error: "ارفع ملف PDF" }, { status: 400 });
     }
-    pdfText = await extractPdfText(file);
+    if (file.size > MAX_BYTES) {
+      return Response.json(
+        {
+          error: `الملف كبير جدًا (${(file.size / 1024 / 1024).toFixed(1)} MB). الحد الأقصى 5 MB.`,
+        },
+        { status: 400 },
+      );
+    }
+    const lowerName = file.name.toLowerCase();
+    if (!lowerName.endsWith(".pdf") && file.type !== "application/pdf") {
+      return Response.json({ error: "لازم الملف يكون PDF" }, { status: 400 });
+    }
+    pdfBytes = new Uint8Array(await file.arrayBuffer());
+    fileName = file.name;
   } catch (err) {
     const msg = err instanceof Error ? err.message : "غير معروف";
-    return Response.json({ error: msg }, { status: 400 });
+    return Response.json({ error: `فشل قراءة الملف: ${msg}` }, { status: 400 });
   }
-
-  // Truncate to keep token usage predictable. ~30k chars ≈ 6-8k tokens.
-  const truncated = pdfText.slice(0, 30000);
 
   try {
     const google = createGoogleGenerativeAI({
       apiKey: process.env.GEMINI_API_KEY,
     });
+
+    // Send the PDF directly as a file part. Gemini handles the OCR /
+    // text extraction internally -- works on text-based and scanned
+    // PDFs alike.
     const { object } = await generateObject({
       model: google(MODEL),
       schema: responseSchema,
-      prompt: PROMPT_TEMPLATE.replace("%TEXT%", truncated),
       temperature: 0.1, // deterministic-ish
+      system: SYSTEM_INSTRUCTIONS,
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: `استخرج بيانات الموظفين من الـ PDF المرفق (${fileName}).`,
+            },
+            {
+              type: "file",
+              data: pdfBytes,
+              mediaType: "application/pdf",
+            },
+          ],
+        },
+      ],
     });
 
     return Response.json({
       ok: true,
       employees: object.employees,
       notes: object.notes,
-      pageBytes: pdfText.length,
-      truncated: pdfText.length > 30000,
+      fileSize: pdfBytes.length,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     // eslint-disable-next-line no-console
     console.warn("parse-pdf failed:", msg);
     return Response.json(
-      { error: `الـ AI ما قدرش يقرا الملف -- جرب ملف تاني أو استخدم Excel: ${msg.slice(0, 120)}` },
+      {
+        error: `الـ AI ما قدرش يقرا الملف -- جرب ملف تاني أو استخدم Excel: ${msg.slice(0, 200)}`,
+      },
       { status: 500 },
     );
   }
