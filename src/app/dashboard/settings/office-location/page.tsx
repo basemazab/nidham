@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { updateOfficeLocation } from "./actions";
 import { UseMyLocationButton } from "./use-my-location";
+import { OfficeMapPickerClient } from "./map-picker-client";
 
 type SearchParams = Promise<{ error?: string; saved?: string }>;
 
@@ -107,17 +108,27 @@ export default async function OfficeLocationPage({
 
             {/* GPS coordinates */}
             <div className="border-t border-slate-100 pt-6">
-              <div className="flex items-center justify-between mb-2">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                 <h3 className="text-sm font-bold text-slate-800 font-cairo">
                   📍 إحداثيات GPS <span className="text-red-500">*</span>
                 </h3>
                 <UseMyLocationButton />
               </div>
-              <p className="text-xs text-slate-500 mb-3 font-cairo">
-                افتح الصفحة دي من جهاز موجود في المكتب فعلًا واضغط
-                <strong> &quot;استخدم موقعي الحالي&quot;</strong>. أو ادخل
-                الإحداثيات يدويًا من Google Maps.
+              <p className="text-xs text-slate-500 mb-3 font-cairo leading-relaxed">
+                <strong>أسهل طريقة:</strong> اضغط على المكان بتاع المكتب على
+                الخريطة تحت، أو اسحب الـ marker لضبط دقيق. الزرار اللي فوق
+                مفيد بس من الموبايل اللي عنده GPS — على الكمبيوتر غالبًا
+                ميشتغلش.
               </p>
+
+              {/* Interactive map picker */}
+              <div className="mb-4">
+                <OfficeMapPickerClient
+                  initialLat={company.office_lat}
+                  initialLng={company.office_lng}
+                  initialRadius={company.office_radius_meters ?? 100}
+                />
+              </div>
 
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
@@ -169,7 +180,7 @@ export default async function OfficeLocationPage({
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1 mt-3 text-xs text-brand-cyan-dark hover:underline font-cairo"
                 >
-                  🗺 افتح الموقع الحالي على Google Maps ↗
+                  🗺 افتح الموقع المحفوظ على Google Maps ↗
                 </a>
               )}
             </div>

@@ -36,8 +36,8 @@ export function UseMyLocationButton() {
         setBusy(false);
         const messages: Record<number, string> = {
           1: "رفضت الإذن. لازم تسمح للموقع من إعدادات المتصفح.",
-          2: "GPS مش متاح دلوقتي. جرّب تاني.",
-          3: "انتهى وقت الطلب. حاول تاني.",
+          2: "الكمبيوتر مش بيدعم GPS. استخدم الخريطة تحت — اضغط على مكان المكتب.",
+          3: "انتهى وقت الطلب. حاول تاني، أو استخدم الخريطة.",
         };
         setError(messages[err.code] ?? err.message);
       },
