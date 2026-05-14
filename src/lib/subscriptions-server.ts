@@ -7,9 +7,14 @@ import { createClient } from "@/lib/supabase/server";
 import { type Feature, type Plan, type Subscription, hasFeature } from "./subscriptions";
 
 /**
- * Fetches the caller's current subscription. RLS scopes to the
- * caller's company. Returns null if not signed in / no subscription
- * row -- treat null as "no access" in feature checks.
+ * Fetches the caller's current subscription.
+ *
+ * IMPORTANT: super_admin's RLS bypass returns rows for EVERY tenant,
+ * so a bare `.single()` blows up with PGRST116. We explicitly scope
+ * by the caller's profile.company_id (mirrors the pattern used by
+ * /dashboard/subscription/page.tsx) and use `.maybeSingle()` so a
+ * tenant with no subscription row degrades to null instead of an
+ * exception.
  */
 export async function getCurrentSubscription(): Promise<Subscription | null> {
   const supabase = await createClient();
@@ -18,10 +23,18 @@ export async function getCurrentSubscription(): Promise<Subscription | null> {
   } = await supabase.auth.getUser();
   if (!user) return null;
 
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("company_id")
+    .eq("id", user.id)
+    .maybeSingle<{ company_id: string }>();
+  if (!profile?.company_id) return null;
+
   const { data } = await supabase
     .from("subscriptions")
     .select("plan, status, ends_at")
-    .single<Subscription>();
+    .eq("company_id", profile.company_id)
+    .maybeSingle<Subscription>();
 
   return data;
 }

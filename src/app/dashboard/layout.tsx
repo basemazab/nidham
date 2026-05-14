@@ -31,25 +31,40 @@ export default async function DashboardLayout({
 
   if (!user) redirect("/login");
 
-  const [profileRes, superAdminRes, subRes] = await Promise.all([
+  const [profileRes, superAdminRes, companyForSubRes] = await Promise.all([
     supabase
       .from("profiles")
-      .select("full_name, role, companies(name)")
+      .select("full_name, role, company_id, companies(name)")
       .eq("id", user.id)
-      .single<Profile>(),
+      .single<Profile & { company_id: string }>(),
     supabase
       .from("super_admins")
       .select("user_id")
       .eq("user_id", user.id)
       .maybeSingle(),
+    // For super_admin the RLS bypass returns rows from every tenant;
+    // explicit company_id filter is the safe way to fetch THE
+    // calling tenant's subscription. profile.company_id is fetched
+    // alongside so this stays a single round-trip.
     supabase
-      .from("subscriptions")
-      .select("plan, ends_at")
-      .single<SubscriptionLite>(),
+      .from("profiles")
+      .select("company_id")
+      .eq("id", user.id)
+      .maybeSingle<{ company_id: string }>(),
   ]);
 
   const profile = profileRes.data;
-  const subscription = subRes.data;
+  const callerCompanyId = companyForSubRes.data?.company_id;
+
+  // Subscription fetched separately so we can scope by company_id
+  // (defends against super_admin RLS bypass returning multi-tenant rows).
+  const { data: subscription } = callerCompanyId
+    ? await supabase
+        .from("subscriptions")
+        .select("plan, ends_at")
+        .eq("company_id", callerCompanyId)
+        .maybeSingle<SubscriptionLite>()
+    : { data: null };
   const daysLeft = subscription
     ? Math.round(
         (new Date(subscription.ends_at + "T23:59:59").getTime() - Date.now()) /

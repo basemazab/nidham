@@ -21,28 +21,25 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
-  // Fetch everything in parallel
+  // Fetch everything in parallel. Profile is needed up-front for the
+  // subscription scoping (super_admin RLS bypass otherwise returns
+  // multi-tenant rows and breaks .single()).
   const [
     profileRes,
     employeesCount,
     customersCount,
     interactionsCount,
-    subscriptionRes,
   ] = await Promise.all([
     supabase
       .from("profiles")
-      .select("full_name, role, companies(name, industry)")
+      .select("full_name, role, company_id, companies(name, industry)")
       .eq("id", user.id)
-      .single<Profile>(),
+      .single<Profile & { company_id: string }>(),
     supabase.from("employees").select("id", { count: "exact", head: true }),
     supabase.from("customers").select("id", { count: "exact", head: true }),
     supabase
       .from("interactions")
       .select("id", { count: "exact", head: true }),
-    supabase
-      .from("subscriptions")
-      .select("plan, status, ends_at")
-      .single<{ plan: string; status: string; ends_at: string }>(),
   ]);
 
   const profile = profileRes.data;
@@ -50,7 +47,15 @@ export default async function DashboardPage() {
   const custCount = customersCount.count ?? 0;
   const intCount = interactionsCount.count ?? 0;
 
-  const subscription = subscriptionRes.data;
+  // Subscription scoped to caller's company_id so super_admin sees
+  // their OWN subscription, not the union of every tenant's row.
+  const { data: subscription } = profile?.company_id
+    ? await supabase
+        .from("subscriptions")
+        .select("plan, status, ends_at")
+        .eq("company_id", profile.company_id)
+        .maybeSingle<{ plan: string; status: string; ends_at: string }>()
+    : { data: null };
   const subDaysLeft = subscription
     ? Math.round(
         (new Date(subscription.ends_at + "T00:00:00").getTime() - Date.now()) /
