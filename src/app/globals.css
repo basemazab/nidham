@@ -30,33 +30,50 @@ body {
   font-family: var(--font-tajawal), Arial, Helvetica, sans-serif;
 }
 
-/* Print: hide chrome (sidebar, header, etc.), keep only .print-area visible.
-   Used by the payroll payslip page. */
+/* ----------------------------------------------------------------------------
+   Print
+   ----------------------------------------------------------------------------
+   The /print/* routes have their own bare layout (no sidebar) so the
+   browser's print preview renders the full payslip / summary cleanly.
+   These rules just whiten the background, force color-exact output,
+   and keep page-breaks from chopping rows mid-cell.
+*/
 @media print {
   @page {
-    size: A4;
-    margin: 12mm;
+    margin: 10mm;
   }
 
   body {
     background: #ffffff !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
   }
 
-  /* Hide the dashboard sidebar/header when printing a payslip */
+  /* Defensive: any leftover sidebar / nav from old / dev routes */
   aside,
+  nav,
   header {
     display: none !important;
   }
 
-  /* Make the main content take the full page */
   main {
     padding: 0 !important;
     background: #ffffff !important;
     min-height: auto !important;
   }
 
-  /* Avoid splitting the payslip mid-page */
+  /* Single payslip card: never break mid-page */
   article {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Wide tables (payroll summary) -- repeat header on each page,
+     avoid splitting a single row across pages. */
+  thead {
+    display: table-header-group;
+  }
+  tr {
     break-inside: avoid;
     page-break-inside: avoid;
   }

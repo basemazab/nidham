@@ -101,6 +101,14 @@ export default async function PayrollPeriodPage({ params }: PageProps) {
           </div>
 
           <div className="flex flex-wrap gap-2">
+            <Link
+              href={`/print/payroll-summary/${id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-4 py-2 rounded-lg bg-gradient-to-r from-brand-cyan to-brand-cyan-dark text-white font-bold text-sm font-cairo transition shadow-md hover:shadow-lg"
+            >
+              🖨 طباعة كشف المرتبات
+            </Link>
             {period.status === "draft" && (
               <form action={async () => { "use server"; await approvePayrollPeriod(id); }}>
                 <button type="submit" className="px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-700 text-white font-bold text-sm font-cairo transition">
