@@ -59,17 +59,45 @@ export default async function AttendanceReportPage({
   const attendance = attendanceRes.data ?? [];
 
   // Aggregate per employee
+  //
+  // Attendance rate is computed against *workdays*, NOT against the
+  // total record count. Friday in Egypt is a weekly rest day, so a
+  // "weekend" record isn't a missed workday -- it's a non-workday.
+  // Approved leave is also excluded: the employee was excused with
+  // pay, so it shouldn't penalise their attendance score.
+  //
+  // workdays = present + absent + halfDay
+  // rate     = (present + halfDay * 0.5) / workdays
+  //
+  // Edge case: an employee with only weekend/leave records has 0
+  // workdays -- we show 100% (nothing to attend, nothing missed).
   const stats = employees.map((emp) => {
     const records = attendance.filter((a) => a.employee_id === emp.id);
     const present = records.filter((r) => r.status === "present").length;
     const absent = records.filter((r) => r.status === "absent").length;
     const halfDay = records.filter((r) => r.status === "half_day").length;
     const leave = records.filter((r) => r.status === "leave").length;
+    const weekend = records.filter(
+      (r) => r.status === "weekend" || r.status === "holiday",
+    ).length;
     const total = records.length;
+    const workdays = present + absent + halfDay;
     const presentRate =
-      total === 0 ? 0 : Math.round(((present + halfDay * 0.5) / total) * 100);
+      workdays === 0
+        ? 100
+        : Math.round(((present + halfDay * 0.5) / workdays) * 100);
 
-    return { employee: emp, present, absent, halfDay, leave, total, presentRate };
+    return {
+      employee: emp,
+      present,
+      absent,
+      halfDay,
+      leave,
+      weekend,
+      total,
+      workdays,
+      presentRate,
+    };
   });
 
   // Sort: best presentRate first; ties broken by more present days
@@ -225,7 +253,8 @@ export default async function AttendanceReportPage({
                   <th className="px-5 py-3 text-xs font-bold text-red-700 uppercase tracking-wider font-cairo">غايب</th>
                   <th className="px-5 py-3 text-xs font-bold text-amber-700 uppercase tracking-wider font-cairo">نص يوم</th>
                   <th className="px-5 py-3 text-xs font-bold text-blue-700 uppercase tracking-wider font-cairo">إجازة</th>
-                  <th className="px-5 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider font-cairo">إجمالي</th>
+                  <th className="px-5 py-3 text-xs font-bold text-violet-700 uppercase tracking-wider font-cairo">عطلة</th>
+                  <th className="px-5 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider font-cairo">أيام عمل</th>
                   <th className="px-5 py-3 text-xs font-bold text-brand-cyan-dark uppercase tracking-wider font-cairo min-w-[180px]">
                     نسبة الحضور
                   </th>
@@ -254,7 +283,8 @@ export default async function AttendanceReportPage({
                     <td className="px-5 py-3 font-bold text-red-700">{s.absent}</td>
                     <td className="px-5 py-3 font-bold text-amber-700">{s.halfDay}</td>
                     <td className="px-5 py-3 font-bold text-blue-700">{s.leave}</td>
-                    <td className="px-5 py-3 font-bold text-slate-600">{s.total}</td>
+                    <td className="px-5 py-3 font-bold text-violet-700">{s.weekend}</td>
+                    <td className="px-5 py-3 font-bold text-slate-600">{s.workdays}</td>
                     <td className="px-5 py-3">
                       <div className="flex items-center gap-2">
                         <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
