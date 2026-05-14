@@ -8,6 +8,8 @@ type SearchParams = Promise<{
   error?: string;
   imported?: string;
   skipped?: string;
+  filtered?: string;
+  mode?: string;
   errors?: string;
 }>;
 
@@ -24,17 +26,34 @@ export default async function AttendanceImportPage({
 
   const params = await searchParams;
 
-  // Count employees with codes (for the user's awareness)
-  const { count: totalEmployees } = await supabase
-    .from("employees")
-    .select("id", { count: "exact", head: true })
-    .eq("status", "active");
-
-  const { count: withCode } = await supabase
-    .from("employees")
-    .select("id", { count: "exact", head: true })
-    .eq("status", "active")
-    .not("employee_code", "is", null);
+  // Count employees with codes + split by pay_frequency so the mode
+  // picker can show "X monthly · Y weekly" badges.
+  const [
+    { count: totalEmployees },
+    { count: withCode },
+    { count: monthlyCount },
+    { count: weeklyCount },
+  ] = await Promise.all([
+    supabase
+      .from("employees")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "active"),
+    supabase
+      .from("employees")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "active")
+      .not("employee_code", "is", null),
+    supabase
+      .from("employees")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "active")
+      .eq("pay_frequency", "monthly"),
+    supabase
+      .from("employees")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "active")
+      .eq("pay_frequency", "weekly"),
+  ]);
 
   return (
     <main className="flex-1 px-6 py-8 bg-gradient-to-b from-slate-50 via-white to-cyan-50/30 min-h-screen">
@@ -66,6 +85,8 @@ export default async function AttendanceImportPage({
           <div className="mb-6 p-4 rounded-xl bg-emerald-50 border-2 border-emerald-200">
             <h3 className="font-bold text-emerald-800 mb-1 font-cairo">
               ✓ تم الاستيراد بنجاح
+              {params.mode === "monthly" && " (وضع شهري)"}
+              {params.mode === "weekly" && " (وضع أسبوعي)"}
             </h3>
             <p className="text-sm text-emerald-700 font-cairo">
               تم حفظ {params.imported} سجل حضور
@@ -73,6 +94,14 @@ export default async function AttendanceImportPage({
                 ? ` · ${params.skipped} سطر تم تخطيهم بسبب أخطاء`
                 : ""}
             </p>
+            {params.filtered && parseInt(params.filtered) > 0 && (
+              <p className="text-sm text-amber-700 font-cairo mt-2 bg-amber-50 border border-amber-200 rounded-lg p-2">
+                ⓘ <b>{params.filtered}</b> سجل تم تجاهله لأنهم لموظفين{" "}
+                {params.mode === "monthly" ? "أسبوعيين" : "شهريين"} (مش في الـ
+                workflow ده). لو محتاج تضيف حضورهم، ارفع نفس الملف بوضع{" "}
+                <b>{params.mode === "monthly" ? "أسبوعي" : "شهري"}</b>.
+              </p>
+            )}
             {params.errors && (
               <details className="mt-3">
                 <summary className="text-xs text-emerald-700 font-cairo cursor-pointer">
@@ -194,6 +223,49 @@ export default async function AttendanceImportPage({
           </div>
 
           <form action={importAttendance} encType="multipart/form-data">
+            {/* Import mode -- picks WHICH employees get their attendance
+                written from the file. The ZKTeco fingerprint exports a
+                monthly sheet that includes weekly employees too; HR
+                imports the same file under each mode in turn (or
+                "الكل" for tenants that don't separate). */}
+            <fieldset className="mb-4 bg-white border border-slate-200 rounded-xl p-4">
+              <legend className="px-2 text-xs font-bold text-slate-700 font-cairo">
+                نوع الموظفين في الشيت
+              </legend>
+              <div className="grid sm:grid-cols-3 gap-2 mt-1">
+                <ModeOption
+                  value="monthly"
+                  emoji="📅"
+                  label="شهري"
+                  description="الإدارة + المكاتب"
+                  count={monthlyCount ?? 0}
+                  color="sky"
+                  defaultChecked
+                />
+                <ModeOption
+                  value="weekly"
+                  emoji="📆"
+                  label="أسبوعي"
+                  description="عمال الإنتاج"
+                  count={weeklyCount ?? 0}
+                  color="violet"
+                />
+                <ModeOption
+                  value="all"
+                  emoji="🌐"
+                  label="كل الموظفين"
+                  description="بدون فلتر"
+                  count={(monthlyCount ?? 0) + (weeklyCount ?? 0)}
+                  color="slate"
+                />
+              </div>
+              <p className="text-[11px] text-slate-500 font-cairo mt-3 leading-relaxed">
+                💡 لو رفعت شيت شهري وفيه أكواد لعمال أسبوعيين، النظام
+                هيتجاهل سطورهم تلقائيًا. ارفع نفس الملف بوضع <b>"أسبوعي"</b>
+                {" "}لما تيجي تسجّل حضورهم في كشف منفصل.
+              </p>
+            </fieldset>
+
             <input
               type="file"
               name="file"
@@ -211,5 +283,58 @@ export default async function AttendanceImportPage({
         </section>
       </div>
     </main>
+  );
+}
+
+// Radio-style mode picker. Renders as a colour-coded card per option;
+// clicking activates the underlying <input type="radio"> so the FormData
+// arrives with import_mode=monthly|weekly|all.
+function ModeOption({
+  value,
+  emoji,
+  label,
+  description,
+  count,
+  color,
+  defaultChecked,
+}: {
+  value: "monthly" | "weekly" | "all";
+  emoji: string;
+  label: string;
+  description: string;
+  count: number;
+  color: "sky" | "violet" | "slate";
+  defaultChecked?: boolean;
+}) {
+  const activeBorder = {
+    sky: "peer-checked:border-sky-400 peer-checked:bg-sky-50 peer-checked:ring-2 peer-checked:ring-sky-300",
+    violet:
+      "peer-checked:border-violet-400 peer-checked:bg-violet-50 peer-checked:ring-2 peer-checked:ring-violet-300",
+    slate:
+      "peer-checked:border-slate-400 peer-checked:bg-slate-50 peer-checked:ring-2 peer-checked:ring-slate-300",
+  }[color];
+  return (
+    <label className="cursor-pointer">
+      <input
+        type="radio"
+        name="import_mode"
+        value={value}
+        defaultChecked={defaultChecked}
+        className="sr-only peer"
+      />
+      <div
+        className={`p-3 rounded-xl border-2 border-slate-200 hover:bg-slate-50 transition text-right ${activeBorder}`}
+      >
+        <div className="flex items-center justify-between gap-1 mb-1">
+          <span className="font-bold text-sm text-slate-800 font-cairo">
+            {emoji} {label}
+          </span>
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white border border-slate-200 text-slate-600 font-cairo">
+            {count.toLocaleString("ar-EG")} موظف
+          </span>
+        </div>
+        <div className="text-[10px] text-slate-500 font-cairo">{description}</div>
+      </div>
+    </label>
   );
 }

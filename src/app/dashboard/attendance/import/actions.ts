@@ -238,6 +238,8 @@ function parseCombinedTimes(raw: unknown): {
   };
 }
 
+type ImportMode = "monthly" | "weekly" | "all";
+
 // ----------------------------------------------------------------------------
 // importAttendance -- main entrypoint
 // ----------------------------------------------------------------------------
@@ -269,6 +271,17 @@ export async function importAttendance(formData: FormData) {
         encodeURIComponent("الملف أكبر من المسموح به (5 ميجا)"),
     );
   }
+
+  // Import mode controls which employees get their attendance written.
+  // ZKTeco exports come as ONE monthly sheet covering both monthly +
+  // weekly employees, but weekly employees' attendance is recorded in
+  // their own weekly batches. If HR uploads the monthly sheet in
+  // "monthly" mode, rows for weekly employees are silently filtered
+  // out (NOT errored) so HR can clearly upload the same file without
+  // accidentally adding weekly attendance to the wrong workflow.
+  const modeRaw = String(formData.get("import_mode") ?? "monthly").trim();
+  const mode: ImportMode =
+    modeRaw === "weekly" ? "weekly" : modeRaw === "all" ? "all" : "monthly";
 
   // Parse the workbook. The `codepage: 1256` option tells xlsx to
   // decode legacy BIFF8 Arabic .xls files correctly -- without it,
@@ -337,12 +350,12 @@ export async function importAttendance(formData: FormData) {
     );
   }
 
-  // Fetch all employees + their assigned shift's expected start/end so we
-  // can compute tardiness + early_leave per row.
+  // Fetch all employees + their pay_frequency (drives the mode filter
+  // below) and assigned shift's expected start/end for tardiness math.
   const { data: empData } = await supabase
     .from("employees")
     .select(
-      "id, employee_code, full_name, shift_id, shifts(start_time, end_time)",
+      "id, employee_code, full_name, pay_frequency, shift_id, shifts(start_time, end_time)",
     )
     .eq("company_id", profile.company_id);
 
@@ -352,6 +365,7 @@ export async function importAttendance(formData: FormData) {
     id: string;
     employee_code: string | null;
     full_name: string;
+    pay_frequency: "monthly" | "weekly" | null;
     shift_id: string | null;
     shifts: { start_time: string; end_time: string } | null;
   };
@@ -360,6 +374,7 @@ export async function importAttendance(formData: FormData) {
       id: string;
       employee_code: string | null;
       full_name: string;
+      pay_frequency: "monthly" | "weekly" | null;
       shift_id: string | null;
       shifts:
         | { start_time: string; end_time: string }
@@ -371,6 +386,7 @@ export async function importAttendance(formData: FormData) {
       id: r.id,
       employee_code: r.employee_code,
       full_name: r.full_name,
+      pay_frequency: r.pay_frequency,
       shift_id: r.shift_id,
       shifts,
     };
@@ -401,6 +417,11 @@ export async function importAttendance(formData: FormData) {
   }> = [];
   const errors: string[] = [];
   let skipped = 0;
+  // Rows skipped because the employee's pay_frequency doesn't match
+  // the import mode (e.g., monthly upload, employee is weekly). NOT
+  // errored -- just filtered so HR can upload the same fingerprint
+  // file under each mode.
+  let modeFiltered = 0;
   const dataRows = matrix.slice(headerRowIdx + 1);
 
   const fieldAt = (row: unknown[], logical: string): unknown => {
@@ -437,6 +458,19 @@ export async function importAttendance(formData: FormData) {
         `السطر ${rowNum}: مفيش موظف بكود "${code ?? "—"}" أو اسم "${name ?? "—"}"`,
       );
       skipped++;
+      continue;
+    }
+
+    // Mode filter: if HR uploaded a monthly fingerprint sheet, drop
+    // rows for weekly employees (they have their own import). And
+    // vice-versa. "all" mode imports everyone.
+    const empFreq = emp.pay_frequency ?? "monthly";
+    if (mode === "monthly" && empFreq === "weekly") {
+      modeFiltered++;
+      continue;
+    }
+    if (mode === "weekly" && empFreq === "monthly") {
+      modeFiltered++;
       continue;
     }
 
@@ -507,6 +541,17 @@ export async function importAttendance(formData: FormData) {
   }
 
   if (records.length === 0) {
+    // Differentiate "nothing imported because of errors" from "nothing
+    // imported because the mode filter matched no one" so HR knows
+    // whether to fix the file or switch the mode.
+    if (modeFiltered > 0 && skipped === 0) {
+      redirect(
+        "/dashboard/attendance/import?error=" +
+          encodeURIComponent(
+            `كل الموظفين في الملف ${mode === "monthly" ? "أسبوعيين" : "شهريين"}. غيّر النوع لـ "${mode === "monthly" ? "أسبوعي" : "شهري"}" وارفع تاني.`,
+          ),
+      );
+    }
     redirect(
       "/dashboard/attendance/import?error=" +
         encodeURIComponent(
@@ -536,6 +581,6 @@ export async function importAttendance(formData: FormData) {
       ? `&errors=${encodeURIComponent(errors.slice(0, 10).join("\n"))}`
       : "";
   redirect(
-    `/dashboard/attendance/import?imported=${records.length}&skipped=${skipped}${errorSummary}`,
+    `/dashboard/attendance/import?imported=${records.length}&skipped=${skipped}&filtered=${modeFiltered}&mode=${mode}${errorSummary}`,
   );
 }
