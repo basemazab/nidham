@@ -20,6 +20,24 @@ function lastDayOfMonth(year: number, month: number): string {
   return d.toISOString().split("T")[0];
 }
 
+/**
+ * Count workdays in a calendar month, treating Friday as the weekly
+ * rest day (Egyptian convention). Public holidays aren't subtracted
+ * here -- once HR records a day as status='holiday', the per-employee
+ * stats will surface it under the عطلة column.
+ *
+ *   countNonFridays(2026, 5) -> 26   (31 days, 5 Fridays)
+ *   countNonFridays(2026, 2) -> 24   (28 days, 4 Fridays)
+ */
+function countNonFridays(year: number, month: number): number {
+  const last = new Date(year, month, 0).getDate();
+  let count = 0;
+  for (let d = 1; d <= last; d++) {
+    if (new Date(year, month - 1, d).getDay() !== 5) count += 1;
+  }
+  return count;
+}
+
 export default async function AttendanceReportPage({
   searchParams,
 }: {
@@ -38,6 +56,12 @@ export default async function AttendanceReportPage({
 
   const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
   const endDate = lastDayOfMonth(year, month);
+
+  // Expected workdays for the selected calendar month = total days
+  // in the month minus weekly Fridays. Public holidays aren't tracked
+  // as a config yet, so the figure is a lower-bound (HR can mark a
+  // day as 'holiday' to take it out of the count once recorded).
+  const expectedWorkdays = countNonFridays(year, month);
 
   // Fetch in parallel — RLS scopes both to the user's company
   const [employeesRes, attendanceRes] = await Promise.all([
@@ -87,6 +111,11 @@ export default async function AttendanceReportPage({
         ? 100
         : Math.round(((present + halfDay * 0.5) / workdays) * 100);
 
+    // Unrecorded gap = expected workdays minus what's actually in
+    // the database under any "workday" status (present/absent/halfDay).
+    // Leave doesn't count as a workday; weekend already isn't counted.
+    const unrecorded = Math.max(0, expectedWorkdays - workdays - leave);
+
     return {
       employee: emp,
       present,
@@ -96,6 +125,7 @@ export default async function AttendanceReportPage({
       weekend,
       total,
       workdays,
+      unrecorded,
       presentRate,
     };
   });
@@ -110,11 +140,18 @@ export default async function AttendanceReportPage({
   const totalRecords = stats.reduce((s, x) => s + x.total, 0);
   const totalPresent = stats.reduce((s, x) => s + x.present, 0);
   const totalAbsent = stats.reduce((s, x) => s + x.absent, 0);
+  const totalUnrecorded = stats.reduce((s, x) => s + x.unrecorded, 0);
   const avgPresentRate =
     stats.length === 0
       ? 0
       : Math.round(stats.reduce((s, x) => s + x.presentRate, 0) / stats.length);
   const topPerformer = stats[0];
+
+  // Hint flag: when more than ~10% of expected cells are missing,
+  // surface the bulk-attendance shortcut.
+  const expectedCells = stats.length * expectedWorkdays;
+  const showGapBanner =
+    expectedCells > 0 && totalUnrecorded > expectedCells * 0.1;
 
   const years = [now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1];
 
@@ -137,8 +174,12 @@ export default async function AttendanceReportPage({
           <h1 className="text-3xl font-black font-cairo text-slate-800 mb-1">
             تقرير الحضور الشهري
           </h1>
-          <p className="text-sm text-slate-500">
-            {ARABIC_MONTHS[month - 1]} {year} · من {startDate} إلى {endDate}
+          <p className="text-sm text-slate-500 font-cairo">
+            {ARABIC_MONTHS[month - 1]} {year} · أيام عمل متوقعة:{" "}
+            <strong className="text-brand-cyan-dark">
+              {expectedWorkdays}
+            </strong>{" "}
+            (بعد استبعاد الجمعات)
           </p>
         </header>
 
@@ -209,6 +250,32 @@ export default async function AttendanceReportPage({
           </div>
         </div>
 
+        {/* Gap banner — surfaces only when significant data is missing */}
+        {showGapBanner && (
+          <div className="mb-6 bg-orange-50 border-2 border-orange-200 rounded-xl p-4 flex flex-wrap items-start justify-between gap-3 font-cairo">
+            <div className="flex items-start gap-3 flex-1 min-w-0">
+              <span className="text-2xl">⚠</span>
+              <div>
+                <div className="font-bold text-orange-900 mb-0.5">
+                  فيه أيام عمل لسه ما اتسجلتش
+                </div>
+                <p className="text-sm text-orange-800 leading-relaxed">
+                  المتوقع {expectedWorkdays} يوم عمل لكل موظف في
+                  {" "}{ARABIC_MONTHS[month - 1]}، بس فيه{" "}
+                  <strong>{totalUnrecorded.toLocaleString("ar-EG")}</strong> خانة
+                  لسه فاضية عبر الموظفين. اعمل "حضور جماعي" للأيام الناقصة.
+                </p>
+              </div>
+            </div>
+            <Link
+              href="/dashboard/attendance"
+              className="px-4 py-2 rounded-lg bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-bold text-sm shadow-md hover:shadow-lg transition whitespace-nowrap"
+            >
+              👥 تسجيل جماعي →
+            </Link>
+          </div>
+        )}
+
         {/* Top performer */}
         {topPerformer && topPerformer.total > 0 && (
           <div className="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 rounded-xl p-5 mb-6 flex items-center gap-4">
@@ -254,7 +321,7 @@ export default async function AttendanceReportPage({
                   <th className="px-5 py-3 text-xs font-bold text-amber-700 uppercase tracking-wider font-cairo">نص يوم</th>
                   <th className="px-5 py-3 text-xs font-bold text-blue-700 uppercase tracking-wider font-cairo">إجازة</th>
                   <th className="px-5 py-3 text-xs font-bold text-violet-700 uppercase tracking-wider font-cairo">عطلة</th>
-                  <th className="px-5 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider font-cairo">أيام عمل</th>
+                  <th className="px-5 py-3 text-xs font-bold text-orange-700 uppercase tracking-wider font-cairo">غير مسجل</th>
                   <th className="px-5 py-3 text-xs font-bold text-brand-cyan-dark uppercase tracking-wider font-cairo min-w-[180px]">
                     نسبة الحضور
                   </th>
@@ -284,7 +351,13 @@ export default async function AttendanceReportPage({
                     <td className="px-5 py-3 font-bold text-amber-700">{s.halfDay}</td>
                     <td className="px-5 py-3 font-bold text-blue-700">{s.leave}</td>
                     <td className="px-5 py-3 font-bold text-violet-700">{s.weekend}</td>
-                    <td className="px-5 py-3 font-bold text-slate-600">{s.workdays}</td>
+                    <td
+                      className={`px-5 py-3 font-bold ${
+                        s.unrecorded > 0 ? "text-orange-700" : "text-slate-400"
+                      }`}
+                    >
+                      {s.unrecorded}
+                    </td>
                     <td className="px-5 py-3">
                       <div className="flex items-center gap-2">
                         <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
