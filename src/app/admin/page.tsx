@@ -137,6 +137,12 @@ export default async function AdminPage() {
         </div>
         <div className="flex items-center gap-3">
           <Link
+            href="/admin/trials"
+            className="text-sm text-amber-300 hover:text-white font-bold font-cairo px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 transition"
+          >
+            🧪 تحليل التجريبيين
+          </Link>
+          <Link
             href="/dashboard"
             className="text-sm text-slate-300 hover:text-white font-cairo"
           >

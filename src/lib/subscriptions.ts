@@ -53,6 +53,10 @@ export type Feature =
   // Pro+ AI features
   | "ai_assistant"
   | "ai_cv_screening"
+  // Retention insights — available on every paid tier so even small
+  // shops get the "deserves a raise" / "flight risk" nudges. The whole
+  // point is to reduce turnover for Egyptian SMBs who can't afford it.
+  | "retention_insights"
   // Enterprise-only
   | "bridge_analytics"
   | "audit_log"
@@ -75,6 +79,7 @@ const FEATURE_RANK: Record<Feature, number> = {
   recruitment: 2,
   ai_assistant: 2,
   ai_cv_screening: 2,
+  retention_insights: 1, // basic+ — too valuable to lock out small shops
   bridge_analytics: 3,
   audit_log: 3,
   custom_branding: 3,

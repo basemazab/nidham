@@ -24,6 +24,7 @@ const FEATURE_TITLES: Partial<Record<Feature, string>> = {
   weekly_payroll: "المرتب الأسبوعي",
   crm: "إدارة العملاء (CRM)",
   recruitment: "نظام التوظيف",
+  retention_insights: "توصيات الاحتفاظ بالموظفين 🎯",
 };
 
 export function UpgradeRequired({

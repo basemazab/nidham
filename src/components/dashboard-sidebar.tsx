@@ -46,6 +46,7 @@ const NAV_ITEMS: readonly NavItem[] = [
   { href: "/dashboard/contracts", label: "العقود", icon: "📋", section: "main" },
   { href: "/dashboard/team", label: "فريق الشركة", icon: "🤝", section: "main", visibleTo: ["admin"] },
   { href: "/dashboard/ai", label: "المساعد الذكي ✦", icon: "🤖", section: "ai", feature: "ai_assistant" },
+  { href: "/dashboard/retention", label: "احتفاظ بالموظفين 🎯", icon: "🎯", section: "ai", feature: "retention_insights" },
   { href: "/dashboard/reports/attendance", label: "تقرير الحضور", icon: "📊", section: "reports" },
   { href: "/dashboard/reports/bridge", label: "Bridge ✦", icon: "✦", section: "reports", feature: "bridge_analytics" },
   { href: "/dashboard/audit-log", label: "سجل النشاط", icon: "📋", section: "reports", visibleTo: ["admin"], feature: "audit_log" },

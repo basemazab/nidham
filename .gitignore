@@ -47,3 +47,6 @@ next-env.d.ts
 scripts/storageState.json
 test-results/
 playwright-report/
+
+# claude code local dev config (preview server)
+.claude/

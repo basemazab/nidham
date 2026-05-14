@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { RetentionBanner } from "@/components/retention-banner";
 
 type Profile = {
   full_name: string | null;
@@ -290,6 +291,10 @@ export default async function DashboardPage() {
           </section>
         )}
 
+        {/* Retention banner — only renders if there are pending insights
+            AND the subscription unlocks retention_insights. Otherwise null. */}
+        <RetentionBanner />
+
         {/* Modules section */}
         <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 font-cairo">
           الموديولات
@@ -341,6 +346,20 @@ export default async function DashboardPage() {
             <div className="text-3xl mb-2">📋</div>
             <h3 className="font-bold font-cairo mb-1 text-slate-800">العقود</h3>
             <p className="text-xs text-slate-500">تنبيه قبل التجديد</p>
+          </Link>
+
+          <Link
+            href="/dashboard/retention"
+            className="bg-gradient-to-br from-rose-50 via-amber-50 to-emerald-50 p-6 rounded-2xl border-2 border-amber-200 hover:border-amber-400 hover:shadow-lg hover:-translate-y-0.5 transition-all relative overflow-hidden"
+          >
+            <div className="absolute top-2 left-2 text-[10px] text-rose-600 font-bold tracking-wider">
+              ✦ ذكاء
+            </div>
+            <div className="text-3xl mb-2">🎯</div>
+            <h3 className="font-bold font-cairo mb-1 text-slate-800">
+              احتفاظ بالموظفين
+            </h3>
+            <p className="text-xs text-amber-700 font-bold">زيادات · مكافآت · إنذارات</p>
           </Link>
         </div>
 
