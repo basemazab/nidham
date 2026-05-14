@@ -8,7 +8,12 @@ type SearchParams = Promise<{
 }>;
 
 type Employee = { id: string; full_name: string; job_title: string | null };
-type AttendanceRow = { employee_id: string; status: string };
+type AttendanceRow = {
+  employee_id: string;
+  status: string;
+  tardiness_minutes: number | null;
+  early_leave_minutes: number | null;
+};
 
 const ARABIC_MONTHS = [
   "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
@@ -73,7 +78,7 @@ export default async function AttendanceReportPage({
       .returns<Employee[]>(),
     supabase
       .from("attendance")
-      .select("employee_id, status")
+      .select("employee_id, status, tardiness_minutes, early_leave_minutes")
       .gte("date", startDate)
       .lte("date", endDate)
       .returns<AttendanceRow[]>(),
@@ -111,6 +116,16 @@ export default async function AttendanceReportPage({
         ? 100
         : Math.round(((present + halfDay * 0.5) / workdays) * 100);
 
+    // Sum tardiness + early-leave minutes across the period. Counted
+    // only on actual workdays (present / half_day) -- a 'weekend' row
+    // shouldn't contribute even if minutes were somehow recorded.
+    const tardinessTotal = records
+      .filter((r) => r.status === "present" || r.status === "half_day")
+      .reduce((s, r) => s + (r.tardiness_minutes ?? 0), 0);
+    const earlyLeaveTotal = records
+      .filter((r) => r.status === "present" || r.status === "half_day")
+      .reduce((s, r) => s + (r.early_leave_minutes ?? 0), 0);
+
     // Unrecorded gap = expected workdays minus what's actually in
     // the database under any "workday" status (present/absent/halfDay).
     // Leave doesn't count as a workday; weekend already isn't counted.
@@ -127,6 +142,8 @@ export default async function AttendanceReportPage({
       workdays,
       unrecorded,
       presentRate,
+      tardinessTotal,
+      earlyLeaveTotal,
     };
   });
 
@@ -141,6 +158,14 @@ export default async function AttendanceReportPage({
   const totalPresent = stats.reduce((s, x) => s + x.present, 0);
   const totalAbsent = stats.reduce((s, x) => s + x.absent, 0);
   const totalUnrecorded = stats.reduce((s, x) => s + x.unrecorded, 0);
+  const totalTardinessMin = stats.reduce(
+    (s, x) => s + x.tardinessTotal,
+    0,
+  );
+  const totalEarlyLeaveMin = stats.reduce(
+    (s, x) => s + x.earlyLeaveTotal,
+    0,
+  );
   const avgPresentRate =
     stats.length === 0
       ? 0
@@ -180,6 +205,18 @@ export default async function AttendanceReportPage({
               {expectedWorkdays}
             </strong>{" "}
             (بعد استبعاد الجمعات)
+            {(totalTardinessMin > 0 || totalEarlyLeaveMin > 0) && (
+              <>
+                {" · "}
+                <span className="text-amber-700">
+                  ⏰ {totalTardinessMin.toLocaleString("ar-EG")} د تأخير
+                </span>
+                {" · "}
+                <span className="text-orange-700">
+                  🚪 {totalEarlyLeaveMin.toLocaleString("ar-EG")} د انصراف مبكر
+                </span>
+              </>
+            )}
           </p>
         </header>
 
@@ -322,6 +359,8 @@ export default async function AttendanceReportPage({
                   <th className="px-5 py-3 text-xs font-bold text-blue-700 uppercase tracking-wider font-cairo">إجازة</th>
                   <th className="px-5 py-3 text-xs font-bold text-violet-700 uppercase tracking-wider font-cairo">عطلة</th>
                   <th className="px-5 py-3 text-xs font-bold text-orange-700 uppercase tracking-wider font-cairo">غير مسجل</th>
+                  <th className="px-3 py-3 text-xs font-bold text-amber-700 uppercase tracking-wider font-cairo whitespace-nowrap">⏰ تأخير (د)</th>
+                  <th className="px-3 py-3 text-xs font-bold text-orange-700 uppercase tracking-wider font-cairo whitespace-nowrap">🚪 انصراف مبكر (د)</th>
                   <th className="px-5 py-3 text-xs font-bold text-brand-cyan-dark uppercase tracking-wider font-cairo min-w-[180px]">
                     نسبة الحضور
                   </th>
@@ -357,6 +396,26 @@ export default async function AttendanceReportPage({
                       }`}
                     >
                       {s.unrecorded}
+                    </td>
+                    <td
+                      className={`px-3 py-3 font-bold font-mono text-center ${
+                        s.tardinessTotal > 0
+                          ? "text-amber-700"
+                          : "text-slate-400"
+                      }`}
+                      dir="ltr"
+                    >
+                      {s.tardinessTotal}
+                    </td>
+                    <td
+                      className={`px-3 py-3 font-bold font-mono text-center ${
+                        s.earlyLeaveTotal > 0
+                          ? "text-orange-700"
+                          : "text-slate-400"
+                      }`}
+                      dir="ltr"
+                    >
+                      {s.earlyLeaveTotal}
                     </td>
                     <td className="px-5 py-3">
                       <div className="flex items-center gap-2">

@@ -53,14 +53,33 @@ export default async function AttendancePage({
 
   const employees = employeesData ?? [];
 
-  // Existing attendance for this date
+  // Existing attendance for this date -- pulled with tardiness +
+  // early-leave so the form defaults reflect what's already saved.
   const { data: existing } = await supabase
     .from("attendance")
-    .select("employee_id, status")
-    .eq("date", selectedDate);
+    .select("employee_id, status, tardiness_minutes, early_leave_minutes")
+    .eq("date", selectedDate)
+    .returns<
+      Array<{
+        employee_id: string;
+        status: string;
+        tardiness_minutes: number | null;
+        early_leave_minutes: number | null;
+      }>
+    >();
 
-  const existingMap = new Map<string, string>(
-    existing?.map((r) => [r.employee_id as string, r.status as string]) ?? [],
+  const existingMap = new Map<
+    string,
+    { status: string; tardiness: number; earlyLeave: number }
+  >(
+    existing?.map((r) => [
+      r.employee_id,
+      {
+        status: r.status,
+        tardiness: r.tardiness_minutes ?? 0,
+        earlyLeave: r.early_leave_minutes ?? 0,
+      },
+    ]) ?? [],
   );
 
   return (
@@ -198,11 +217,17 @@ export default async function AttendancePage({
                     <th className="px-5 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider font-cairo">
                       الحالة
                     </th>
+                    <th className="px-3 py-3 text-xs font-bold text-amber-700 uppercase tracking-wider font-cairo">
+                      تأخير (د)
+                    </th>
+                    <th className="px-3 py-3 text-xs font-bold text-orange-700 uppercase tracking-wider font-cairo">
+                      انصراف مبكر (د)
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {employees.map((emp) => {
-                    const currentStatus = existingMap.get(emp.id) ?? "";
+                    const current = existingMap.get(emp.id);
                     return (
                       <tr key={emp.id} className="hover:bg-slate-50/50">
                         <td className="px-5 py-3">
@@ -226,7 +251,7 @@ export default async function AttendancePage({
                         <td className="px-5 py-3">
                           <select
                             name={`status_${emp.id}`}
-                            defaultValue={currentStatus}
+                            defaultValue={current?.status ?? ""}
                             className="px-4 py-2 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none text-slate-900 font-cairo min-w-[140px]"
                           >
                             <option value="">— اختار —</option>
@@ -235,6 +260,30 @@ export default async function AttendancePage({
                             <option value="half_day">◐ نص يوم</option>
                             <option value="leave">🏖 إجازة</option>
                           </select>
+                        </td>
+                        <td className="px-3 py-3">
+                          <input
+                            type="number"
+                            name={`tardiness_${emp.id}`}
+                            defaultValue={current?.tardiness ?? 0}
+                            min="0"
+                            max="720"
+                            step="1"
+                            className="w-20 px-2 py-2 rounded-lg border border-slate-200 focus:border-amber-400 focus:ring-2 focus:ring-amber-200 outline-none text-slate-900 text-center font-mono"
+                            dir="ltr"
+                          />
+                        </td>
+                        <td className="px-3 py-3">
+                          <input
+                            type="number"
+                            name={`early_leave_${emp.id}`}
+                            defaultValue={current?.earlyLeave ?? 0}
+                            min="0"
+                            max="720"
+                            step="1"
+                            className="w-20 px-2 py-2 rounded-lg border border-slate-200 focus:border-orange-400 focus:ring-2 focus:ring-orange-200 outline-none text-slate-900 text-center font-mono"
+                            dir="ltr"
+                          />
                         </td>
                       </tr>
                     );

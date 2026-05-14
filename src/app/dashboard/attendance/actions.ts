@@ -44,12 +44,16 @@ export async function saveAttendance(formData: FormData) {
     redirect("/dashboard/attendance?error=" + encodeURIComponent("التاريخ مطلوب"));
   }
 
-  // Collect all status_<employee_id> entries
+  // Collect all status_<employee_id> entries. Tardiness + early-leave
+  // (minutes) are read alongside the status with the same employee_id
+  // suffix so they end up on the same upserted row.
   const records: Array<{
     company_id: string;
     employee_id: string;
     date: string;
     status: string;
+    tardiness_minutes: number;
+    early_leave_minutes: number;
     created_by: string;
   }> = [];
 
@@ -57,13 +61,19 @@ export async function saveAttendance(formData: FormData) {
     if (!key.startsWith("status_")) continue;
     const value = String(rawValue ?? "");
     if (!value) continue;
-    if (!VALID_STATUSES.includes(value as (typeof VALID_STATUSES)[number])) continue;
+    if (!VALID_STATUSES.includes(value as AttendanceStatus)) continue;
+
+    const empId = key.replace("status_", "");
+    const tardiness = clampMinutes(formData.get(`tardiness_${empId}`));
+    const earlyLeave = clampMinutes(formData.get(`early_leave_${empId}`));
 
     records.push({
       company_id: profile.company_id as string,
-      employee_id: key.replace("status_", ""),
+      employee_id: empId,
       date,
       status: value,
+      tardiness_minutes: tardiness,
+      early_leave_minutes: earlyLeave,
       created_by: user.id,
     });
   }
@@ -248,6 +258,15 @@ export async function bulkSaveAttendance(formData: FormData) {
         `${inserted}|${dates.length}|${empIds.length}`,
       ),
   );
+}
+
+// Parse and clamp a tardiness / early-leave minute value to the DB
+// check-constraint range (0..720). Empty or non-numeric input -> 0.
+function clampMinutes(value: FormDataEntryValue | null): number {
+  if (value === null) return 0;
+  const n = parseInt(String(value), 10);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  return Math.min(n, 720);
 }
 
 function datesBetween(start: string, end: string): string[] {
