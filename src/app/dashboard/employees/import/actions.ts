@@ -370,16 +370,56 @@ export async function importEmployees(formData: FormData) {
     );
   }
 
-  // Parse
+  // Parse the workbook into a 2D array of cells first, then auto-detect
+  // the header row. ERP-exported reports often have title rows, blank
+  // lines, or merged-cell banners above the actual column headers, so
+  // trusting row 1 as the header (xlsx default) breaks on those files.
+  // findHeaderRow() scans the first ~15 rows and picks the one with
+  // the most matches against HEADER_ALIASES.
   let rows: Record<string, unknown>[];
+  let detectedHeaderRow = 0; // 0-indexed; -1 means "no good row found"
   try {
     const buf = Buffer.from(await file.arrayBuffer());
     const wb = XLSX.read(buf, { type: "buffer", cellDates: false });
     const sheet = wb.Sheets[wb.SheetNames[0]];
-    rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
+
+    // Get the workbook as a 2D array so we can scan rows for headers.
+    const matrix = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
+      header: 1,
       raw: true,
       defval: null,
+      blankrows: false,
     });
+
+    detectedHeaderRow = findHeaderRow(matrix);
+    if (detectedHeaderRow === -1) {
+      redirect(
+        "/dashboard/employees/import?error=" +
+          encodeURIComponent(
+            "مش لاقي صف فيه أسماء أعمدة معروفة (زي 'الاسم' أو 'Name'). " +
+              "تأكد إن الملف فيه صف header واحد على الأقل.",
+          ),
+      );
+    }
+
+    // Slice from the detected header onwards and convert back to
+    // object form using THAT row as the header. The rest of the
+    // pipeline (buildKeyMap, HEADER_ALIASES lookup) stays identical.
+    const headerCells = matrix[detectedHeaderRow] as unknown[];
+    const dataRows = matrix.slice(detectedHeaderRow + 1);
+    rows = dataRows
+      .filter((r) => Array.isArray(r) && r.some((c) => c !== null && c !== ""))
+      .map((r) => {
+        const obj: Record<string, unknown> = {};
+        for (let i = 0; i < headerCells.length; i++) {
+          const key = headerCells[i];
+          if (key === null || key === undefined) continue;
+          const keyStr = String(key).trim();
+          if (keyStr.length === 0) continue;
+          obj[keyStr] = (r as unknown[])[i] ?? null;
+        }
+        return obj;
+      });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "غير معروف";
     redirect(
@@ -547,4 +587,49 @@ function buildKeyMap(firstRow: Record<string, unknown>): Record<string, string> 
     }
   }
   return out;
+}
+
+// ----------------------------------------------------------------------------
+// findHeaderRow -- pick the row most likely to be the column header
+//
+// ERP/HR systems export reports with title rows, blank lines, and merged
+// banners above the real headers, so trusting "row 1 = headers" breaks.
+// We score each of the first ~15 rows by how many of its non-empty cells
+// match a known alias in HEADER_ALIASES. The highest-scoring row (with
+// at least 2 hits) is the header.
+//
+// Ties broken by "earlier row wins" so a report with two header-like
+// rows (e.g. summary + detail) uses the first one.
+//
+// Returns the 0-indexed row number, or -1 if no row hits the threshold.
+// ----------------------------------------------------------------------------
+function findHeaderRow(matrix: unknown[][]): number {
+  const SCAN_LIMIT = Math.min(matrix.length, 15);
+  const MIN_HITS = 2;
+
+  let bestRow = -1;
+  let bestScore = 0;
+
+  for (let i = 0; i < SCAN_LIMIT; i++) {
+    const row = matrix[i];
+    if (!Array.isArray(row)) continue;
+
+    let hits = 0;
+    for (const cell of row) {
+      if (cell === null || cell === undefined) continue;
+      const s = String(cell).trim();
+      if (s.length === 0) continue;
+      const lower = s.toLowerCase();
+      if (HEADER_ALIASES[lower] || HEADER_ALIASES[s]) {
+        hits += 1;
+      }
+    }
+
+    if (hits > bestScore && hits >= MIN_HITS) {
+      bestScore = hits;
+      bestRow = i;
+    }
+  }
+
+  return bestRow;
 }
