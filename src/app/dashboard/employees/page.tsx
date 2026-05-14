@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { DeleteAllEmployeesButton } from "@/components/delete-all-employees-button";
+import { getMyProfile } from "@/lib/permissions";
 
 type Employee = {
   id: string;
@@ -12,19 +14,38 @@ type Employee = {
   hire_date: string | null;
 };
 
+type Params = Promise<{
+  deleted_all?: string;
+  error?: string;
+  updated?: string;
+}>;
+
 const statusLabel: Record<Employee["status"], { text: string; classes: string }> = {
   active: { text: "نشط", classes: "bg-emerald-50 text-emerald-700 border-emerald-200" },
   on_leave: { text: "إجازة", classes: "bg-amber-50 text-amber-700 border-amber-200" },
   terminated: { text: "منتهي", classes: "bg-slate-100 text-slate-600 border-slate-200" },
 };
 
-export default async function EmployeesPage() {
+export default async function EmployeesPage({
+  searchParams,
+}: {
+  searchParams: Params;
+}) {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) redirect("/login");
+
+  const params = await searchParams;
+  const deletedAll = params.deleted_all
+    ? parseInt(params.deleted_all, 10)
+    : null;
+  const errorMsg = params.error ? decodeURIComponent(params.error) : null;
+
+  const { profile } = await getMyProfile();
+  const isAdmin = profile?.role === "admin";
 
   const { data: employees } = await supabase
     .from("employees")
@@ -46,6 +67,25 @@ export default async function EmployeesPage() {
             ← الرجوع للـ Dashboard
           </Link>
         </div>
+
+        {deletedAll !== null && (
+          <div className="mb-6 bg-emerald-50 border-2 border-emerald-200 rounded-xl p-4 font-cairo text-emerald-800 flex items-start gap-3">
+            <span className="text-2xl">✓</span>
+            <div>
+              <div className="font-bold">تم الحذف الجماعي</div>
+              <p className="text-sm mt-0.5">
+                اتمسح <b>{deletedAll.toLocaleString("ar-EG")}</b> موظف
+                مع كل بياناتهم المرتبطة.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {errorMsg && (
+          <div className="mb-6 bg-red-50 border-2 border-red-200 rounded-xl p-4 text-red-700 font-cairo text-sm">
+            ⚠ {errorMsg}
+          </div>
+        )}
 
         <header className="flex items-center justify-between mb-8">
           <div>
@@ -142,6 +182,27 @@ export default async function EmployeesPage() {
               </tbody>
             </table>
           </div>
+        )}
+
+        {/* Danger zone -- admin-only bulk delete. Lives at the bottom of
+            the page on purpose: out of the way for normal HR work, but
+            available for a clean reset (e.g. wrong import that needs to
+            be re-done from scratch). */}
+        {isAdmin && list.length > 0 && (
+          <section className="mt-12 bg-red-50/50 border-2 border-red-200 rounded-2xl p-6">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div>
+                <h3 className="font-black text-red-800 font-cairo mb-1">
+                  ⚠ منطقة الخطر
+                </h3>
+                <p className="text-sm text-red-700 leading-relaxed font-cairo max-w-xl">
+                  حذف كل الموظفين بياخد معاه كل سجلات الحضور والرواتب
+                  والطلبات. مفيش رجوع — استعملها بس لو حابب تبدأ من الصفر.
+                </p>
+              </div>
+              <DeleteAllEmployeesButton employeeCount={list.length} />
+            </div>
+          </section>
         )}
       </div>
     </main>

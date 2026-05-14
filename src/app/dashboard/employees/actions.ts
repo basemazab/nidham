@@ -119,6 +119,68 @@ export async function deleteEmployee(id: string) {
   revalidatePath("/dashboard/employees");
 }
 
+// ============================================================================
+// Nuclear option: delete ALL employees in the current company.
+//
+// Admin-only, gated behind a typed-phrase confirmation ("حذف الكل") so a
+// rogue click or a stolen session can't quietly wipe a 200-employee
+// roster. Counts before delete + reports back via the URL so HR sees
+// "تم حذف 47 موظف" instead of an ambiguous "done".
+//
+// Cascades: every employee-keyed table (attendance, payroll_entries,
+// leave_requests, advance_requests, permission_requests, leave_balances,
+// audit_log via trigger) has ON DELETE CASCADE on employee_id, so the
+// dependent data goes with them. auth.users rows are NOT touched; if HR
+// wants to retire an employee's mobile account, they need to remove the
+// auth user separately.
+// ============================================================================
+export async function deleteAllEmployees(formData: FormData) {
+  const { supabase, profile } = await requireAdmin();
+
+  const phrase = String(formData.get("confirm_phrase") ?? "").trim();
+  if (phrase !== "حذف الكل") {
+    redirect(
+      "/dashboard/employees?error=" +
+        encodeURIComponent("لازم تكتب 'حذف الكل' بالظبط عشان تأكد."),
+    );
+  }
+
+  // Count first so the success message can be specific.
+  const { count } = await supabase
+    .from("employees")
+    .select("id", { count: "exact", head: true })
+    .eq("company_id", profile.company_id);
+
+  if (!count || count === 0) {
+    redirect(
+      "/dashboard/employees?error=" +
+        encodeURIComponent("مفيش موظفين عندك أصلاً."),
+    );
+  }
+
+  // Wipe. RLS is doing the company-scoping anyway, but we're explicit
+  // about the company_id eq for defence in depth -- if RLS got loosened
+  // in a future migration this still scopes to the caller's tenant.
+  const { error } = await supabase
+    .from("employees")
+    .delete()
+    .eq("company_id", profile.company_id);
+
+  if (error) {
+    redirect(
+      "/dashboard/employees?error=" +
+        encodeURIComponent(arabicizeDbError(error.message)),
+    );
+  }
+
+  revalidatePath("/dashboard/employees");
+  revalidatePath("/dashboard/attendance");
+  revalidatePath("/dashboard/payroll");
+  redirect(
+    "/dashboard/employees?deleted_all=" + encodeURIComponent(String(count)),
+  );
+}
+
 /**
  * Generates an invitation token for an employee. The HR person hands
  * the resulting UUID to the employee (paper / WhatsApp / SMS), and the
