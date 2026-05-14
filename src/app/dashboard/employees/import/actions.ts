@@ -6,6 +6,7 @@ import * as XLSX from "xlsx";
 import { createClient } from "@/lib/supabase/server";
 import { requireHR } from "@/lib/permissions";
 import { arabicizeDbError } from "@/lib/i18n";
+import { bustDashboardCache } from "@/lib/cache";
 
 export type EmployeeImportRow = {
   full_name: string;
@@ -121,6 +122,7 @@ export async function confirmPdfImport(rows: EmployeeImportRow[]) {
   }
 
   revalidatePath("/dashboard/employees");
+  bustDashboardCache();
 
   const params = new URLSearchParams({
     inserted: String(inserted.length),
@@ -500,6 +502,7 @@ export async function importEmployees(formData: FormData) {
   }
 
   revalidatePath("/dashboard/employees");
+  bustDashboardCache();
 
   const params = new URLSearchParams({
     inserted: String(inserted.length),

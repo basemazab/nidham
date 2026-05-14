@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireHR } from "@/lib/permissions";
 import { arabicizeDbError } from "@/lib/i18n";
+import { bustDashboardCache } from "@/lib/cache";
 
 function asText(value: FormDataEntryValue | null): string | null {
   if (value === null) return null;
@@ -71,6 +72,7 @@ export async function logInteraction(formData: FormData) {
 
   revalidatePath("/dashboard/interactions");
   revalidatePath("/dashboard/reports/bridge");
+  bustDashboardCache();
   redirect("/dashboard/interactions?saved=1");
 }
 
@@ -111,6 +113,7 @@ export async function updateInteraction(id: string, formData: FormData) {
 
   revalidatePath("/dashboard/interactions");
   revalidatePath("/dashboard/reports/bridge");
+  bustDashboardCache();
   redirect("/dashboard/interactions?updated=1");
 }
 
@@ -120,4 +123,5 @@ export async function deleteInteraction(id: string) {
   await supabase.from("interactions").delete().eq("id", id);
   revalidatePath("/dashboard/interactions");
   revalidatePath("/dashboard/reports/bridge");
+  bustDashboardCache();
 }

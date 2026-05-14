@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { calculatePayroll, type AttendanceBreakdown } from "@/lib/payroll";
 import { requireAdmin, requireHR } from "@/lib/permissions";
 import { arabicizeDbError } from "@/lib/i18n";
+import { bustDashboardCache } from "@/lib/cache";
 
 function asText(value: FormDataEntryValue | null): string | null {
   if (value === null) return null;
@@ -213,6 +214,7 @@ export async function generatePayrollPeriod(formData: FormData) {
   }
 
   revalidatePath("/dashboard/payroll");
+  bustDashboardCache();
   redirect(`/dashboard/payroll/${period.id}`);
 }
 
@@ -379,5 +381,6 @@ export async function deletePayrollPeriod(periodId: string) {
     .eq("status", "draft");
 
   revalidatePath("/dashboard/payroll");
+  bustDashboardCache();
   redirect("/dashboard/payroll");
 }

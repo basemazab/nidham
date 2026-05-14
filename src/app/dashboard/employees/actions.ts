@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireAdmin, requireHR } from "@/lib/permissions";
 import { arabicizeDbError } from "@/lib/i18n";
+import { bustDashboardCache } from "@/lib/cache";
 import { sendEmail, emailMobileInvitation } from "@/lib/email";
 
 function asText(value: FormDataEntryValue | null): string | null {
@@ -60,6 +61,7 @@ export async function createEmployee(formData: FormData) {
   }
 
   revalidatePath("/dashboard/employees");
+  bustDashboardCache();
   redirect("/dashboard/employees");
 }
 
@@ -106,6 +108,7 @@ export async function updateEmployee(id: string, formData: FormData) {
   }
 
   revalidatePath("/dashboard/employees");
+  bustDashboardCache();
   revalidatePath(`/dashboard/employees/${id}`);
   redirect("/dashboard/employees?updated=1");
 }
@@ -117,6 +120,7 @@ export async function deleteEmployee(id: string) {
   const supabase = await createClient();
   await supabase.from("employees").delete().eq("id", id);
   revalidatePath("/dashboard/employees");
+  bustDashboardCache();
 }
 
 // ============================================================================
@@ -174,6 +178,7 @@ export async function deleteAllEmployees(formData: FormData) {
   }
 
   revalidatePath("/dashboard/employees");
+  bustDashboardCache();
   revalidatePath("/dashboard/attendance");
   revalidatePath("/dashboard/payroll");
   redirect(

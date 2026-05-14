@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireAdmin } from "@/lib/permissions";
+import { bustDashboardCache } from "@/lib/cache";
 
 function asText(value: FormDataEntryValue | null): string | null {
   if (value === null) return null;
@@ -60,6 +61,7 @@ export async function createInvitation(formData: FormData) {
   }
 
   revalidatePath("/dashboard/team");
+  bustDashboardCache();
   redirect(`/dashboard/team/invited/${invitation.id}`);
 }
 
@@ -73,6 +75,7 @@ export async function cancelInvitation(id: string) {
     .eq("id", id);
 
   revalidatePath("/dashboard/team");
+  bustDashboardCache();
 }
 
 export async function resendInvitation(id: string) {
@@ -92,5 +95,6 @@ export async function resendInvitation(id: string) {
     .eq("id", id);
 
   revalidatePath("/dashboard/team");
+  bustDashboardCache();
   redirect(`/dashboard/team/invited/${id}`);
 }

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireHR } from "@/lib/permissions";
 import { arabicizeDbError } from "@/lib/i18n";
+import { bustDashboardCache } from "@/lib/cache";
 
 function asText(value: FormDataEntryValue | null): string | null {
   if (value === null) return null;
@@ -98,6 +99,7 @@ export async function createContract(formData: FormData) {
   }
 
   revalidatePath("/dashboard/contracts");
+  bustDashboardCache();
   redirect("/dashboard/contracts");
 }
 
@@ -123,6 +125,7 @@ export async function updateContract(id: string, formData: FormData) {
   }
 
   revalidatePath("/dashboard/contracts");
+  bustDashboardCache();
   revalidatePath(`/dashboard/contracts/${id}`);
   redirect("/dashboard/contracts?updated=1");
 }
@@ -132,4 +135,5 @@ export async function deleteContract(id: string) {
   const supabase = await createClient();
   await supabase.from("contracts").delete().eq("id", id);
   revalidatePath("/dashboard/contracts");
+  bustDashboardCache();
 }

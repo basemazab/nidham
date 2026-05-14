@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireHR } from "@/lib/permissions";
 import { arabicizeDbError } from "@/lib/i18n";
+import { bustDashboardCache } from "@/lib/cache";
 
 // ----------------------------------------------------------------------------
 // Helpers
@@ -121,6 +122,7 @@ export async function createJob(formData: FormData) {
   }
 
   revalidatePath("/dashboard/jobs");
+  bustDashboardCache();
   redirect(`/dashboard/jobs/${data.id}`);
 }
 
@@ -164,6 +166,7 @@ export async function updateJob(jobId: string, formData: FormData) {
 
   revalidatePath(`/dashboard/jobs/${jobId}`);
   revalidatePath("/dashboard/jobs");
+  bustDashboardCache();
   redirect(`/dashboard/jobs/${jobId}`);
 }
 
@@ -172,6 +175,7 @@ export async function deleteJob(jobId: string) {
   const supabase = await createClient();
   await supabase.from("jobs").delete().eq("id", jobId);
   revalidatePath("/dashboard/jobs");
+  bustDashboardCache();
   redirect("/dashboard/jobs");
 }
 
@@ -184,6 +188,7 @@ export async function changeJobStatus(jobId: string, status: string) {
     .eq("id", jobId);
   revalidatePath(`/dashboard/jobs/${jobId}`);
   revalidatePath("/dashboard/jobs");
+  bustDashboardCache();
 }
 
 // ----------------------------------------------------------------------------

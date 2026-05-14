@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireAdmin } from "@/lib/permissions";
+import { bustDashboardCache } from "@/lib/cache";
 
 function asNumber(value: FormDataEntryValue | null): number | null {
   if (value === null || typeof value !== "string") return null;
@@ -67,5 +68,6 @@ export async function updateOfficeLocation(formData: FormData) {
   }
 
   revalidatePath("/dashboard/settings/office-location");
+  bustDashboardCache();
   redirect("/dashboard/settings/office-location?saved=1");
 }

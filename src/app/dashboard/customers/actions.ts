@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireHR } from "@/lib/permissions";
 import { arabicizeDbError } from "@/lib/i18n";
+import { bustDashboardCache } from "@/lib/cache";
 
 function asText(value: FormDataEntryValue | null): string | null {
   if (value === null) return null;
@@ -71,6 +72,7 @@ export async function createCustomer(formData: FormData) {
   }
 
   revalidatePath("/dashboard/customers");
+  bustDashboardCache();
   redirect("/dashboard/customers");
 }
 
@@ -110,6 +112,7 @@ export async function updateCustomer(id: string, formData: FormData) {
   }
 
   revalidatePath("/dashboard/customers");
+  bustDashboardCache();
   revalidatePath(`/dashboard/customers/${id}`);
   redirect("/dashboard/customers?updated=1");
 }
@@ -119,4 +122,5 @@ export async function deleteCustomer(id: string) {
   const supabase = await createClient();
   await supabase.from("customers").delete().eq("id", id);
   revalidatePath("/dashboard/customers");
+  bustDashboardCache();
 }

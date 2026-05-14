@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireHR } from "@/lib/permissions";
+import { bustDashboardCache } from "@/lib/cache";
 import {
   sendEmail,
   emailLeaveDecision,
@@ -64,6 +65,7 @@ export async function decideRequest(
   void notifyDecision(supabase, kind, id, decision, hrNotes);
 
   revalidatePath("/dashboard/requests");
+  bustDashboardCache();
   revalidatePath(backUrl);
   redirect("/dashboard/requests?decided=1");
 }
@@ -214,5 +216,6 @@ export async function markAdvancePaid(id: string) {
   })();
 
   revalidatePath("/dashboard/requests");
+  bustDashboardCache();
   revalidatePath(`/dashboard/requests/advance/${id}`);
 }

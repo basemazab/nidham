@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import * as XLSX from "xlsx";
 import { createClient } from "@/lib/supabase/server";
 import { requireHR } from "@/lib/permissions";
+import { bustDashboardCache } from "@/lib/cache";
 
 // Hard cap on uploaded file size. XLSX.read loads the whole buffer
 // into memory, so accepting an arbitrarily-large workbook is an easy
@@ -273,6 +274,7 @@ export async function importAttendance(formData: FormData) {
 
   revalidatePath("/dashboard/attendance");
   revalidatePath("/dashboard/reports/attendance");
+  bustDashboardCache();
 
   const errorSummary =
     errors.length > 0

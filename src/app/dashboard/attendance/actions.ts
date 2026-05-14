@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireHR } from "@/lib/permissions";
+import { bustDashboardCache } from "@/lib/cache";
 
 const VALID_STATUSES = [
   "present",
@@ -83,6 +84,7 @@ export async function saveAttendance(formData: FormData) {
   }
 
   revalidatePath("/dashboard/attendance");
+  bustDashboardCache();
   redirect(
     "/dashboard/attendance?date=" +
       encodeURIComponent(date) +
