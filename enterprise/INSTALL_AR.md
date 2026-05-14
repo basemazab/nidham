@@ -220,7 +220,7 @@ docker compose down -v   # -v يمسح الـ volume كمان
 
 ## 📞 الدعم الفني
 
-- البريد: support@nidham.com
+- البريد: nidhamhr@proton.me
 - الواتساب: +20 1553641615
 - ساعات العمل: 9 ص — 6 م (السبت — الخميس)
 

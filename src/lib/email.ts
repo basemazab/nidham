@@ -45,10 +45,20 @@ export async function sendEmail(input: EmailInput): Promise<SendResult> {
     return { ok: false, skipped: true, reason: "RESEND_API_KEY not set" };
   }
 
+  // FROM: ⚠ requires a Resend-verified domain. The default below assumes
+  // nidham.app is verified; until then, set RESEND_FROM_EMAIL to a
+  // verified address (or Resend's onboarding sandbox).
   const from =
     input.from ||
     process.env.RESEND_FROM_EMAIL ||
     "Nidham <notifications@nidham.app>";
+
+  // REPLY-TO: when an employee hits "reply" on a system email, the
+  // reply should land in a real mailbox -- not bounce back to a
+  // noreply notifications@ address. Defaults to our Proton support
+  // mailbox so feedback always reaches a human.
+  const replyTo =
+    input.replyTo ?? process.env.RESEND_REPLY_TO ?? "nidhamhr@proton.me";
 
   try {
     const res = await fetch(RESEND_ENDPOINT, {
@@ -63,7 +73,7 @@ export async function sendEmail(input: EmailInput): Promise<SendResult> {
         subject: input.subject,
         html: wrapHtml(input.html),
         text: input.text,
-        reply_to: input.replyTo ?? process.env.RESEND_REPLY_TO,
+        reply_to: replyTo,
       }),
     });
 

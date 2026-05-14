@@ -890,8 +890,8 @@ function Footer() {
               </a>
             </li>
             <li>
-              <a href="mailto:basemazab640@gmail.com" className="hover:text-white transition">
-                ✉ basemazab640@gmail.com
+              <a href="mailto:nidhamhr@proton.me" className="hover:text-white transition">
+                ✉ nidhamhr@proton.me
               </a>
             </li>
           </ul>
