@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { requireHRPage } from "@/lib/permissions";
+import { canUseFeature } from "@/lib/subscriptions-server";
+import { UpgradeRequired } from "@/components/upgrade-required";
 
 // Audit log viewer. Migration 018 attaches an INSERT/UPDATE/DELETE
 // trigger to every high-value table and writes the before/after JSON
@@ -63,6 +65,13 @@ export default async function AuditLogPage({
   searchParams: Params;
 }) {
   const { supabase } = await requireHRPage();
+
+  // Audit log is an Enterprise feature (compliance + forensics value
+  // scales with company size; SMBs on basic/pro don't need full
+  // before/after diffs).
+  if (!(await canUseFeature("audit_log"))) {
+    return <UpgradeRequired feature="audit_log" />;
+  }
   const params = await searchParams;
 
   // Build the query

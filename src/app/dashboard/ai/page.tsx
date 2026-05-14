@@ -2,6 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { AIChat } from "@/components/ai-chat";
+import { canUseFeature } from "@/lib/subscriptions-server";
+import { UpgradeRequired } from "@/components/upgrade-required";
 
 export default async function AIPage() {
   const supabase = await createClient();
@@ -9,6 +11,12 @@ export default async function AIPage() {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+
+  // AI Assistant + AI CV Screening run on Gemini and cost money per
+  // request -- gated to Pro+ so we can scale economics with the tier.
+  if (!(await canUseFeature("ai_assistant"))) {
+    return <UpgradeRequired feature="ai_assistant" />;
+  }
 
   return (
     <main className="flex-1 px-4 md:px-6 py-6 bg-gradient-to-b from-slate-50 via-white to-cyan-50/30 min-h-screen">

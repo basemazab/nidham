@@ -76,11 +76,48 @@ export default async function DashboardPage() {
   const onboardingDone = empCount > 0 && custCount > 0 && intCount > 0;
   const completedSteps = (empCount > 0 ? 1 : 0) + (custCount > 0 ? 1 : 0) + (intCount > 0 ? 1 : 0);
 
+  const isEnterprise = subscription?.plan === "enterprise";
+
   return (
-    <main className="flex-1 px-6 py-8 bg-gradient-to-b from-slate-50 via-white to-cyan-50/30 min-h-screen">
+    <main className={`flex-1 px-6 py-8 min-h-screen ${
+      isEnterprise
+        ? "bg-gradient-to-b from-amber-50/40 via-white to-amber-50/20"
+        : "bg-gradient-to-b from-slate-50 via-white to-cyan-50/30"
+    }`}>
       <div className="max-w-6xl mx-auto">
+        {/* Enterprise premium banner -- only shown to enterprise tier
+            customers so they immediately feel the upgrade value. */}
+        {isEnterprise && (
+          <div className="bg-gradient-to-r from-amber-100 via-yellow-50 to-amber-100 border-2 border-amber-300 rounded-2xl p-5 mb-6 flex items-center gap-4 shadow-lg shadow-amber-500/10">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-500 via-yellow-500 to-amber-600 flex items-center justify-center flex-shrink-0 shadow-md">
+              <span className="text-2xl">👑</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-[10px] tracking-[0.3em] text-amber-700 font-bold uppercase font-cairo mb-0.5">
+                Enterprise Account
+              </div>
+              <div className="text-lg font-black text-amber-900 font-cairo">
+                مرحبًا بك في الباقة المميزة ✨
+              </div>
+              <div className="text-xs text-amber-800 font-cairo mt-0.5">
+                كل الميزات مفتوحة · دعم متميز · Bridge Analytics · سجل النشاط
+              </div>
+            </div>
+            <Link
+              href="/dashboard/subscription"
+              className="text-xs text-amber-800 hover:text-amber-900 hover:underline font-bold font-cairo whitespace-nowrap"
+            >
+              عرض التفاصيل ↗
+            </Link>
+          </div>
+        )}
+
         {/* Welcome card */}
-        <div className="bg-white p-8 rounded-2xl shadow-xl border border-slate-100 mb-6">
+        <div className={`bg-white p-8 rounded-2xl shadow-xl mb-6 ${
+          isEnterprise
+            ? "border-2 border-amber-200"
+            : "border border-slate-100"
+        }`}>
           <div className="flex items-start gap-4">
             <div className="w-14 h-14 rounded-full bg-gradient-to-br from-brand-cyan to-brand-cyan-dark flex items-center justify-center flex-shrink-0">
               <span className="text-xl font-black text-white">

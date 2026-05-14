@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { canUseFeature } from "@/lib/subscriptions-server";
+import { UpgradeRequired } from "@/components/upgrade-required";
 
 type SearchParams = Promise<{ year?: string; month?: string }>;
 
@@ -31,6 +33,13 @@ export default async function BridgeReportPage({
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+
+  // Bridge Analytics is the Enterprise-tier flagship: it cross-joins
+  // HR + CRM data, which only customers running both modules at scale
+  // benefit from. Trial sees it; basic/pro hit the upgrade screen.
+  if (!(await canUseFeature("bridge_analytics"))) {
+    return <UpgradeRequired feature="bridge_analytics" />;
+  }
 
   const now = new Date();
   const params = await searchParams;

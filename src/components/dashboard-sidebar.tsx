@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { logout } from "@/app/login/actions";
+import { TierBadge } from "@/components/tier-badge";
+import { hasFeature, type Plan, type Feature } from "@/lib/subscriptions";
 
 type Role = "admin" | "manager" | "employee";
 
@@ -13,6 +15,8 @@ type Props = {
   userEmail: string;
   isSuperAdmin?: boolean;
   role?: Role;
+  plan?: Plan | null;
+  daysLeft?: number;
 };
 
 type NavItem = {
@@ -23,6 +27,10 @@ type NavItem = {
   // Roles that may see + click this item. Defaults to HR (admin + manager).
   // Settings + team management are admin-only.
   visibleTo?: Role[];
+  // Optional subscription feature gate. If set, the item is shown with
+  // a 🔒 indicator for callers whose plan doesn't include it; the link
+  // still navigates -- the destination page renders <UpgradeRequired />.
+  feature?: Feature;
 };
 
 const NAV_ITEMS: readonly NavItem[] = [
@@ -37,14 +45,22 @@ const NAV_ITEMS: readonly NavItem[] = [
   { href: "/dashboard/interactions", label: "التفاعلات", icon: "💬", section: "main" },
   { href: "/dashboard/contracts", label: "العقود", icon: "📋", section: "main" },
   { href: "/dashboard/team", label: "فريق الشركة", icon: "🤝", section: "main", visibleTo: ["admin"] },
-  { href: "/dashboard/ai", label: "المساعد الذكي ✦", icon: "🤖", section: "ai" },
+  { href: "/dashboard/ai", label: "المساعد الذكي ✦", icon: "🤖", section: "ai", feature: "ai_assistant" },
   { href: "/dashboard/reports/attendance", label: "تقرير الحضور", icon: "📊", section: "reports" },
-  { href: "/dashboard/reports/bridge", label: "Bridge ✦", icon: "✦", section: "reports" },
-  { href: "/dashboard/audit-log", label: "سجل النشاط", icon: "📋", section: "reports", visibleTo: ["admin"] },
+  { href: "/dashboard/reports/bridge", label: "Bridge ✦", icon: "✦", section: "reports", feature: "bridge_analytics" },
+  { href: "/dashboard/audit-log", label: "سجل النشاط", icon: "📋", section: "reports", visibleTo: ["admin"], feature: "audit_log" },
   { href: "/dashboard/settings/office-location", label: "موقع المكتب 📍", icon: "⚙", section: "settings", visibleTo: ["admin"] },
 ];
 
-export function DashboardSidebar({ userName, companyName, userEmail, isSuperAdmin, role }: Props) {
+export function DashboardSidebar({
+  userName,
+  companyName,
+  userEmail,
+  isSuperAdmin,
+  role,
+  plan,
+  daysLeft,
+}: Props) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -111,10 +127,10 @@ export function DashboardSidebar({ userName, companyName, userEmail, isSuperAdmi
               </button>
             </div>
             <nav className="flex-1 overflow-y-auto p-3">
-              <NavSection label="الموديولات" items={mainItems} isActive={isActive} />
-              <NavSection label="✦ ذكاء" items={aiItems} isActive={isActive} />
-              <NavSection label="التقارير" items={reportItems} isActive={isActive} />
-              <NavSection label="الإعدادات" items={settingsItems} isActive={isActive} />
+              <NavSection label="الموديولات" items={mainItems} isActive={isActive} plan={plan} />
+              <NavSection label="✦ ذكاء" items={aiItems} isActive={isActive} plan={plan} />
+              <NavSection label="التقارير" items={reportItems} isActive={isActive} plan={plan} />
+              <NavSection label="الإعدادات" items={settingsItems} isActive={isActive} plan={plan} />
             </nav>
             <UserFooter
               userName={userName}
@@ -122,6 +138,8 @@ export function DashboardSidebar({ userName, companyName, userEmail, isSuperAdmi
               companyName={companyName}
               isSuperAdmin={isSuperAdmin}
               isActive={isActive}
+              plan={plan}
+              daysLeft={daysLeft}
             />
           </aside>
         </>
@@ -163,10 +181,12 @@ function NavSection({
   label,
   items,
   isActive,
+  plan,
 }: {
   label: string;
   items: NavItem[];
   isActive: (href: string) => boolean;
+  plan?: Plan | null;
 }) {
   if (items.length === 0) return null;
   return (
@@ -178,6 +198,11 @@ function NavSection({
         {items.map((item) => {
           const active = isActive(item.href);
           const isReport = item.section === "reports";
+          // A feature-gated item shows a lock if the current plan
+          // doesn't unlock it -- the link still navigates so the
+          // destination page can render <UpgradeRequired />.
+          const locked =
+            !!item.feature && !hasFeature(plan, item.feature);
           return (
             <Link
               key={item.href}
@@ -187,11 +212,21 @@ function NavSection({
                   ? isReport
                     ? "bg-amber-50 text-amber-800 font-bold border-r-4 border-amber-500"
                     : "bg-brand-cyan/10 text-brand-cyan-dark font-bold border-r-4 border-brand-cyan-dark"
-                  : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                  : locked
+                    ? "text-slate-400 hover:bg-slate-50 hover:text-slate-600"
+                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
               }`}
             >
               <span className="text-base">{item.icon}</span>
-              <span>{item.label}</span>
+              <span className="flex-1">{item.label}</span>
+              {locked && (
+                <span
+                  className="text-[10px] opacity-70"
+                  title="يتطلب ترقية الاشتراك"
+                >
+                  🔒
+                </span>
+              )}
             </Link>
           );
         })}
@@ -206,15 +241,24 @@ function UserFooter({
   companyName,
   isSuperAdmin,
   isActive,
+  plan,
+  daysLeft,
 }: {
   userName: string;
   userEmail: string;
   companyName: string;
   isSuperAdmin?: boolean;
   isActive: (href: string) => boolean;
+  plan?: Plan | null;
+  daysLeft?: number;
 }) {
   return (
     <div className="p-3 border-t border-slate-100 bg-slate-50/50 space-y-1">
+      {plan && (
+        <div className="flex justify-center pb-1">
+          <TierBadge plan={plan} daysLeft={daysLeft} />
+        </div>
+      )}
       {isSuperAdmin && (
         <Link
           href="/admin"
