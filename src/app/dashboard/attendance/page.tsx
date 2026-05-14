@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { saveAttendance } from "./actions";
+import { saveAttendance, bulkSaveAttendance } from "./actions";
+import { BulkAttendanceModal } from "./bulk-attendance-modal";
 
 type SearchParams = Promise<{
   date?: string;
   error?: string;
   saved?: string;
+  bulk?: string;
 }>;
 
 type Employee = {
@@ -82,13 +84,19 @@ export default async function AttendancePage({
               {formatArabicDate(selectedDate)} · {employees.length} موظف نشط
             </p>
           </div>
-          <Link
-            href="/dashboard/attendance/import"
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-bold text-sm shadow-md font-cairo transition"
-          >
-            <span>⚡</span>
-            <span>استيراد من ZKTeco / Excel</span>
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            <BulkAttendanceModal
+              defaultDate={selectedDate}
+              action={bulkSaveAttendance}
+            />
+            <Link
+              href="/dashboard/attendance/import"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-bold text-sm shadow-md font-cairo transition"
+            >
+              <span>⚡</span>
+              <span>استيراد من ZKTeco / Excel</span>
+            </Link>
+          </div>
         </header>
 
         {/* Date selector */}
@@ -123,6 +131,33 @@ export default async function AttendancePage({
             ✓ تم حفظ {params.saved} سجل حضور
           </div>
         )}
+        {params.bulk && (() => {
+          const [insertedStr, daysStr, empStr] = decodeURIComponent(params.bulk).split("|");
+          const inserted = parseInt(insertedStr, 10) || 0;
+          const days = parseInt(daysStr, 10) || 0;
+          const emps = parseInt(empStr, 10) || 0;
+          const totalCells = days * emps;
+          const skipped = Math.max(0, totalCells - inserted);
+          return (
+            <div className="mb-4 p-4 rounded-xl bg-emerald-50 border-2 border-emerald-200 text-emerald-900 font-cairo">
+              <div className="font-bold text-base mb-1">✓ تم التسجيل الجماعي</div>
+              <div className="text-sm leading-relaxed">
+                اتسجل <b>{inserted.toLocaleString("ar-EG")}</b> حالة حضور
+                لـ <b>{emps.toLocaleString("ar-EG")}</b> موظف عبر{" "}
+                <b>{days.toLocaleString("ar-EG")}</b> يوم.
+                {skipped > 0 && (
+                  <>
+                    {" "}
+                    <span className="text-emerald-700">
+                      اتخطّى <b>{skipped.toLocaleString("ar-EG")}</b> سجل
+                      كانوا موجودين بالفعل (محدش اتعدّل عليه).
+                    </span>
+                  </>
+                )}
+              </div>
+            </div>
+          );
+        })()}
         {params.error && (
           <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm font-cairo">
             ⚠ {decodeURIComponent(params.error)}
