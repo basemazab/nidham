@@ -45,9 +45,27 @@ export async function updateSubscription(
   };
   if (endsAt) update.ends_at = endsAt;
 
-  await supabase.from("subscriptions").update(update).eq("id", subscriptionId);
+  const { error } = await supabase
+    .from("subscriptions")
+    .update(update)
+    .eq("id", subscriptionId);
 
+  if (error) {
+    redirect(
+      `/admin/subscriptions/${subscriptionId}?error=` +
+        encodeURIComponent(error.message),
+    );
+  }
+
+  // The owner's view at /dashboard/subscription reads from the same row.
+  // Without revalidating that path here, the company admin keeps seeing
+  // the stale Trial plan in their own dashboard even after super-admin
+  // flipped them to a paid tier.
   revalidatePath("/admin");
+  revalidatePath("/admin/subscriptions/" + subscriptionId);
+  revalidatePath("/dashboard/subscription");
+  revalidatePath("/dashboard", "layout");
+  redirect(`/admin/subscriptions/${subscriptionId}?saved=1`);
 }
 
 export async function extendTrial(
@@ -63,16 +81,32 @@ export async function extendTrial(
     .eq("id", subscriptionId)
     .single();
 
-  if (!current) return;
+  if (!current) {
+    redirect(
+      `/admin/subscriptions/${subscriptionId}?error=` +
+        encodeURIComponent("الاشتراك غير موجود"),
+    );
+  }
 
   const currentEnd = new Date(current.ends_at as string);
   currentEnd.setDate(currentEnd.getDate() + days);
   const newEnd = currentEnd.toISOString().split("T")[0];
 
-  await supabase
+  const { error } = await supabase
     .from("subscriptions")
     .update({ ends_at: newEnd })
     .eq("id", subscriptionId);
 
+  if (error) {
+    redirect(
+      `/admin/subscriptions/${subscriptionId}?error=` +
+        encodeURIComponent(error.message),
+    );
+  }
+
   revalidatePath("/admin");
+  revalidatePath("/admin/subscriptions/" + subscriptionId);
+  revalidatePath("/dashboard/subscription");
+  revalidatePath("/dashboard", "layout");
+  redirect(`/admin/subscriptions/${subscriptionId}?extended=${days}`);
 }

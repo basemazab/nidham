@@ -5,6 +5,7 @@ import { updateSubscription, extendTrial } from "../../actions";
 
 type PageProps = {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ saved?: string; extended?: string; error?: string }>;
 };
 
 type SubscriptionRow = {
@@ -20,8 +21,15 @@ type SubscriptionRow = {
   companies: { name: string; industry: string | null } | null;
 };
 
-export default async function AdminSubscriptionPage({ params }: PageProps) {
+export default async function AdminSubscriptionPage({
+  params,
+  searchParams,
+}: PageProps) {
   const { id } = await params;
+  const sp = await searchParams;
+  const saved = !!sp.saved;
+  const extended = sp.extended ? parseInt(sp.extended, 10) : null;
+  const errorMsg = sp.error ? decodeURIComponent(sp.error) : null;
 
   const supabase = await createClient();
   const {
@@ -66,6 +74,39 @@ export default async function AdminSubscriptionPage({ params }: PageProps) {
       </header>
 
       <div className="max-w-3xl mx-auto px-6 py-8">
+        {saved && (
+          <div className="mb-6 bg-emerald-50 border-2 border-emerald-200 rounded-xl p-4 font-cairo text-emerald-800 flex items-start gap-3">
+            <span className="text-2xl">✓</span>
+            <div>
+              <div className="font-bold">تم الحفظ</div>
+              <p className="text-sm mt-0.5">
+                التحديث ظهر في حساب الشركة فورًا. لو شفت الصفحة الـ
+                trial في الـ dashboard اعمل refresh.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {extended && (
+          <div className="mb-6 bg-amber-50 border-2 border-amber-200 rounded-xl p-4 font-cairo text-amber-800 flex items-start gap-3">
+            <span className="text-2xl">⏰</span>
+            <div>
+              <div className="font-bold">
+                اتمدّد الاشتراك {extended} يوم
+              </div>
+              <p className="text-sm mt-0.5">
+                تاريخ الانتهاء الجديد ظاهر تحت.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {errorMsg && (
+          <div className="mb-6 bg-red-50 border-2 border-red-200 rounded-xl p-4 text-red-700 font-cairo text-sm">
+            ⚠ {errorMsg}
+          </div>
+        )}
+
         <header className="mb-8">
           <h1 className="text-3xl font-black font-cairo text-slate-800 mb-1">
             {subscription.companies?.name ?? "—"}
