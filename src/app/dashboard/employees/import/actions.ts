@@ -148,61 +148,137 @@ export async function confirmPdfImport(rows: EmployeeImportRow[]) {
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 
 // Column aliases -- map any of these header strings to the canonical
-// employees column. Lower-cased + Arabic preserved.
+// employees column. Lower-cased for English, untouched for Arabic.
+// We're permissive on purpose -- HR files come from a dozen vendors
+// with their own naming conventions.
 const HEADER_ALIASES: Record<string, string> = {
   // full_name
   "الاسم": "full_name",
   "اسم": "full_name",
   "الاسم الكامل": "full_name",
+  "اسم الموظف": "full_name",
+  "الاسم بالكامل": "full_name",
+  "الموظف": "full_name",
+  "الاسم رباعي": "full_name",
+  "الإسم": "full_name",
+  "اسم الموظفه": "full_name",
+  "اسم بالكامل": "full_name",
   "name": "full_name",
   "full name": "full_name",
   "full_name": "full_name",
   "employee name": "full_name",
+  "employee_name": "full_name",
+  "emp name": "full_name",
+  "staff name": "full_name",
   // employee_code
   "كود الموظف": "employee_code",
+  "كود": "employee_code",
   "الكود": "employee_code",
+  "كود موظف": "employee_code",
+  "رقم الموظف": "employee_code",
+  "رقم موظف": "employee_code",
+  "id": "employee_code",
   "code": "employee_code",
   "employee code": "employee_code",
   "employee_code": "employee_code",
+  "employee id": "employee_code",
+  "emp id": "employee_code",
+  "emp code": "employee_code",
+  "staff id": "employee_code",
   // job_title
   "الوظيفة": "job_title",
   "المسمى الوظيفي": "job_title",
+  "المسمى": "job_title",
+  "الوظيفه": "job_title",
+  "وظيفة": "job_title",
+  "وظيفه": "job_title",
+  "المهنة": "job_title",
   "title": "job_title",
   "job title": "job_title",
   "job_title": "job_title",
+  "position": "job_title",
+  "role": "job_title",
   // department
   "القسم": "department",
+  "قسم": "department",
   "الإدارة": "department",
   "الادارة": "department",
+  "ادارة": "department",
+  "إدارة": "department",
   "department": "department",
+  "dept": "department",
+  "division": "department",
   // phone
   "تليفون": "phone",
+  "تلفون": "phone",
   "موبايل": "phone",
+  "محمول": "phone",
   "الهاتف": "phone",
+  "هاتف": "phone",
+  "رقم الهاتف": "phone",
+  "رقم التليفون": "phone",
+  "رقم الموبايل": "phone",
   "phone": "phone",
+  "phone number": "phone",
   "mobile": "phone",
+  "mobile number": "phone",
+  "tel": "phone",
+  "telephone": "phone",
+  "contact": "phone",
   // email
   "إيميل": "email",
   "ايميل": "email",
+  "الإيميل": "email",
+  "الايميل": "email",
   "البريد": "email",
+  "البريد الإلكتروني": "email",
+  "البريد الالكتروني": "email",
+  "البريد الاليكتروني": "email",
   "email": "email",
+  "e-mail": "email",
+  "email address": "email",
+  "mail": "email",
   // hire_date
   "تاريخ التعيين": "hire_date",
   "تاريخ الالتحاق": "hire_date",
+  "تاريخ الإلتحاق": "hire_date",
+  "تاريخ بدء العمل": "hire_date",
+  "تاريخ بداية العمل": "hire_date",
+  "تاريخ الانضمام": "hire_date",
+  "بداية العمل": "hire_date",
+  "تاريخ تعيين": "hire_date",
+  "التاريخ": "hire_date",
   "hire date": "hire_date",
   "hire_date": "hire_date",
+  "date of joining": "hire_date",
+  "joining date": "hire_date",
+  "start date": "hire_date",
+  "date of hire": "hire_date",
   // basic_salary
   "المرتب": "basic_salary",
   "المرتب الأساسي": "basic_salary",
   "الراتب": "basic_salary",
+  "الراتب الأساسي": "basic_salary",
+  "الأساسي": "basic_salary",
+  "الاساسي": "basic_salary",
+  "مرتب": "basic_salary",
+  "راتب": "basic_salary",
   "basic salary": "basic_salary",
   "basic_salary": "basic_salary",
   "salary": "basic_salary",
+  "base salary": "basic_salary",
+  "monthly salary": "basic_salary",
   // national_id
   "الرقم القومي": "national_id",
   "رقم قومي": "national_id",
+  "رقم البطاقة": "national_id",
+  "البطاقة": "national_id",
+  "بطاقة": "national_id",
   "national id": "national_id",
   "national_id": "national_id",
+  "national-id": "national_id",
+  "nid": "national_id",
+  "id number": "national_id",
 };
 
 type ParsedRow = {
@@ -316,6 +392,23 @@ export async function importEmployees(formData: FormData) {
   // Build a canonical-key map for the first row's headers so we accept
   // any of the aliases above.
   const keyMap = buildKeyMap(rows[0]);
+
+  // Fail fast with a diagnostic if the file doesn't have an Arabic /
+  // English column for the employee name -- without it every row is
+  // skipped as "ناقص اسم الموظف" and the user has no idea why.
+  if (!keyMap.full_name) {
+    const foundHeaders = Object.keys(rows[0]).filter((h) => h && h.trim());
+    const headersPreview =
+      foundHeaders.length > 0
+        ? `الأعمدة الموجودة في الملف: ${foundHeaders.slice(0, 10).join(" · ")}`
+        : "الملف مفيهوش أعمدة في السطر الأول.";
+    redirect(
+      "/dashboard/employees/import?error=" +
+        encodeURIComponent(
+          `مفيش عمود للاسم في الملف. ${headersPreview}. غيّر اسم العمود لـ "الاسم" أو "اسم الموظف" أو "Name".`,
+        ),
+    );
+  }
 
   const parsed: ParsedRow[] = rows.map((row, i) => {
     const get = (canonical: string) => {
