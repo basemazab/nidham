@@ -12,6 +12,7 @@ import {
 } from "@/lib/recruitment";
 import { CopyButton } from "@/components/copy-button";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
+import { AISourcingPanel } from "@/components/ai-sourcing-panel";
 import { headers } from "next/headers";
 
 type PageProps = {
@@ -224,6 +225,11 @@ export default async function JobDetailPage({ params }: PageProps) {
           <FunnelCard label="قائمة قصيرة" value={counts.shortlisted} color="cyan" />
           <FunnelCard label="تم التعيين" value={counts.hired} color="emerald" />
           <FunnelCard label="مرفوضين" value={counts.rejected} color="red" />
+        </div>
+
+        {/* AI sourcing tools -- match candidates / boolean search / outreach */}
+        <div className="mb-6">
+          <AISourcingPanel jobId={id} />
         </div>
 
         {/* Job description (collapsible look) */}

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createJob } from "../actions";
+import { AIJobDescriptionGenerator } from "@/components/ai-jd-generator";
 
 type SearchParams = Promise<{ error?: string }>;
 
@@ -195,6 +196,19 @@ export default async function NewJobPage({
               <p className="text-xs text-slate-500 mb-3 font-cairo">
                 الـ AI يستخدم النصوص دي عشان يقارن كل CV — كل ما كانت أوضح، كل ما التقييم أدق.
               </p>
+
+              <AIJobDescriptionGenerator
+                titleFieldId="title"
+                departmentFieldId="department"
+                experienceYearsFieldId="experience_years_min"
+                jobTypeFieldId="job_type"
+                locationFieldId="location"
+                descriptionFieldId="description"
+                requirementsFieldId="requirements"
+                responsibilitiesFieldId="responsibilities"
+                salaryMinFieldId="salary_min"
+                salaryMaxFieldId="salary_max"
+              />
 
               <div className="space-y-4">
                 <div>
