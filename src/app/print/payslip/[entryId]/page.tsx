@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { formatEGP } from "@/lib/payroll";
 import { AutoPrint } from "@/components/auto-print";
 import { ClientDate } from "@/components/client-date";
+import { PrintAgainButton } from "@/components/print-again-button";
 
 // Standalone printable payslip. Same content as the dashboard payslip
 // page but free of the dashboard sidebar, so the print preview
@@ -125,13 +126,8 @@ export default async function PrintPayslipPage({ params }: PageProps) {
         <Link href={`/dashboard/payroll`} className="text-slate-500 hover:text-brand-cyan-dark">
           ← الرجوع لشاشة المرتبات
         </Link>
-        <button
-          type="button"
-          onClick={() => window.print()}
-          className="px-4 py-2 rounded-lg bg-brand-cyan-dark text-white font-bold"
-        >
-          🖨 طباعة تاني
-        </button>
+        <PrintAgainButton />
+
       </div>
 
       <article

@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { formatEGP } from "@/lib/payroll";
 import { AutoPrint } from "@/components/auto-print";
 import { ClientDate } from "@/components/client-date";
+import { PrintAgainButton } from "@/components/print-again-button";
 
 // Printable summary of an entire payroll period -- every active
 // employee on one or two A4 pages with totals row. The output a
@@ -159,13 +160,8 @@ export default async function PayrollSummaryPrint({ params }: PageProps) {
         >
           ← الرجوع لشهر المرتبات
         </Link>
-        <button
-          type="button"
-          onClick={() => window.print()}
-          className="px-4 py-2 rounded-lg bg-brand-cyan-dark text-white font-bold"
-        >
-          🖨 طباعة تاني
-        </button>
+        <PrintAgainButton />
+
       </div>
 
       <article
