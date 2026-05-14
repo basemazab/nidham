@@ -193,6 +193,42 @@ const HEADER_ALIASES: Record<string, string> = {
   remarks: "notes",
 };
 
+// Detect+repair Arabic strings that xlsx mis-decoded as latin1. ZK's
+// .xls files declare cp1252 in their BIFF8 header even when the content
+// is cp1256-encoded Arabic, so xlsx faithfully gives us latin1
+// gibberish like "ÑÞã ÇáÈÕãå" when the real text is "رقم البصمه".
+//
+// Fix: encode the garbled string back to its original bytes (each
+// latin1 codepoint = one byte), then decode those bytes as
+// windows-1256. TextDecoder('windows-1256') is supported in Node 12+.
+function fixArabicEncoding(matrix: unknown[][]): unknown[][] {
+  const decoder = new TextDecoder("windows-1256");
+  // Cell-level repair: only touch strings; numbers/dates pass through.
+  const fixCell = (cell: unknown): unknown => {
+    if (typeof cell !== "string") return cell;
+    // Skip strings that contain NO high-bit char (pure ASCII -- no
+    // encoding issue possible).
+    let hasHigh = false;
+    for (let i = 0; i < cell.length; i++) {
+      if (cell.charCodeAt(i) > 127) {
+        hasHigh = true;
+        break;
+      }
+    }
+    if (!hasHigh) return cell;
+    // Each char of `cell` is a latin1 byte. Reassemble the byte array
+    // and re-decode as cp1256.
+    const bytes = new Uint8Array(cell.length);
+    for (let i = 0; i < cell.length; i++) {
+      bytes[i] = cell.charCodeAt(i) & 0xff;
+    }
+    return decoder.decode(bytes);
+  };
+  return matrix.map((row) =>
+    Array.isArray(row) ? row.map(fixCell) : row,
+  );
+}
+
 // Arabic normalizer: ZKTeco exports use "الإداره" (with هـ ending)
 // while a different vendor might use "الإدارة" (with ة), and HR types
 // can be inconsistent too. Normalize tashkeel + unify ة/ه, ى/ي, and
@@ -379,11 +415,17 @@ export async function importAttendance(formData: FormData) {
     modeRaw === "weekly" ? "weekly" : modeRaw === "all" ? "all" : "monthly";
 
   // Parse the workbook. ZK products span multiple language packs +
-  // codepages: Arabic builds emit BIFF8 with cp1256, modern Chinese
-  // builds with cp936, English/Western with cp1252, and newer UTF-8
-  // exports with cp65001. We try each codepage in turn and keep the
-  // FIRST one where findHeaderRow can locate a real header row -- so
-  // HR doesn't have to know which ZK product they're running.
+  // codepages: Arabic builds emit BIFF8 with cp1256, English/Western
+  // with cp1252, newer UTF-8 exports with cp65001. We try each
+  // codepage in turn and keep the FIRST one where findHeaderRow can
+  // locate a real header row.
+  //
+  // CAVEAT: xlsx prefers the file's own internal codepage marker
+  // over our `codepage` option, so an Arabic-content file that's
+  // mis-declared as cp1252 in its BIFF metadata comes back as
+  // latin1 gibberish (ÑÞã ÇáÈÕãå). The fixArabicEncoding() pass
+  // below handles that: it re-decodes each string cell via
+  // TextDecoder('windows-1256') against the latin1 byte view.
   let matrix: unknown[][] = [];
   let parseError: string | null = null;
   const CODEPAGE_FALLBACKS = [1256, 65001, 1252, 0]; // 0 = autodetect
@@ -411,6 +453,17 @@ export async function importAttendance(formData: FormData) {
       // Otherwise hold onto the first parsed matrix so the diagnostic
       // below can still show something useful.
       if (matrix.length === 0) matrix = candidate;
+    }
+
+    // Last-resort rescue: if NO codepage gave a usable header, the
+    // file's internal codepage marker is wrong. Re-decode strings
+    // from latin1 bytes via TextDecoder('windows-1256') and try
+    // header detection again.
+    if (findHeaderRow(matrix) === -1) {
+      const fixed = fixArabicEncoding(matrix);
+      if (findHeaderRow(fixed) !== -1) {
+        matrix = fixed;
+      }
     }
   } catch (e) {
     parseError = e instanceof Error ? e.message : "error";
