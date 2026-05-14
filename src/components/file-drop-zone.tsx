@@ -1,17 +1,22 @@
 "use client";
 
-// Big, friendly file picker. Replaces bare <input type="file"> in
-// places where the user is uploading something important (employee
-// import, PDF parse, ...).
+// Big, friendly file picker. Two interaction paths so iOS Safari, in-
+// app browsers, and stripped-down WebViews all reach the OS dialog:
 //
-// Pattern: a <label> wraps the visually-hidden <input type="file">.
-// Browsers natively forward any click inside the label to the input,
-// so we don't have to call .click() programmatically -- that path was
-// blocked by iOS Safari when the synthetic click was overlapped by an
-// absolute-positioned input. With the label pattern the tap always
-// fires the native file dialog, on every device.
+//   1. The whole drop zone is a <label htmlFor={inputId}>. Browsers
+//      natively forward any click inside the label to the matching
+//      <input id={inputId}>. No JS .click() needed.
+//   2. Inside the drop zone there's an explicit "اختار ملف" link
+//      with the same htmlFor. Some embedded browsers refuse to forward
+//      clicks on non-text label children -- this gives them a plain
+//      label-text fallback that always works.
+//
+// The <input type="file"> itself is positioned far off-screen rather
+// than display:none, because iOS Safari has been known to refuse
+// .change events on display:none inputs in older builds. Off-screen
+// keeps it focusable + change-eventable everywhere.
 
-import { useRef, useState, type ChangeEvent, type DragEvent } from "react";
+import { useId, useRef, useState, type ChangeEvent, type DragEvent } from "react";
 
 type Props = {
   /** Comma-separated list of accepted file extensions / MIME types. */
@@ -39,6 +44,7 @@ export function FileDropZone({
   onFileSelected,
   maxBytes,
 }: Props) {
+  const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -72,8 +78,6 @@ export function FileDropZone({
     const f = e.dataTransfer.files?.[0] ?? null;
     if (!f) return;
 
-    // Drag-and-drop bypasses the input's accept filter, so re-check by
-    // extension. (MIME types are unreliable on Windows for .xlsx etc.)
     const acceptList = accept
       .split(",")
       .map((s) => s.trim().toLowerCase())
@@ -90,8 +94,6 @@ export function FileDropZone({
       return;
     }
 
-    // Sync the picked file into the underlying <input> so a parent
-    // form-submit still sends it. Works in Chrome, Edge, Firefox, Safari.
     if (inputRef.current) {
       const dt = new DataTransfer();
       dt.items.add(f);
@@ -109,7 +111,27 @@ export function FileDropZone({
 
   return (
     <div>
+      {/* Off-screen but functional input. Positioning (not display:none)
+          keeps iOS Safari + WebViews happy with the change event. */}
+      <input
+        ref={inputRef}
+        id={inputId}
+        type="file"
+        name={name}
+        accept={accept}
+        required={required && !file}
+        onChange={onChange}
+        style={{
+          position: "absolute",
+          left: "-9999px",
+          width: "1px",
+          height: "1px",
+          opacity: 0,
+        }}
+      />
+
       <label
+        htmlFor={inputId}
         onDragOver={(e) => {
           e.preventDefault();
           setDragOver(true);
@@ -124,19 +146,6 @@ export function FileDropZone({
             : "border-slate-300 bg-slate-50 hover:border-brand-cyan/50 hover:bg-slate-100/50 active:bg-slate-100"
         }`}
       >
-        {/* The input is visually hidden but still focusable + clickable
-            via the <label> wrap. Browser natively forwards label clicks
-            to it -- no JS .click() needed (which iOS Safari blocked). */}
-        <input
-          ref={inputRef}
-          type="file"
-          name={name}
-          accept={accept}
-          required={required && !file}
-          onChange={onChange}
-          className="sr-only"
-        />
-
         {file ? (
           <div className="flex items-center justify-between gap-3 text-right">
             <div className="flex items-center gap-3 min-w-0">
@@ -172,12 +181,27 @@ export function FileDropZone({
             {hint && (
               <div className="text-xs text-slate-500 font-cairo">{hint}</div>
             )}
-            <div className="text-[11px] text-slate-400 mt-3 font-cairo inline-block px-3 py-1 rounded-full bg-white border border-slate-200">
-              اضغط هنا لاختيار ملف
+            <div className="mt-4 inline-block px-4 py-2 rounded-full bg-brand-cyan-dark text-white text-sm font-bold font-cairo">
+              اختار ملف
+            </div>
+            <div className="text-[11px] text-slate-400 mt-2 font-cairo">
+              أو اسحب الملف لهنا
             </div>
           </div>
         )}
       </label>
+
+      {/* Fallback: a fully redundant plain-label button. Identical
+          htmlFor, separate visual element so the user has two ways to
+          open the picker. */}
+      {!file && (
+        <label
+          htmlFor={inputId}
+          className="block text-center mt-3 text-xs text-brand-cyan-dark hover:underline cursor-pointer font-cairo"
+        >
+          مش شغّال؟ اضغط هنا
+        </label>
+      )}
 
       {error && (
         <div className="mt-3 px-3 py-2 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs font-cairo">
