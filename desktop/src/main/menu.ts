@@ -1,4 +1,4 @@
-import { Menu, BrowserWindow, app, shell, dialog } from "electron";
+import { Menu, BrowserWindow, app, shell, dialog, session } from "electron";
 import { clearServerUrl, getServerUrl, getZoomLevel, setZoomLevel } from "./settings";
 
 // Arabic menu for the HR user. Keep it short -- just the actions someone
@@ -13,6 +13,49 @@ export function buildAppMenu(getWindow: () => BrowserWindow | null): Menu {
           accelerator: "F5",
           click: () => getWindow()?.webContents.reload(),
         },
+        {
+          // Force-reload bypasses HTTP cache + Service Workers. The
+          // single best recovery action when the page renders blank or
+          // shows stale JS after a deploy -- the previous reload may
+          // have been serving a stale bundle reference.
+          label: "تحديث قسري (مسح الـ cache)",
+          accelerator: "CmdOrCtrl+Shift+R",
+          click: async () => {
+            const w = getWindow();
+            if (!w) return;
+            try {
+              await session.defaultSession.clearCache();
+              await session.defaultSession.clearStorageData({
+                storages: ["cachestorage", "serviceworkers", "shadercache"],
+              });
+            } catch {
+              /* best effort */
+            }
+            w.webContents.reloadIgnoringCache();
+          },
+        },
+        {
+          label: "العودة لصفحة الدخول",
+          click: () => {
+            const w = getWindow();
+            const url = getServerUrl();
+            if (w && url) w.loadURL(`${url}/login`);
+          },
+        },
+        {
+          label: "أدوات المطوّر",
+          accelerator: "CmdOrCtrl+Shift+I",
+          click: () => {
+            const w = getWindow();
+            if (!w) return;
+            if (w.webContents.isDevToolsOpened()) {
+              w.webContents.closeDevTools();
+            } else {
+              w.webContents.openDevTools({ mode: "detach" });
+            }
+          },
+        },
+        { type: "separator" },
         {
           label: "تكبير",
           accelerator: "CmdOrCtrl+=",

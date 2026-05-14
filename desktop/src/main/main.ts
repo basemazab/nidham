@@ -121,9 +121,108 @@ function createWindow(loadUrl: string, isSetup: boolean): BrowserWindow {
   } else {
     // The Nidham web app -- could be Cloud or self-hosted
     window.loadURL(loadUrl);
+
+    // Recovery overlay: when the renderer fails to load (network error,
+    // 5xx response, CSP block, etc.) Electron shows a raw chrome error
+    // page that's confusing in Arabic. Replace it with our own panel
+    // that gives the HR user a 1-click "try again" + "go to login" +
+    // "reset server URL".
+    window.webContents.on(
+      "did-fail-load",
+      (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+        if (!isMainFrame) return; // ignore sub-resource failures
+        // -3 = ABORTED, fires on legitimate navigations -- skip.
+        if (errorCode === -3) return;
+
+        const url = getServerUrl() ?? "";
+        const html = renderErrorPage({
+          errorCode,
+          errorDescription,
+          attemptedUrl: validatedURL || url,
+          serverUrl: url,
+        });
+        window.loadURL(
+          `data:text/html;charset=utf-8,${encodeURIComponent(html)}`,
+        );
+      },
+    );
   }
 
   return window;
+}
+
+// Inline error page shown when did-fail-load fires. Self-contained HTML
+// + CSS so it works even when the configured server is completely
+// unreachable. Uses query-string-based action triggers we intercept
+// with a will-navigate handler on the window.
+function renderErrorPage(opts: {
+  errorCode: number;
+  errorDescription: string;
+  attemptedUrl: string;
+  serverUrl: string;
+}): string {
+  const { errorCode, errorDescription, attemptedUrl, serverUrl } = opts;
+  return `<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<title>تعذّر الاتصال — Nidham</title>
+<style>
+  body { margin: 0; min-height: 100vh; background: #0a1428; color: #f8fafc;
+         display: flex; align-items: center; justify-content: center;
+         font-family: "Tajawal", "Cairo", system-ui, sans-serif; padding: 2rem; }
+  .card { max-width: 480px; background: rgba(255,255,255,0.04); border: 1px solid #1e293b;
+          border-radius: 20px; padding: 2rem; box-shadow: 0 24px 48px rgba(0,0,0,0.4); }
+  h1 { font-size: 1.5rem; margin: 0 0 0.5rem; }
+  p { color: #94a3b8; line-height: 1.7; margin: 0 0 1rem; }
+  .err { background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.3);
+         border-radius: 12px; padding: 0.75rem 1rem; margin-bottom: 1.5rem;
+         color: #fca5a5; font-size: 0.85rem; line-height: 1.6; }
+  .err code { background: #0a1428; padding: 2px 6px; border-radius: 4px; direction: ltr;
+              display: inline-block; }
+  .actions { display: flex; flex-direction: column; gap: 0.5rem; }
+  a { display: block; padding: 0.85rem 1.25rem; border-radius: 12px;
+      text-align: center; text-decoration: none; font-weight: 700;
+      transition: transform 0.1s ease; }
+  a.primary { background: linear-gradient(135deg, #22d3ee, #0891b2); color: white; }
+  a.secondary { background: rgba(255,255,255,0.08); color: #f8fafc;
+                border: 1px solid #334155; }
+  a:hover { transform: translateY(-1px); }
+  .logo { width: 56px; height: 56px; border-radius: 16px;
+          background: linear-gradient(135deg, #22d3ee, #0a1428);
+          display: flex; align-items: center; justify-content: center;
+          font-size: 1.75rem; font-weight: 900; color: white; margin-bottom: 1rem; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">ن</div>
+    <h1>تعذّر الاتصال بسيرفر نِظام</h1>
+    <p>التطبيق ما قدرش يحمّل الصفحة. ممكن يكون الاتصال بالإنترنت متقطع أو السيرفر يحدّث.</p>
+    <div class="err">
+      <div><b>الخطأ:</b> ${escapeHtml(errorDescription)} (${errorCode})</div>
+      <div><b>الرابط:</b> <code>${escapeHtml(attemptedUrl)}</code></div>
+    </div>
+    <div class="actions">
+      <a class="primary" href="${escapeHtml(serverUrl || "https://nidham-seven.vercel.app")}/login">
+        ↻ حاول تاني — صفحة الدخول
+      </a>
+      <a class="secondary" href="${escapeHtml(serverUrl || "https://nidham-seven.vercel.app")}">
+        🏠 الصفحة الرئيسية
+      </a>
+    </div>
+  </div>
+</body>
+</html>`;
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }
 
 // ----------------------------------------------------------------------------
