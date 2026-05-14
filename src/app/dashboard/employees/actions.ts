@@ -125,6 +125,128 @@ export async function updateEmployee(id: string, formData: FormData) {
   redirect("/dashboard/employees?updated=1");
 }
 
+// End-of-service settlement breakdown returned by the RPC. The
+// terminateEmployee action calls it twice -- once to preview before
+// HR confirms, and once again after confirmation to snapshot the
+// final number onto employees.eos_gratuity.
+export type EOSBreakdown = {
+  hire_date: string;
+  termination_date: string;
+  years_of_service: number;
+  wage_base: number;
+  months_owed: number;
+  gratuity_amount: number;
+};
+
+/**
+ * Compute the End-of-Service gratuity owed to an employee at a given
+ * termination date. Pure preview -- doesn't modify the employee row.
+ * Used by the "Terminate" modal to show HR "كده فاضل عليك تدفع
+ * X جنيه" before they confirm.
+ */
+export async function previewEOSGratuity(
+  employeeId: string,
+  terminationDate: string,
+): Promise<EOSBreakdown | null> {
+  await requireHR();
+  const supabase = await createClient();
+  const { data } = await supabase.rpc("compute_eos_gratuity", {
+    p_employee_id: employeeId,
+    p_termination_date: terminationDate,
+  });
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row || typeof row !== "object") return null;
+  return row as EOSBreakdown;
+}
+
+/**
+ * Finalize an employee's termination:
+ *   1. Compute EOS gratuity at the chosen date
+ *   2. Set status='terminated' + termination_date + termination_reason +
+ *      eos_gratuity (snapshot, NOT recomputed later if wages change)
+ *   3. Audit log captures the row update via the migration-018 trigger
+ *
+ * Admin-only because the consequences (gratuity write, employee
+ * locked out, payroll exclusion) are financial.
+ */
+export async function terminateEmployee(formData: FormData) {
+  const { supabase, profile } = await requireAdmin();
+
+  const employeeId = String(formData.get("employee_id") ?? "").trim();
+  const terminationDate = String(formData.get("termination_date") ?? "").trim();
+  const reason = String(formData.get("termination_reason") ?? "").trim();
+
+  const validReasons = [
+    "resignation",
+    "termination_by_employer",
+    "mutual_agreement",
+    "end_of_contract",
+    "retirement",
+    "death",
+  ];
+
+  if (!employeeId) {
+    redirect("/dashboard/employees?error=" + encodeURIComponent("الموظف غير محدد"));
+  }
+  if (!terminationDate) {
+    redirect(
+      `/dashboard/employees/${employeeId}?error=` +
+        encodeURIComponent("تاريخ انتهاء الخدمة مطلوب"),
+    );
+  }
+  if (!validReasons.includes(reason)) {
+    redirect(
+      `/dashboard/employees/${employeeId}?error=` +
+        encodeURIComponent("سبب انتهاء الخدمة غير صحيح"),
+    );
+  }
+
+  // 1. Final preview right before the write so the snapshot uses the
+  //    latest wage data.
+  const { data: eosData } = await supabase.rpc("compute_eos_gratuity", {
+    p_employee_id: employeeId,
+    p_termination_date: terminationDate,
+  });
+  const eos = (Array.isArray(eosData) ? eosData[0] : eosData) as
+    | EOSBreakdown
+    | null;
+  if (!eos) {
+    redirect(
+      `/dashboard/employees/${employeeId}?error=` +
+        encodeURIComponent("مش قادر يحسب المكافأة — تأكد إن للموظف تاريخ تعيين"),
+    );
+  }
+
+  // 2. Write the termination record. RLS scopes by company_id.
+  const { error } = await supabase
+    .from("employees")
+    .update({
+      status: "terminated",
+      termination_date: terminationDate,
+      termination_reason: reason,
+      eos_gratuity: eos.gratuity_amount,
+    })
+    .eq("id", employeeId)
+    .eq("company_id", profile.company_id);
+
+  if (error) {
+    redirect(
+      `/dashboard/employees/${employeeId}?error=` +
+        encodeURIComponent(arabicizeDbError(error.message)),
+    );
+  }
+
+  revalidatePath("/dashboard/employees");
+  revalidatePath(`/dashboard/employees/${employeeId}`);
+  bustDashboardCache();
+  redirect(
+    `/dashboard/employees/${employeeId}?terminated=` +
+      encodeURIComponent(
+        `${eos.gratuity_amount}|${eos.years_of_service}|${eos.months_owed}`,
+      ),
+  );
+}
+
 export async function deleteEmployee(id: string) {
   // Deletion cascades to attendance, payroll_entries, leave_requests,
   // advance_requests, permission_requests -- restrict to admin only.

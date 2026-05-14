@@ -1,7 +1,15 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { updateEmployee, deleteEmployee, generateEmployeeInvitation } from "../actions";
+import {
+  updateEmployee,
+  deleteEmployee,
+  generateEmployeeInvitation,
+  previewEOSGratuity,
+  terminateEmployee,
+} from "../actions";
+import { TerminateEmployeeModal } from "@/components/terminate-employee-modal";
+import { getMyProfile } from "@/lib/permissions";
 import { CopyButton } from "@/components/copy-button";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { InvitationQR } from "@/components/invitation-qr";
@@ -31,6 +39,9 @@ type Employee = {
   other_allowances: number | null;
   incentive_allowance: number | null;
   pay_frequency: "monthly" | "weekly" | null;
+  termination_date: string | null;
+  termination_reason: string | null;
+  eos_gratuity: number | null;
   shift_id: string | null;
   rotation_id: string | null;
   rotation_anchor_date: string | null;
@@ -64,6 +75,11 @@ export default async function EditEmployeePage({ params, searchParams }: PagePro
     .single<Employee>();
 
   if (!employee) notFound();
+
+  // The "إنهاء التوظيف" modal is admin-only because terminating an
+  // employee snapshots an EOS gratuity and locks them out of the system.
+  const { profile: currentProfile } = await getMyProfile();
+  const isAdmin = currentProfile?.role === "admin";
 
   // Fetch shifts + rotations for the assignment card + resolve today's
   // shift for the badge. Doing this here keeps the card a pure client
@@ -117,14 +133,57 @@ export default async function EditEmployeePage({ params, searchParams }: PagePro
           </Link>
         </div>
 
-        <header className="mb-6">
-          <h1 className="text-3xl font-black font-cairo text-slate-800 mb-1">
-            تعديل بيانات الموظف
-          </h1>
-          <p className="text-sm text-slate-500">
-            {employee.full_name} · تم إضافته في {new Date(employee.created_at).toLocaleDateString("ar-EG")}
-          </p>
+        <header className="mb-6 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-3xl font-black font-cairo text-slate-800 mb-1">
+              تعديل بيانات الموظف
+            </h1>
+            <p className="text-sm text-slate-500">
+              {employee.full_name} · تم إضافته في {new Date(employee.created_at).toLocaleDateString("ar-EG")}
+            </p>
+          </div>
+          {isAdmin && employee.status === "active" && (
+            <TerminateEmployeeModal
+              employeeId={employee.id}
+              employeeName={employee.full_name}
+              isActive={employee.status === "active"}
+              previewAction={previewEOSGratuity}
+              terminateAction={terminateEmployee}
+            />
+          )}
         </header>
+
+        {/* If the employee was already terminated, show a banner with
+            the EOS snapshot so HR sees the final settlement. */}
+        {employee.status === "terminated" && employee.termination_date && (
+          <div className="mb-6 bg-gradient-to-br from-slate-100 to-slate-50 border-2 border-slate-300 rounded-2xl p-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div className="text-xs text-slate-500 font-cairo mb-1">
+                  🏁 منتهي الخدمة في{" "}
+                  <strong className="text-slate-700">
+                    {new Date(employee.termination_date).toLocaleDateString("ar-EG")}
+                  </strong>
+                </div>
+                {employee.termination_reason && (
+                  <div className="text-sm text-slate-700 font-cairo">
+                    السبب: <strong>{terminationReasonLabel(employee.termination_reason)}</strong>
+                  </div>
+                )}
+              </div>
+              {employee.eos_gratuity !== null && (
+                <div className="text-left">
+                  <div className="text-[10px] text-slate-500 font-cairo">
+                    مكافأة نهاية الخدمة
+                  </div>
+                  <div className="text-2xl font-black text-emerald-700 font-mono" dir="ltr">
+                    {Math.round(employee.eos_gratuity).toLocaleString("ar-EG")} ج
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Mobile invitation section -- shown above the form because HR
             usually needs it more than the employee's basic details. */}
@@ -512,5 +571,18 @@ export default async function EditEmployeePage({ params, searchParams }: PagePro
         </div>
       </div>
     </main>
+  );
+}
+
+function terminationReasonLabel(reason: string): string {
+  return (
+    {
+      resignation: "استقالة",
+      termination_by_employer: "فصل من العمل",
+      mutual_agreement: "اتفاق ودي",
+      end_of_contract: "انتهاء عقد محدد المدة",
+      retirement: "تقاعد",
+      death: "وفاة",
+    }[reason] ?? reason
   );
 }
