@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { formatEGP } from "@/lib/payroll";
 
+type SearchParams = Promise<{ freq?: string }>;
+
 type Period = {
   id: string;
   year: number;
@@ -46,24 +48,65 @@ const STATUS_LABELS: Record<Period["status"], { text: string; classes: string }>
   cancelled: { text: "ملغية", classes: "bg-slate-100 text-slate-600 border-slate-200" },
 };
 
-export default async function PayrollPage() {
+export default async function PayrollPage({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}) {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: periods } = await supabase
-    .from("payroll_periods")
-    .select(
-      "id, year, month, frequency, start_date, end_date, status, working_days, approved_at, paid_at, created_at",
-    )
-    .order("start_date", { ascending: false, nullsFirst: false })
-    .order("year", { ascending: false })
-    .order("month", { ascending: false })
-    .returns<Period[]>();
+  const sp = await searchParams;
+  // Filter periods by frequency from the URL (?freq=weekly|monthly).
+  // "all" or missing -> show everything (default).
+  const filter: "all" | "monthly" | "weekly" =
+    sp.freq === "monthly"
+      ? "monthly"
+      : sp.freq === "weekly"
+        ? "weekly"
+        : "all";
 
-  const list = periods ?? [];
+  // Fetch periods + per-frequency employee counts in parallel.
+  // The employee counts power the buttons in the header ("X موظف شهري")
+  // so HR knows at a glance whether a weekly run is worthwhile.
+  const [periodsRes, monthlyEmpRes, weeklyEmpRes] = await Promise.all([
+    (filter === "all"
+      ? supabase
+          .from("payroll_periods")
+          .select(
+            "id, year, month, frequency, start_date, end_date, status, working_days, approved_at, paid_at, created_at",
+          )
+          .order("start_date", { ascending: false, nullsFirst: false })
+          .order("year", { ascending: false })
+          .order("month", { ascending: false })
+      : supabase
+          .from("payroll_periods")
+          .select(
+            "id, year, month, frequency, start_date, end_date, status, working_days, approved_at, paid_at, created_at",
+          )
+          .eq("frequency", filter)
+          .order("start_date", { ascending: false, nullsFirst: false })
+          .order("year", { ascending: false })
+          .order("month", { ascending: false })
+    ).returns<Period[]>(),
+    supabase
+      .from("employees")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "active")
+      .eq("pay_frequency", "monthly"),
+    supabase
+      .from("employees")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "active")
+      .eq("pay_frequency", "weekly"),
+  ]);
+
+  const list = periodsRes.data ?? [];
+  const monthlyEmpCount = monthlyEmpRes.count ?? 0;
+  const weeklyEmpCount = weeklyEmpRes.count ?? 0;
 
   // Aggregate net salary per period
   const { data: entries } = await supabase
@@ -88,15 +131,15 @@ export default async function PayrollPage() {
           </Link>
         </div>
 
-        <header className="flex flex-wrap items-start justify-between gap-3 mb-8">
+        <header className="flex flex-wrap items-start justify-between gap-3 mb-6">
           <div>
             <h1 className="text-3xl font-black font-cairo text-slate-800 mb-1">
               الرواتب والمرتبات
             </h1>
             <p className="text-sm text-slate-500 font-cairo">
               {list.length === 0
-                ? "ابدأ بإنشاء أول شهر مرتبات"
-                : `${list.length} شهر مرتبات`}
+                ? "ابدأ بإنشاء أول فترة مرتبات"
+                : `${list.length} فترة مرتبات`}
               {" · "}
               <span className="text-brand-cyan-dark font-bold">
                 مصري — قانون 12/2003 + 148/2019
@@ -117,17 +160,83 @@ export default async function PayrollPage() {
               className="inline-flex items-center gap-2 px-4 py-3 rounded-xl border border-slate-200 text-slate-700 font-bold text-sm hover:bg-slate-50 transition font-cairo"
             >
               <span>⚙</span>
-              <span>إعدادات الرواتب</span>
-            </Link>
-            <Link
-              href="/dashboard/payroll/new"
-              className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-brand-cyan to-brand-cyan-dark text-white font-bold shadow-lg shadow-cyan-500/30 hover:shadow-cyan-500/50 hover:-translate-y-0.5 transition-all font-cairo"
-            >
-              <span className="text-lg leading-none">+</span>
-              <span>شهر مرتبات جديد</span>
+              <span>إعدادات</span>
             </Link>
           </div>
         </header>
+
+        {/* Two prominent "new period" buttons -- one for monthly office
+            staff, one for the weekly production roster. The employee
+            count badge tells HR at a glance whether each run is
+            worthwhile (zero employees of that frequency = no point). */}
+        <div className="grid sm:grid-cols-2 gap-3 mb-6">
+          <Link
+            href="/dashboard/payroll/new?freq=monthly"
+            className="group bg-white border-2 border-sky-200 hover:border-sky-400 rounded-2xl p-5 transition shadow-sm hover:shadow-md flex items-center justify-between gap-3"
+          >
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-2xl">📅</span>
+                <span className="font-black text-slate-800 font-cairo text-base">
+                  مرتب شهري جديد
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 font-cairo">
+                لموظفي الإدارة والمكاتب
+              </p>
+            </div>
+            <div className="text-left">
+              <div className="text-2xl font-black text-sky-700 font-display leading-none">
+                {monthlyEmpCount}
+              </div>
+              <div className="text-[10px] text-sky-700 font-cairo">موظف</div>
+            </div>
+          </Link>
+
+          <Link
+            href="/dashboard/payroll/new?freq=weekly"
+            className="group bg-white border-2 border-violet-200 hover:border-violet-400 rounded-2xl p-5 transition shadow-sm hover:shadow-md flex items-center justify-between gap-3"
+          >
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-2xl">📆</span>
+                <span className="font-black text-slate-800 font-cairo text-base">
+                  مرتب أسبوعي جديد
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 font-cairo">
+                لعمال الإنتاج باليومية
+              </p>
+            </div>
+            <div className="text-left">
+              <div className="text-2xl font-black text-violet-700 font-display leading-none">
+                {weeklyEmpCount}
+              </div>
+              <div className="text-[10px] text-violet-700 font-cairo">عامل</div>
+            </div>
+          </Link>
+        </div>
+
+        {/* Filter tabs: All / Monthly / Weekly */}
+        {list.length > 0 && (
+          <div className="flex items-center gap-2 mb-4">
+            <FilterTab
+              href="/dashboard/payroll"
+              active={filter === "all"}
+              label="الكل"
+            />
+            <FilterTab
+              href="/dashboard/payroll?freq=monthly"
+              active={filter === "monthly"}
+              label="📅 شهري"
+            />
+            <FilterTab
+              href="/dashboard/payroll?freq=weekly"
+              active={filter === "weekly"}
+              label="📆 أسبوعي"
+            />
+          </div>
+        )}
 
         {list.length === 0 ? (
           <div className="bg-white rounded-2xl shadow-md border border-slate-100 p-16 text-center">
@@ -139,12 +248,20 @@ export default async function PayrollPage() {
               النظام بيحسبلك المرتب تلقائيًا من راتب الموظف + حضوره خلال الشهر،
               مع تطبيق التأمينات الاجتماعية (14%) وضريبة الدخل المصرية التصاعدية.
             </p>
-            <Link
-              href="/dashboard/payroll/new"
-              className="inline-block px-6 py-3 rounded-xl bg-brand-cyan-dark text-white font-bold hover:bg-brand-cyan transition font-cairo"
-            >
-              ابدأ بأول شهر
-            </Link>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <Link
+                href="/dashboard/payroll/new?freq=monthly"
+                className="px-5 py-3 rounded-xl bg-brand-cyan-dark text-white font-bold hover:bg-brand-cyan transition font-cairo"
+              >
+                📅 ابدأ بأول مرتب شهري
+              </Link>
+              <Link
+                href="/dashboard/payroll/new?freq=weekly"
+                className="px-5 py-3 rounded-xl bg-violet-600 text-white font-bold hover:bg-violet-700 transition font-cairo"
+              >
+                📆 ابدأ بأول مرتب أسبوعي
+              </Link>
+            </div>
           </div>
         ) : (
           <div className="bg-white rounded-2xl shadow-md border border-slate-100 overflow-hidden">
@@ -208,5 +325,28 @@ export default async function PayrollPage() {
         )}
       </div>
     </main>
+  );
+}
+
+function FilterTab({
+  href,
+  active,
+  label,
+}: {
+  href: string;
+  active: boolean;
+  label: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className={`px-4 py-1.5 rounded-full text-sm font-bold font-cairo transition ${
+        active
+          ? "bg-brand-cyan-dark text-white shadow-sm"
+          : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
+      }`}
+    >
+      {label}
+    </Link>
   );
 }
