@@ -5,6 +5,7 @@ import { updateEmployee, deleteEmployee, generateEmployeeInvitation } from "../a
 import { CopyButton } from "@/components/copy-button";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { InvitationQR } from "@/components/invitation-qr";
+import { EmployeeShiftCard } from "@/components/employee-shift-card";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -29,6 +30,10 @@ type Employee = {
   transport_allowance: number | null;
   other_allowances: number | null;
   incentive_allowance: number | null;
+  shift_id: string | null;
+  rotation_id: string | null;
+  rotation_anchor_date: string | null;
+  rotation_anchor_position: number | null;
   national_id: string | null;
   social_insurance_number: string | null;
   bank_name: string | null;
@@ -58,6 +63,35 @@ export default async function EditEmployeePage({ params, searchParams }: PagePro
     .single<Employee>();
 
   if (!employee) notFound();
+
+  // Fetch shifts + rotations for the assignment card + resolve today's
+  // shift for the badge. Doing this here keeps the card a pure client
+  // component without its own DB call.
+  const [{ data: shifts }, { data: rotations }, { data: todaysShiftId }] =
+    await Promise.all([
+      supabase
+        .from("shifts")
+        .select("id, name, start_time, end_time")
+        .eq("is_active", true)
+        .order("start_time")
+        .returns<{ id: string; name: string; start_time: string; end_time: string }[]>(),
+      supabase
+        .from("shift_rotations")
+        .select("id, name, cycle_days")
+        .eq("is_active", true)
+        .order("created_at", { ascending: false })
+        .returns<{ id: string; name: string; cycle_days: number }[]>(),
+      supabase.rpc("get_shift_for_employee_on_date", {
+        p_employee_id: id,
+        p_date: new Date().toISOString().split("T")[0],
+      }),
+    ]);
+
+  let todaysShiftName: string | null = null;
+  if (todaysShiftId && shifts) {
+    const matched = shifts.find((s) => s.id === todaysShiftId);
+    if (matched) todaysShiftName = matched.name;
+  }
 
   const updateAction = updateEmployee.bind(null, id);
   const deleteAction = async () => {
@@ -154,6 +188,22 @@ export default async function EditEmployeePage({ params, searchParams }: PagePro
               </button>
             </form>
           )}
+        </div>
+
+        {/* Shift assignment -- fixed shift OR rotation pattern. */}
+        <div className="mb-6">
+          <EmployeeShiftCard
+            employeeId={id}
+            shifts={shifts ?? []}
+            rotations={rotations ?? []}
+            current={{
+              shift_id: employee.shift_id,
+              rotation_id: employee.rotation_id,
+              rotation_anchor_date: employee.rotation_anchor_date,
+              rotation_anchor_position: employee.rotation_anchor_position,
+            }}
+            todaysShiftName={todaysShiftName}
+          />
         </div>
 
         <div className="bg-white p-8 rounded-2xl shadow-xl border border-slate-100">

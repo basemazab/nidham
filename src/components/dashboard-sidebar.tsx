@@ -29,6 +29,7 @@ const NAV_ITEMS: readonly NavItem[] = [
   { href: "/dashboard", label: "الرئيسية", icon: "🏠", section: "main" },
   { href: "/dashboard/employees", label: "الموظفين", icon: "👥", section: "main" },
   { href: "/dashboard/attendance", label: "الحضور", icon: "⏰", section: "main" },
+  { href: "/dashboard/shifts", label: "الورديات", icon: "🕒", section: "main" },
   { href: "/dashboard/payroll", label: "الرواتب", icon: "💰", section: "main" },
   { href: "/dashboard/requests", label: "طلبات الموظفين", icon: "📨", section: "main" },
   { href: "/dashboard/jobs", label: "التوظيف ✦", icon: "🎯", section: "main" },
