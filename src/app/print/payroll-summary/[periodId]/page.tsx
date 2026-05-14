@@ -3,6 +3,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { formatEGP } from "@/lib/payroll";
 import { AutoPrint } from "@/components/auto-print";
+import { ClientDate } from "@/components/client-date";
 
 // Printable summary of an entire payroll period -- every active
 // employee on one or two A4 pages with totals row. The output a
@@ -188,11 +189,13 @@ export default async function PayrollSummaryPrint({ params }: PageProps) {
               <div className="font-bold text-sm">{statusLabel}</div>
               <div className="text-cyan-200 mt-2 mb-0.5">تاريخ الإصدار</div>
               <div className="font-bold text-xs">
-                {new Date().toLocaleDateString("ar-EG", {
-                  day: "numeric",
-                  month: "long",
-                  year: "numeric",
-                })}
+                <ClientDate
+                  options={{
+                    day: "numeric",
+                    month: "long",
+                    year: "numeric",
+                  }}
+                />
               </div>
             </div>
           </div>
@@ -328,8 +331,7 @@ export default async function PayrollSummaryPrint({ params }: PageProps) {
 
         <footer className="px-8 py-3 bg-slate-50 border-t border-slate-100 text-[10px] text-slate-500 font-cairo flex flex-wrap items-center justify-between gap-2">
           <div>
-            مولّد من Nidham · {new Date().toLocaleDateString("ar-EG")} · حالة:{" "}
-            {statusLabel}
+            مولّد من Nidham · <ClientDate /> · حالة: {statusLabel}
           </div>
           <div className="font-mono" dir="ltr">
             {periodId}

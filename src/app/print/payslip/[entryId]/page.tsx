@@ -3,6 +3,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { formatEGP } from "@/lib/payroll";
 import { AutoPrint } from "@/components/auto-print";
+import { ClientDate } from "@/components/client-date";
 
 // Standalone printable payslip. Same content as the dashboard payslip
 // page but free of the dashboard sidebar, so the print preview
@@ -286,7 +287,7 @@ export default async function PrintPayslipPage({ params }: PageProps) {
         </section>
 
         <footer className="px-8 py-4 bg-slate-50 border-t border-slate-100 text-[10px] text-slate-500 font-cairo flex flex-wrap items-center justify-between gap-2">
-          <div>Nidham · {new Date().toLocaleDateString("ar-EG")}</div>
+          <div>Nidham · <ClientDate /></div>
           <div className="font-mono" dir="ltr">{entryId}</div>
         </footer>
       </article>
