@@ -34,15 +34,22 @@ export default async function EmployeesPage({
   const { profile } = await getMyProfile();
   const isAdmin = profile?.role === "admin";
 
-  const { data: employees } = await supabase
-    .from("employees")
-    .select(
-      "id, full_name, employee_code, job_title, department, phone, status, hire_date, pay_frequency",
-    )
-    .order("created_at", { ascending: false })
-    .returns<Employee[]>();
+  const [employeesRes, dupCountRes] = await Promise.all([
+    supabase
+      .from("employees")
+      .select(
+        "id, full_name, employee_code, job_title, department, phone, status, hire_date, pay_frequency",
+      )
+      .order("created_at", { ascending: false })
+      .returns<Employee[]>(),
+    isAdmin
+      ? supabase.rpc("count_duplicate_employee_groups")
+      : Promise.resolve({ data: 0 }),
+  ]);
 
-  const list = employees ?? [];
+  const list = employeesRes.data ?? [];
+  const duplicateGroupCount =
+    typeof dupCountRes.data === "number" ? dupCountRes.data : 0;
 
   return (
     <main className="flex-1 px-6 py-8 bg-gradient-to-b from-slate-50 via-white to-cyan-50/30 min-h-screen">
@@ -73,6 +80,33 @@ export default async function EmployeesPage({
         {errorMsg && (
           <div className="mb-6 bg-red-50 border-2 border-red-200 rounded-xl p-4 text-red-700 font-cairo text-sm">
             ⚠ {errorMsg}
+          </div>
+        )}
+
+        {/* Duplicate-employees banner -- admin-only. Shows when the
+            find_duplicate_employees() RPC reports at least one group
+            of matching national_id / employee_code / email / phone. */}
+        {isAdmin && duplicateGroupCount > 0 && (
+          <div className="mb-6 bg-amber-50 border-2 border-amber-200 rounded-xl p-4 font-cairo flex flex-wrap items-start justify-between gap-3">
+            <div className="flex items-start gap-3 flex-1 min-w-0">
+              <span className="text-2xl">⚠</span>
+              <div>
+                <div className="font-bold text-amber-900 mb-0.5">
+                  فيه {duplicateGroupCount.toLocaleString("ar-EG")} حالة تكرار
+                  محتملة بين موظفينك
+                </div>
+                <p className="text-sm text-amber-800 leading-relaxed">
+                  موظفين بنفس الرقم القومي / كود الموظف / إيميل / تليفون.
+                  راجعهم واحذف المكرر منهم عشان البيانات تبقى نضيفة.
+                </p>
+              </div>
+            </div>
+            <Link
+              href="/dashboard/employees/duplicates"
+              className="px-4 py-2 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 text-white font-bold text-sm shadow-md hover:shadow-lg transition whitespace-nowrap"
+            >
+              🔍 راجع التكرارات →
+            </Link>
           </div>
         )}
 
