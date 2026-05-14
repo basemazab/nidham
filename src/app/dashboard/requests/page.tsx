@@ -11,6 +11,7 @@ import {
   type LeaveType,
   type PermissionType,
 } from "@/lib/requests";
+import { formatEGP, formatDateShort, formatDateRange } from "@/lib/format";
 
 type EmployeeMini = { id: string; full_name: string; job_title: string | null };
 
@@ -47,12 +48,6 @@ type PermissionRow = {
   created_at: string;
   employees: EmployeeMini | null;
 };
-
-function formatEGP(value: number): string {
-  return (
-    value.toLocaleString("ar-EG", { maximumFractionDigits: 0 }) + " ج"
-  );
-}
 
 export default async function RequestsInboxPage({
   searchParams,
@@ -223,7 +218,7 @@ export default async function RequestsInboxPage({
                               </span>
                             </div>
                             <div className="text-xs text-slate-500 font-cairo">
-                              {r.days_count} يوم · من {r.start_date} إلى {r.end_date}
+                              {r.days_count} يوم · {formatDateRange(r.start_date, r.end_date)}
                               {r.reason && ` · ${r.reason.slice(0, 60)}`}
                             </div>
                           </div>
@@ -319,7 +314,7 @@ export default async function RequestsInboxPage({
                               </span>
                             </div>
                             <div className="text-xs text-slate-500 font-cairo">
-                              {r.permission_date}
+                              {formatDateShort(r.permission_date)}
                               {r.from_time && r.to_time && ` · من ${r.from_time} إلى ${r.to_time}`}
                               {r.reason && ` · ${r.reason.slice(0, 60)}`}
                             </div>

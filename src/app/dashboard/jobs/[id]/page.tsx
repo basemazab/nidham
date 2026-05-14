@@ -163,16 +163,22 @@ export default async function JobDetailPage({ params }: PageProps) {
             </Link>
             {job.status === "open" && (
               <form action={async () => { "use server"; await changeJobStatus(id, "closed"); }}>
-                <button type="submit" className="px-4 py-2 rounded-lg border border-amber-200 text-amber-700 font-bold text-sm hover:bg-amber-50 transition font-cairo">
-                  إغلاق
-                </button>
+                <ConfirmSubmitButton
+                  label="إغلاق"
+                  message={`هتقفل الوظيفة "${job.title}". مش هيقدر حد يقدّم عليها من صفحة الـ public بعد الإغلاق.`}
+                  confirmLabel="نعم اقفلها"
+                  className="px-4 py-2 rounded-lg border border-amber-200 text-amber-700 font-bold text-sm hover:bg-amber-50 transition font-cairo cursor-pointer"
+                />
               </form>
             )}
             {job.status === "closed" && (
               <form action={async () => { "use server"; await changeJobStatus(id, "open"); }}>
-                <button type="submit" className="px-4 py-2 rounded-lg border border-emerald-200 text-emerald-700 font-bold text-sm hover:bg-emerald-50 transition font-cairo">
-                  إعادة فتح
-                </button>
+                <ConfirmSubmitButton
+                  label="إعادة فتح"
+                  message={`هتفتح الوظيفة "${job.title}" تاني، وهتظهر للمتقدمين في صفحة الوظائف العامة.`}
+                  confirmLabel="نعم افتحها"
+                  className="px-4 py-2 rounded-lg border border-emerald-200 text-emerald-700 font-bold text-sm hover:bg-emerald-50 transition font-cairo cursor-pointer"
+                />
               </form>
             )}
             <form action={async () => { "use server"; await deleteJob(id); }}>

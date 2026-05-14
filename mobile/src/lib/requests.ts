@@ -113,9 +113,12 @@ export const PERMISSION_TYPE_LABELS: Record<PermissionType, string> = {
   other:        "أخرى",
 };
 
+// Kept in lockstep with the web's `src/lib/requests.ts` STATUS_LABELS_AR
+// so HR sees the same wording on both surfaces. If you change one,
+// change the other.
 export const STATUS_LABELS: Record<RequestStatus, string> = {
-  pending:    "قيد المراجعة",
-  approved:   "موافق",
+  pending:    "تحت المراجعة",
+  approved:   "موافق عليه",
   rejected:   "مرفوض",
   cancelled:  "ملغي",
   paid:       "تم الصرف",

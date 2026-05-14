@@ -5,9 +5,10 @@ import { useAuth } from "@/lib/auth";
 import { AttendanceCard } from "@/components/AttendanceCard";
 import { colors, fontSize, radius, spacing } from "@/lib/theme";
 
-// Employee home screen. The attendance card is the headline feature
-// (Phase 3, live GPS clock-in/out). Phase 4 will fill in the four
-// action tiles below for leave / advance / permission / payslips.
+// Employee home screen. Renders:
+//   - The GPS-aware attendance card (clock in/out + today's status)
+//   - The four self-service tiles below, each routing to its screen
+//     (leave / advance / permission / payslips) -- all wired and live.
 export default function HomeScreen() {
   const { user, employee, signOut } = useAuth();
   const isLinked = employee !== null;

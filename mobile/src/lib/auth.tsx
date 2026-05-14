@@ -163,18 +163,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    // Did handle_new_user's Path 0 already link the employee? If so we
-    // can skip the RPC entirely. Refresh + check.
-    await refreshEmployee();
+    // Did handle_new_user's Path 0 already link the employee? Check
+    // via a direct query against the freshly-fetched session, because
+    // refreshEmployee() depends on react-state `session` which hasn't
+    // ticked yet -- if we relied on it we'd briefly flash the "not
+    // linked" warning on the home screen before onAuthStateChange
+    // catches up.
     const { data: sessAfter } = await supabase.auth.getSession();
-    const linkedNow = await supabase
-      .from("employees")
-      .select("id")
-      .eq("user_id", sessAfter.session?.user.id ?? "")
-      .maybeSingle();
-
-    if (linkedNow.data) {
-      return {};
+    const userId = sessAfter.session?.user.id;
+    if (userId) {
+      const linkedNow = await supabase
+        .from("employees")
+        .select("id, full_name, company_id")
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (linkedNow.data) {
+        // Drive React state directly from the query result so the
+        // home screen renders the linked-employee branch on the first
+        // paint after signup.
+        setSession(sessAfter.session);
+        setEmployee(linkedNow.data);
+        return {};
+      }
     }
 
     // Fallback: token didn't make it through the trigger (signup

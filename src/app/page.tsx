@@ -291,7 +291,7 @@ function BridgeAnalyticsSection() {
               Bridge Analytics
               <br />
               <span className="text-brand-cyan">
-                التزام Ø— إنتاجية = صورة الموظف الحقيقية
+                التزام × إنتاجية = صورة الموظف الحقيقية
               </span>
             </h2>
             <p className="text-lg text-slate-300 mb-6 leading-relaxed font-cairo">

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createInvitation, cancelInvitation, resendInvitation } from "./actions";
 import { SubmitButton } from "@/components/submit-button";
+import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 
 type SearchParams = Promise<{ error?: string; deleted?: string }>;
 
@@ -260,12 +261,12 @@ export default async function TeamPage({
                             await cancelInvitation(inv.id);
                           }}
                         >
-                          <button
-                            type="submit"
-                            className="text-xs text-red-500 hover:text-red-700 font-cairo"
-                          >
-                            إلغاء
-                          </button>
+                          <ConfirmSubmitButton
+                            label="إلغاء"
+                            message={`هتلغي الدعوة المرسلة لـ "${inv.email}". مش هيقدر يستخدم اللينك تاني.`}
+                            confirmLabel="نعم ألغِها"
+                            className="text-xs text-red-500 hover:text-red-700 font-cairo cursor-pointer"
+                          />
                         </form>
                       </>
                     )}

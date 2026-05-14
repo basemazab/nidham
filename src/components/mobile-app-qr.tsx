@@ -89,14 +89,17 @@ export function MobileAppQR({ variant = "card", href }: Props) {
   );
 }
 
-// QR scanners do better with absolute URLs. In the browser we can build
-// one from window.location; on the server we just embed the path and
-// trust the scanner to handle it. The qrcode.react component renders
-// during hydration too so this works either way.
+// QR scanners only render absolute URLs reliably. SSR can't read
+// window.location, so we fall back to the publicly-known production
+// host. The qrcode.react component re-renders on hydration with the
+// real origin, so anyone who actually scans the QR gets the right
+// URL whether dev / preview / prod.
+const FALLBACK_HOST = "https://nidham-seven.vercel.app";
+
 function absoluteUrl(path: string): string {
   if (path.startsWith("http")) return path;
   if (typeof window !== "undefined") {
     return new URL(path, window.location.origin).toString();
   }
-  return path;
+  return new URL(path, FALLBACK_HOST).toString();
 }
