@@ -342,6 +342,10 @@ type ParsedFile = {
   rows: Record<string, string | number | null>[];
   hint: "employees" | "attendance" | "unknown";
   notes: string;
+  // PDF-only fields
+  is_pdf?: boolean;
+  pdf_type?: "employees" | "attendance" | "other";
+  text_summary?: string | null;
 };
 
 export function AIAgentChat() {
@@ -389,29 +393,58 @@ export function AIAgentChat() {
   };
 
   // Build the actual message text that goes to the AI. When a file is
-  // attached, we prepend a structured ATTACHMENT block (with the parsed
-  // rows as JSON) before the user's prose. The system prompt instructs
-  // the agent to use this data when calling bulk_import_* tools.
+  // attached, we prepend a structured ATTACHMENT block before the user's
+  // prose. Three flavours:
+  //
+  //   1) Excel / structured PDF (employees | attendance): embed JSON rows
+  //      so the agent can call bulk_import_* tools.
+  //   2) Free-form PDF (contracts, memos, etc): embed the text summary
+  //      so the agent can answer questions about it.
+  //
+  // The system prompt instructs the agent how to use each shape.
   const buildMessageText = (userText: string): string => {
     if (!attached) return userText;
+
+    const fileKind = attached.is_pdf ? "PDF" : "Excel/CSV";
     const hintLine =
       attached.hint === "employees"
         ? "هذا كشف موظفين"
         : attached.hint === "attendance"
           ? "هذا كشف حضور"
-          : "نوع الملف غير محدد — استنتج من المحتوى";
-    return [
-      "📎 [ملف مرفق]",
+          : attached.pdf_type === "other"
+            ? "هذا ملف غير منظم (عقد / مذكرة / تقرير...)"
+            : "نوع الملف غير محدد — استنتج من المحتوى";
+
+    const lines: string[] = [
+      `📎 [ملف ${fileKind} مرفق]`,
       `اسم الملف: ${attached.filename}`,
-      `${hintLine} — اتقرى ${attached.row_count} صف${attached.truncated ? " (المتبقي اتجاهل)" : ""}`,
-      `العناوين: ${attached.headers.join(" | ")}`,
-      "البيانات الكاملة (JSON):",
-      "```json",
-      JSON.stringify(attached.rows, null, 0),
-      "```",
-      "",
-      userText,
-    ].join("\n");
+    ];
+
+    if (attached.pdf_type === "other" && attached.text_summary) {
+      // Free-form PDF — surface the summary; no rows
+      lines.push(hintLine);
+      lines.push("");
+      lines.push("ملخص المحتوى:");
+      lines.push(attached.text_summary);
+    } else {
+      // Structured data (Excel OR structured PDF)
+      lines.push(
+        `${hintLine} — اتقرى ${attached.row_count} صف${attached.truncated ? " (المتبقي اتجاهل)" : ""}`,
+      );
+      if (attached.headers.length > 0) {
+        lines.push(`العناوين: ${attached.headers.join(" | ")}`);
+      }
+      if (attached.rows.length > 0) {
+        lines.push("البيانات الكاملة (JSON):");
+        lines.push("```json");
+        lines.push(JSON.stringify(attached.rows, null, 0));
+        lines.push("```");
+      }
+    }
+
+    lines.push("");
+    lines.push(userText);
+    return lines.join("\n");
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -456,10 +489,10 @@ export function AIAgentChat() {
             <p className="text-sm text-slate-500 mb-2 font-cairo max-w-lg leading-relaxed">
               <strong className="text-amber-700">دلوقتي بقدرات خارقة</strong> —
               قولي اقفل المرتبات، ابحث عن موظف، اعرض الطلبات المعلقة، أو
-              حتى ارفعلي ملف Excel وأضيف الموظفين/الحضور لوحدي.
+              ارفعلي ملف Excel أو PDF وأضيف الموظفين/الحضور لوحدي.
             </p>
             <p className="text-[11px] text-emerald-600 mb-2 font-cairo">
-              📎 اضغط على المشبك تحت لرفع ملف Excel
+              📎 اضغط على المشبك تحت لرفع ملف Excel أو PDF
             </p>
             <p className="text-[11px] text-slate-400 mb-6 font-cairo">
               متخصص في قانون العمل المصري 12/2003 + التأمينات 148/2019.
@@ -535,17 +568,28 @@ export function AIAgentChat() {
         <div className="px-3 pt-3 bg-slate-50/50 border-t border-slate-100">
           <div className="p-3 rounded-xl bg-white border border-emerald-200 flex items-start gap-3">
             <div className="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center text-lg flex-shrink-0">
-              {attached.hint === "employees"
-                ? "👥"
-                : attached.hint === "attendance"
-                  ? "⏰"
-                  : "📎"}
+              {attached.is_pdf
+                ? attached.pdf_type === "employees"
+                  ? "📄"
+                  : attached.pdf_type === "attendance"
+                    ? "📄"
+                    : "📕"
+                : attached.hint === "employees"
+                  ? "👥"
+                  : attached.hint === "attendance"
+                    ? "⏰"
+                    : "📎"}
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-sm font-bold text-slate-800 font-cairo truncate">
-                {attached.filename}
+              <div className="text-sm font-bold text-slate-800 font-cairo truncate flex items-center gap-2">
+                <span className="truncate">{attached.filename}</span>
+                {attached.is_pdf && (
+                  <span className="text-[9px] font-bold text-rose-600 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded-full whitespace-nowrap">
+                    PDF
+                  </span>
+                )}
               </div>
-              <div className="text-[11px] text-slate-500 font-cairo mt-0.5">
+              <div className="text-[11px] text-slate-500 font-cairo mt-0.5 line-clamp-2">
                 {attached.notes}
               </div>
             </div>
@@ -577,7 +621,7 @@ export function AIAgentChat() {
         <input
           ref={fileInputRef}
           type="file"
-          accept=".xlsx,.xls,.csv"
+          accept=".xlsx,.xls,.csv,.pdf,application/pdf"
           onChange={(e) => handleFilePick(e.target.files?.[0])}
           className="hidden"
         />
@@ -585,7 +629,7 @@ export function AIAgentChat() {
           type="button"
           onClick={() => fileInputRef.current?.click()}
           disabled={isLoading || fileBusy}
-          title="ارفع ملف Excel"
+          title="ارفع ملف Excel أو PDF"
           className="flex-shrink-0 w-12 h-12 rounded-xl bg-white border border-slate-200 text-slate-600 hover:border-brand-cyan hover:text-brand-cyan-dark disabled:opacity-50 transition flex items-center justify-center text-lg"
         >
           {fileBusy ? (

@@ -20,10 +20,15 @@
 // V2 may unify these.
 
 import * as XLSX from "xlsx";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { generateObject } from "ai";
+import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { checkRateLimit } from "@/lib/rate-limit";
 
-export const maxDuration = 30;
+// PDFs need a bit more time because Gemini runs OCR + structured
+// output on top of vision. 60s is the Vercel hobby/pro hard ceiling.
+export const maxDuration = 60;
 
 const MAX_BYTES = 5 * 1024 * 1024; // 5 MB
 const MAX_ROWS = 500; // hard cap so we don't blow up Gemini context
@@ -93,15 +98,31 @@ export async function POST(req: Request) {
     lowerName.endsWith(".xlsx") ||
     lowerName.endsWith(".xls") ||
     lowerName.endsWith(".csv");
+  const isPdf =
+    lowerName.endsWith(".pdf") || file.type === "application/pdf";
 
-  if (!isExcel) {
+  if (!isExcel && !isPdf) {
     return Response.json(
       {
-        error:
-          "النوع ده مش مدعوم. ارفع Excel (.xlsx, .xls) أو CSV. لـ PDF استخدم صفحة رفع الموظفين.",
+        error: "النوع ده مش مدعوم. ارفع Excel (.xlsx, .xls), CSV, أو PDF.",
       },
       { status: 400 },
     );
+  }
+
+  // ============================== PDF PATH ===============================
+  // Gemini Flash 2.5 multimodal — same approach as /api/import/parse-pdf.
+  // We ask it to classify the document AND extract structured rows so
+  // the response shape matches the Excel path exactly. The AI Agent then
+  // doesn't care which file type was uploaded.
+  if (isPdf) {
+    if (!process.env.GEMINI_API_KEY) {
+      return Response.json(
+        { error: "AI configuration missing — GEMINI_API_KEY not set" },
+        { status: 500 },
+      );
+    }
+    return parsePdfWithGemini(file);
   }
 
   // Parse Excel
@@ -284,4 +305,247 @@ function buildNotes(parsedCount: number, totalCount: number, hint: string): stri
   if (hint === "employees") parts.push("الملف يبدو إنه كشف موظفين");
   else if (hint === "attendance") parts.push("الملف يبدو إنه كشف حضور");
   return parts.join(" · ");
+}
+
+// ============================================================================
+// PDF parsing via Gemini multimodal
+// ============================================================================
+//
+// We send the raw PDF bytes to Gemini Flash 2.5 and ask for a structured
+// JSON response. The schema covers TWO data shapes (employees, attendance)
+// plus a free-form summary for "other" documents (contracts, memos, etc).
+// We normalize whichever branch came back into the same { headers, rows }
+// shape the Excel path returns — so the chat UI + the AI Agent's
+// bulk_import_* tools don't care which file type was uploaded.
+
+const employeeRowSchema = z.object({
+  full_name: z.string().describe("اسم الموظف كما هو في الملف"),
+  employee_code: z.string().nullable().describe("كود الموظف لو موجود"),
+  job_title: z.string().nullable(),
+  department: z.string().nullable(),
+  phone: z.string().nullable().describe("11 رقم مصري، شيل +20 لو موجود"),
+  email: z.string().nullable(),
+  hire_date: z
+    .string()
+    .nullable()
+    .describe("YYYY-MM-DD فقط، null لو غير واضح"),
+  basic_salary: z
+    .number()
+    .nullable()
+    .describe("راتب أساسي بالجنيه كرقم، null لو مدى أو ناقص"),
+  national_id: z
+    .string()
+    .nullable()
+    .describe("14 رقم بالظبط، أي حاجة تانية = null"),
+});
+
+const attendanceRowSchema = z.object({
+  employee_name: z
+    .string()
+    .nullable()
+    .describe("اسم الموظف اللي السجل بتاعه"),
+  employee_code: z.string().nullable(),
+  date: z.string().describe("YYYY-MM-DD"),
+  status: z
+    .enum([
+      "present",
+      "absent",
+      "half_day",
+      "leave",
+      "holiday",
+      "weekend",
+    ])
+    .nullable(),
+  check_in: z
+    .string()
+    .nullable()
+    .describe("HH:MM أو HH:MM:SS، null لو ناقص"),
+  check_out: z.string().nullable(),
+  tardiness_minutes: z.number().nullable(),
+  early_leave_minutes: z.number().nullable(),
+});
+
+const pdfSchema = z.object({
+  // Gemini picks ONE based on what's in the PDF
+  type: z
+    .enum(["employees", "attendance", "other"])
+    .describe(
+      "نوع المحتوى: employees لو كشف موظفين، attendance لو كشف حضور، other لو حاجة تانية (عقد، مذكرة...)",
+    ),
+  employees: z
+    .array(employeeRowSchema)
+    .max(200)
+    .describe("لو type='employees', الموظفين المستخرجين. لو لا، []"),
+  attendance: z
+    .array(attendanceRowSchema)
+    .max(500)
+    .describe("لو type='attendance', سجلات الحضور المستخرجة. لو لا، []"),
+  text_summary: z
+    .string()
+    .describe(
+      "لو type='other', ملخص بالعربي (٥-١٠ سطور) للمحتوى. غير ده، فاضي.",
+    ),
+  notes: z
+    .string()
+    .describe(
+      "ملاحظة قصيرة عن جودة الاستخراج (مثلاً: 'تم استخراج 12 موظف، 8 منهم بدون رقم قومي')",
+    ),
+});
+
+const PDF_SYSTEM_INSTRUCTIONS = `أنت مساعد لاستخراج بيانات من ملفات PDF لشركات مصرية.
+شوف الـ PDF بصريًا (صور + نصوص) وحدد:
+
+1) **نوع المحتوى**:
+   - employees لو فيه قائمة موظفين (أسماء + بياناتهم)
+   - attendance لو فيه سجلات حضور وانصراف (تواريخ + حالة + وقت بصمة)
+   - other لو حاجة تانية (عقد، مذكرة، تقرير...)
+
+2) **استخرج كل صفوف البيانات**:
+   - لو employees: استخدم نفس الـ schema (full_name + كل الحقول الاختيارية)
+   - لو attendance: استخدم schema الحضور (employee_name + date + status...)
+   - لو other: حط فقط text_summary بملخص قصير
+
+3) **قواعد مهمة**:
+   - تواريخ output yyyy-mm-dd بس. "15/3/2024" → "2024-03-15"
+   - تليفون 11 رقم مصري. شيل +20 لو موجود
+   - رقم قومي 14 رقم بالظبط. غير كده → null
+   - الراتب رقم بالجنيه. "5,000" → 5000. مدى "5000-7000" → null
+   - تجاهل أسطر الإجمالي والمتوسط (Total, Summary, Average)
+   - **متخترعش بيانات** — لو ما لقيتش حقل، حط null
+   - status للحضور لازم يكون واحد من: present, absent, half_day, leave, holiday, weekend
+   - لو الـ status مكتوب بالعربي (حاضر, غايب, إجازة...) حوّله للإنجليزي
+
+4) **notes بالعربي**: عدد الصفوف + أي ملاحظات.
+`;
+
+async function parsePdfWithGemini(file: File): Promise<Response> {
+  let pdfBytes: Uint8Array;
+  try {
+    pdfBytes = new Uint8Array(await file.arrayBuffer());
+  } catch {
+    return Response.json(
+      { error: "فشل قراءة محتوى الـ PDF" },
+      { status: 400 },
+    );
+  }
+
+  const google = createGoogleGenerativeAI({
+    apiKey: process.env.GEMINI_API_KEY,
+  });
+
+  let object: z.infer<typeof pdfSchema>;
+  try {
+    const result = await generateObject({
+      model: google("gemini-2.5-flash"),
+      schema: pdfSchema,
+      temperature: 0.1,
+      system: PDF_SYSTEM_INSTRUCTIONS,
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: `استخرج البيانات من الـ PDF المرفق (${file.name}). صنّف نوعه واستخرج كل الصفوف.`,
+            },
+            {
+              type: "file",
+              data: pdfBytes,
+              mediaType: "application/pdf",
+            },
+          ],
+        },
+      ],
+    });
+    object = result.object;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return Response.json(
+      {
+        error: `الـ AI ما قدرش يقرا الـ PDF — جرب ملف تاني أو حوّله لـ Excel. (${msg.slice(0, 150)})`,
+      },
+      { status: 500 },
+    );
+  }
+
+  // ----------------------------------------------------------------------
+  // Normalize the response to the same shape as the Excel path so the
+  // chat UI + the AI Agent see consistent data.
+  // ----------------------------------------------------------------------
+  let headers: string[] = [];
+  let rows: ParsedRow[] = [];
+  let hint: "employees" | "attendance" | "unknown" = "unknown";
+  let notes = object.notes || "";
+
+  if (object.type === "employees") {
+    hint = "employees";
+    headers = [
+      "full_name",
+      "employee_code",
+      "job_title",
+      "department",
+      "phone",
+      "email",
+      "hire_date",
+      "basic_salary",
+      "national_id",
+    ];
+    rows = object.employees.map((e) => ({
+      full_name: e.full_name,
+      employee_code: e.employee_code,
+      job_title: e.job_title,
+      department: e.department,
+      phone: e.phone,
+      email: e.email,
+      hire_date: e.hire_date,
+      basic_salary: e.basic_salary,
+      national_id: e.national_id,
+    }));
+  } else if (object.type === "attendance") {
+    hint = "attendance";
+    headers = [
+      "employee_name",
+      "employee_code",
+      "date",
+      "status",
+      "check_in",
+      "check_out",
+      "tardiness_minutes",
+      "early_leave_minutes",
+    ];
+    rows = object.attendance.map((a) => ({
+      employee_name: a.employee_name,
+      employee_code: a.employee_code,
+      date: a.date,
+      status: a.status,
+      check_in: a.check_in,
+      check_out: a.check_out,
+      tardiness_minutes: a.tardiness_minutes,
+      early_leave_minutes: a.early_leave_minutes,
+    }));
+  } else {
+    // type === "other" — surface the text summary as the message body.
+    // No structured rows; the AI agent will see the summary inline and
+    // can answer questions about it. No bulk_import_* tool fires.
+    hint = "unknown";
+    notes = object.text_summary
+      ? `${notes ? notes + " · " : ""}ملخص المحتوى:\n${object.text_summary}`
+      : notes;
+  }
+
+  return Response.json({
+    ok: true,
+    filename: file.name,
+    size: file.size,
+    sheet_name: "PDF",
+    headers,
+    row_count: rows.length,
+    truncated: false,
+    rows,
+    hint,
+    notes: notes || buildNotes(rows.length, rows.length, hint),
+    is_pdf: true,
+    pdf_type: object.type,
+    text_summary: object.text_summary || null,
+  });
 }
