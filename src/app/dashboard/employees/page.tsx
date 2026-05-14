@@ -3,28 +3,15 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { DeleteAllEmployeesButton } from "@/components/delete-all-employees-button";
 import { getMyProfile } from "@/lib/permissions";
+import { EmployeesTable, type Employee } from "./employees-table";
 
-type Employee = {
-  id: string;
-  full_name: string;
-  job_title: string | null;
-  department: string | null;
-  phone: string | null;
-  status: "active" | "on_leave" | "terminated";
-  hire_date: string | null;
-};
+export type { Employee };
 
 type Params = Promise<{
   deleted_all?: string;
   error?: string;
   updated?: string;
 }>;
-
-const statusLabel: Record<Employee["status"], { text: string; classes: string }> = {
-  active: { text: "نشط", classes: "bg-emerald-50 text-emerald-700 border-emerald-200" },
-  on_leave: { text: "إجازة", classes: "bg-amber-50 text-amber-700 border-amber-200" },
-  terminated: { text: "منتهي", classes: "bg-slate-100 text-slate-600 border-slate-200" },
-};
 
 export default async function EmployeesPage({
   searchParams,
@@ -49,7 +36,9 @@ export default async function EmployeesPage({
 
   const { data: employees } = await supabase
     .from("employees")
-    .select("id, full_name, job_title, department, phone, status, hire_date")
+    .select(
+      "id, full_name, employee_code, job_title, department, phone, status, hire_date, pay_frequency",
+    )
     .order("created_at", { ascending: false })
     .returns<Employee[]>();
 
@@ -135,53 +124,7 @@ export default async function EmployeesPage({
             </Link>
           </div>
         ) : (
-          <div className="bg-white rounded-2xl shadow-md border border-slate-100 overflow-hidden">
-            <table className="w-full text-right">
-              <thead className="bg-slate-50 border-b border-slate-200">
-                <tr>
-                  <th className="px-5 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider font-cairo">الاسم</th>
-                  <th className="px-5 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider font-cairo">المسمى الوظيفي</th>
-                  <th className="px-5 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider font-cairo">القسم</th>
-                  <th className="px-5 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider font-cairo">الموبايل</th>
-                  <th className="px-5 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider font-cairo">الحالة</th>
-                  <th className="px-5 py-3"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {list.map((employee) => {
-                  const status = statusLabel[employee.status];
-                  return (
-                    <tr key={employee.id} className="hover:bg-slate-50 transition">
-                      <td className="px-5 py-4">
-                        <Link href={`/dashboard/employees/${employee.id}`} className="flex items-center gap-3 group">
-                          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-brand-cyan to-brand-cyan-dark flex items-center justify-center text-white font-bold text-sm">
-                            {employee.full_name[0]}
-                          </div>
-                          <span className="font-medium text-slate-800 font-cairo group-hover:text-brand-cyan-dark transition">{employee.full_name}</span>
-                        </Link>
-                      </td>
-                      <td className="px-5 py-4 text-slate-600">{employee.job_title ?? "—"}</td>
-                      <td className="px-5 py-4 text-slate-600">{employee.department ?? "—"}</td>
-                      <td className="px-5 py-4 text-slate-600 font-mono text-sm" dir="ltr">{employee.phone ?? "—"}</td>
-                      <td className="px-5 py-4">
-                        <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-bold border ${status.classes} font-cairo`}>
-                          {status.text}
-                        </span>
-                      </td>
-                      <td className="px-5 py-4">
-                        <Link
-                          href={`/dashboard/employees/${employee.id}`}
-                          className="text-xs text-brand-cyan-dark hover:text-brand-cyan font-cairo font-bold"
-                        >
-                          تعديل
-                        </Link>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <EmployeesTable employees={list} />
         )}
 
         {/* Danger zone -- admin-only bulk delete. Lives at the bottom of
