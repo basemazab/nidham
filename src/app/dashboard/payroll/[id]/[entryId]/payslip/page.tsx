@@ -185,11 +185,7 @@ export default async function PayslipPage({ params }: PageProps) {
             />
             <Row
               label="تاريخ التعيين"
-              value={
-                emp?.hire_date
-                  ? new Date(emp.hire_date).toLocaleDateString("ar-EG")
-                  : "—"
-              }
+              value={emp?.hire_date ? formatIsoDate(emp.hire_date) : "—"}
             />
             <Row label="أيام العمل بالشهر" value={`${period?.working_days ?? "—"} يوم`} />
           </div>
