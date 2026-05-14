@@ -30,6 +30,7 @@ type Employee = {
   transport_allowance: number | null;
   other_allowances: number | null;
   incentive_allowance: number | null;
+  pay_frequency: "monthly" | "weekly" | null;
   shift_id: string | null;
   rotation_id: string | null;
   rotation_anchor_date: string | null;
@@ -308,6 +309,25 @@ export default async function EditEmployeePage({ params, searchParams }: PagePro
               <p className="text-xs text-slate-500 mb-3 font-cairo">
                 دي القيم اللي السيستم هيستخدمها لما تحسب المرتب الشهري.
               </p>
+
+              <div className="mb-4">
+                <label htmlFor="pay_frequency" className="block text-sm font-medium text-slate-700 mb-2 font-cairo">
+                  دورة الصرف
+                  <span className="text-xs text-slate-400 mr-2 font-normal">
+                    (شهري لموظفين الإدارة / أسبوعي لعمال الإنتاج)
+                  </span>
+                </label>
+                <select
+                  id="pay_frequency"
+                  name="pay_frequency"
+                  defaultValue={employee.pay_frequency ?? "monthly"}
+                  className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none transition text-slate-900 font-cairo"
+                >
+                  <option value="monthly">شهري</option>
+                  <option value="weekly">أسبوعي</option>
+                </select>
+              </div>
+
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="basic_salary" className="block text-sm font-medium text-slate-700 mb-2 font-cairo">الراتب الأساسي (جنيه)</label>

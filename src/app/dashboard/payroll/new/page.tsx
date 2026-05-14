@@ -2,21 +2,32 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { generatePayrollPeriod } from "../actions";
-import { SubmitButton } from "@/components/submit-button";
+import { NewPayrollForm } from "./form";
 
-type SearchParams = Promise<{ error?: string }>;
+type SearchParams = Promise<{ error?: string; freq?: string }>;
 
-const ARABIC_MONTHS = [
-  "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
-  "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر",
-];
+type CompanySettings = {
+  monthly_cycle_start_day: number | null;
+  weekly_cycle_start_dow: number | null;
+};
+
+// Form for creating a new payroll period. Now cycle-aware:
+//   - User picks frequency (monthly / weekly).
+//   - System suggests the most-recently-closed cycle window based on
+//     the company's monthly_cycle_start_day + weekly_cycle_start_dow
+//     settings (migration 026).
+//   - User can adjust start_date; end_date auto-fills.
+//   - Only employees whose pay_frequency matches are included.
 
 export default async function NewPayrollPage({
   searchParams,
 }: {
   searchParams: SearchParams;
 }) {
-  const { error } = await searchParams;
+  const sp = await searchParams;
+  const error = sp.error;
+  const initialFreq =
+    sp.freq === "weekly" ? "weekly" : ("monthly" as "monthly" | "weekly");
 
   const supabase = await createClient();
   const {
@@ -24,150 +35,174 @@ export default async function NewPayrollPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  // Get count of active employees
-  const { count: empCount } = await supabase
-    .from("employees")
-    .select("id", { count: "exact", head: true })
-    .eq("status", "active");
+  // Resolve the caller's company so we can read cycle settings + count
+  // eligible employees per frequency.
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("company_id")
+    .eq("id", user.id)
+    .single<{ company_id: string }>();
 
-  const { count: empWithSalary } = await supabase
-    .from("employees")
-    .select("id", { count: "exact", head: true })
-    .eq("status", "active")
-    .gt("basic_salary", 0);
+  const companyId = profile?.company_id ?? null;
 
-  const now = new Date();
-  // Default to previous month (most common use case)
-  let defaultYear = now.getFullYear();
-  let defaultMonth = now.getMonth(); // 1-indexed but JS gives 0-indexed prev
-  if (defaultMonth === 0) {
-    defaultMonth = 12;
-    defaultYear--;
-  }
+  const [{ data: settings }, monthlyCountRes, weeklyCountRes, missingSalaryRes] =
+    await Promise.all([
+      companyId
+        ? supabase
+            .from("companies")
+            .select("monthly_cycle_start_day, weekly_cycle_start_dow")
+            .eq("id", companyId)
+            .single<CompanySettings>()
+        : Promise.resolve({ data: null }),
+      supabase
+        .from("employees")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "active")
+        .eq("pay_frequency", "monthly"),
+      supabase
+        .from("employees")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "active")
+        .eq("pay_frequency", "weekly"),
+      supabase
+        .from("employees")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "active")
+        .or("basic_salary.is.null,basic_salary.eq.0"),
+    ]);
 
-  const years = [now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1];
+  const monthlyCount = monthlyCountRes.count ?? 0;
+  const weeklyCount = weeklyCountRes.count ?? 0;
+  const missingSalaryCount = missingSalaryRes.count ?? 0;
+
+  // Suggest the most-recently-closed cycle for the user's frequency choice.
+  // Compute it here on the server so the form opens pre-filled.
+  const monthlyStartDay = settings?.monthly_cycle_start_day ?? 1;
+  const weeklyStartDow = settings?.weekly_cycle_start_dow ?? 6; // Sat by default
+
+  const suggested = suggestCycle(initialFreq, monthlyStartDay, weeklyStartDow);
 
   return (
     <main className="flex-1 px-6 py-8 bg-gradient-to-b from-slate-50 via-white to-cyan-50/30 min-h-screen">
       <div className="max-w-2xl mx-auto">
         <div className="mb-6">
-          <Link href="/dashboard/payroll" className="text-sm text-slate-500 hover:text-brand-cyan-dark font-cairo">
+          <Link
+            href="/dashboard/payroll"
+            className="text-sm text-slate-500 hover:text-brand-cyan-dark font-cairo"
+          >
             ← الرجوع لقائمة المرتبات
           </Link>
         </div>
 
-        <header className="mb-8">
+        <header className="mb-6">
           <h1 className="text-3xl font-black font-cairo text-slate-800 mb-1">
-            شهر مرتبات جديد
+            فترة مرتبات جديدة
           </h1>
           <p className="text-sm text-slate-500 font-cairo leading-relaxed">
-            النظام هيحسب المرتب لكل موظف تلقائيًا بناءً على راتبه + حضوره + التأمينات والضريبة.
+            اختار التكرار (شهري / أسبوعي) ونطاق الفترة. النظام بيحسب المرتب لكل موظف
+            من نوع التكرار اللي اخترته فقط.
           </p>
         </header>
 
         {error && (
-          <div className="mb-6 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm font-cairo">
+          <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm font-cairo">
             ⚠ {decodeURIComponent(error)}
           </div>
         )}
 
-        {/* Warning if some employees don't have salary set */}
-        {(empCount ?? 0) > 0 && (empWithSalary ?? 0) < (empCount ?? 0) && (
-          <div className="mb-6 p-4 rounded-xl bg-amber-50 border border-amber-200">
-            <h3 className="font-bold text-amber-800 mb-1 font-cairo">
-              ⚠ {(empCount ?? 0) - (empWithSalary ?? 0)} موظف بدون راتب أساسي
-            </h3>
-            <p className="text-sm text-amber-700 font-cairo">
-              ضبط الراتب الأساسي + البدلات لكل موظف من <Link href="/dashboard/employees" className="underline font-bold">صفحة الموظفين</Link> قبل ما تعمل شهر مرتبات.
-            </p>
+        {missingSalaryCount > 0 && (
+          <div className="mb-4 p-3 rounded-lg bg-amber-50 border border-amber-200 text-sm font-cairo text-amber-800">
+            ⚠ {missingSalaryCount} موظف لسه بدون راتب أساسي.{" "}
+            <Link
+              href="/dashboard/employees"
+              className="underline font-bold"
+            >
+              عدّلهم من صفحة الموظفين
+            </Link>
+            .
           </div>
         )}
 
-        <div className="bg-white p-8 rounded-2xl shadow-xl border border-slate-100">
-          <form action={generatePayrollPeriod} className="space-y-5">
-            <div className="grid md:grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="month" className="block text-sm font-bold text-slate-700 mb-2 font-cairo">
-                  الشهر <span className="text-red-500">*</span>
-                </label>
-                <select
-                  id="month"
-                  name="month"
-                  required
-                  defaultValue={defaultMonth}
-                  className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none transition text-slate-900 font-cairo"
-                >
-                  {ARABIC_MONTHS.map((m, i) => (
-                    <option key={i} value={i + 1}>{m}</option>
-                  ))}
-                </select>
-              </div>
+        <div className="bg-white p-6 rounded-2xl shadow-xl border border-slate-100">
+          <NewPayrollForm
+            initialFrequency={initialFreq}
+            initialStartDate={suggested.startDate}
+            initialEndDate={suggested.endDate}
+            monthlyStartDay={monthlyStartDay}
+            weeklyStartDow={weeklyStartDow}
+            monthlyEmployeeCount={monthlyCount}
+            weeklyEmployeeCount={weeklyCount}
+            action={generatePayrollPeriod}
+          />
+        </div>
 
-              <div>
-                <label htmlFor="year" className="block text-sm font-bold text-slate-700 mb-2 font-cairo">
-                  السنة <span className="text-red-500">*</span>
-                </label>
-                <select
-                  id="year"
-                  name="year"
-                  required
-                  defaultValue={defaultYear}
-                  className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none transition text-slate-900 font-cairo"
-                >
-                  {years.map((y) => (
-                    <option key={y} value={y}>{y}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor="working_days" className="block text-sm font-bold text-slate-700 mb-2 font-cairo">
-                أيام العمل في الشهر <span className="text-red-500">*</span>
-              </label>
-              <input
-                id="working_days"
-                name="working_days"
-                type="number"
-                min="20"
-                max="31"
-                required
-                defaultValue="22"
-                className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none transition text-slate-900"
-              />
-              <p className="text-xs text-slate-500 mt-1 font-cairo">
-                عادة 22 يوم (6 أيام أسبوعيًا — جمعة فقط) أو 26 (لو سبت وأحد كمان عمل)
-              </p>
-            </div>
-
-            <div className="bg-cyan-50 border border-cyan-200 p-4 rounded-lg text-sm text-slate-700 font-cairo">
-              <strong className="text-cyan-700">📋 خلاصة الحساب:</strong>
-              <ul className="mt-2 space-y-1 text-xs">
-                <li>✓ راتب أساسي + بدلات (سكن + انتقال + أخرى)</li>
-                <li>✓ خصم الغياب (Pro-rated من إجمالي الراتب اليومي)</li>
-                <li>✓ التأمينات الاجتماعية = 14% (حد أقصى 12,600 ج)</li>
-                <li>✓ ضريبة الدخل التصاعدية المصرية (2024-2025)</li>
-                <li>✓ الإعفاء الشخصي = 20,000 ج/سنة</li>
-              </ul>
-            </div>
-
-            <div className="flex gap-3 pt-4">
-              <SubmitButton
-                loadingText="جاري الحساب..."
-                className="flex-1 px-6 py-3 rounded-lg bg-gradient-to-r from-brand-cyan to-brand-cyan-dark text-white font-bold shadow-lg shadow-cyan-500/30 hover:shadow-cyan-500/50 transition-all font-cairo"
-              >
-                احسب المرتبات
-              </SubmitButton>
-              <Link
-                href="/dashboard/payroll"
-                className="px-6 py-3 rounded-lg border border-slate-200 text-slate-700 font-bold hover:bg-slate-50 transition font-cairo"
-              >
-                إلغاء
-              </Link>
-            </div>
-          </form>
+        <div className="mt-4 text-center">
+          <Link
+            href="/dashboard/payroll/settings"
+            className="text-xs text-slate-500 hover:text-brand-cyan-dark font-cairo"
+          >
+            ⚙ إعدادات دورة الرواتب →
+          </Link>
         </div>
       </div>
     </main>
   );
+}
+
+// ----------------------------------------------------------------------------
+// Compute the most-recently-closed cycle window. Mirrors the SQL
+// suggest_next_payroll_cycle but runs server-side here so the form
+// renders without a round-trip.
+// ----------------------------------------------------------------------------
+function suggestCycle(
+  frequency: "monthly" | "weekly",
+  monthlyStartDay: number,
+  weeklyStartDow: number,
+): { startDate: string; endDate: string } {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  if (frequency === "monthly") {
+    // Today is day D. The cycle that just ENDED is the one whose start
+    // is the latest start_day on or before (today - 1).
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const d = yesterday.getDate();
+    let startMonth = yesterday.getMonth();
+    let startYear = yesterday.getFullYear();
+    if (d < monthlyStartDay) {
+      startMonth -= 1;
+      if (startMonth < 0) {
+        startMonth = 11;
+        startYear -= 1;
+      }
+    }
+    const start = new Date(startYear, startMonth, monthlyStartDay);
+    const end = new Date(start);
+    end.setMonth(end.getMonth() + 1);
+    end.setDate(end.getDate() - 1);
+    return {
+      startDate: toIso(start),
+      endDate: toIso(end),
+    };
+  }
+
+  // Weekly -- the cycle that just ended is the most recent full
+  // 7-day window before today.
+  const todayDow = today.getDay(); // 0=Sun..6=Sat
+  // step back to the most recent (start_dow), then back another 7 days
+  // so we land on the start of the JUST-CLOSED cycle.
+  const stepBack = ((todayDow - weeklyStartDow + 7) % 7) + 7;
+  const start = new Date(today);
+  start.setDate(start.getDate() - stepBack);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 6);
+  return { startDate: toIso(start), endDate: toIso(end) };
+}
+
+function toIso(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }

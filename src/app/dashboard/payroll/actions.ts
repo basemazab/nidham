@@ -47,6 +47,7 @@ type EmployeeRow = {
   transport_allowance: number | null;
   other_allowances: number | null;
   incentive_allowance: number | null;
+  pay_frequency: "monthly" | "weekly";
 };
 
 type AttendanceRecord = {
@@ -55,49 +56,84 @@ type AttendanceRecord = {
 };
 
 /**
- * Generate a new payroll period for a given month/year.
- * Auto-computes payroll for each active employee using their salary structure
- * + that month's attendance.
+ * Generate a new payroll period.
+ *
+ * Accepts EITHER:
+ *   (frequency, start_date, end_date, working_days)  -- new, cycle-aware
+ *   (year, month, working_days)                       -- legacy, monthly only
+ *
+ * In the new model, only employees whose pay_frequency matches the
+ * period's frequency are included. So generating a "weekly" period
+ * picks up the daily-paid production workers; generating a "monthly"
+ * period picks up the salaried staff. The cycle window can be any
+ * (start, end) -- 21st-to-20th, Sat-to-Fri, etc.
  */
 export async function generatePayrollPeriod(formData: FormData) {
   await requireHR();
   const supabase = await createClient();
   const companyId = await getCurrentCompanyId(supabase);
 
-  const year = parseInt(asText(formData.get("year")) ?? "", 10);
-  const month = parseInt(asText(formData.get("month")) ?? "", 10);
+  const frequency = (asText(formData.get("frequency")) ?? "monthly") as
+    | "monthly"
+    | "weekly";
+
+  let startDate = asText(formData.get("start_date"));
+  let endDate = asText(formData.get("end_date"));
+
+  // Legacy path: derive start/end from (year, month) if start_date wasn't
+  // sent (keeps the older /dashboard/payroll/new URL working).
+  const yearRaw = asText(formData.get("year"));
+  const monthRaw = asText(formData.get("month"));
+  if (!startDate && yearRaw && monthRaw) {
+    const y = parseInt(yearRaw, 10);
+    const m = parseInt(monthRaw, 10);
+    if (Number.isFinite(y) && Number.isFinite(m) && m >= 1 && m <= 12) {
+      startDate = `${y}-${String(m).padStart(2, "0")}-01`;
+      const lastDay = new Date(y, m, 0).getDate();
+      endDate = `${y}-${String(m).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+    }
+  }
+
+  if (!startDate || !endDate) {
+    redirect(
+      "/dashboard/payroll/new?error=" +
+        encodeURIComponent("تاريخ البداية والنهاية مطلوبين"),
+    );
+  }
+
   const workingDays = parseInt(
     asText(formData.get("working_days")) ?? "22",
     10,
   );
 
-  if (!year || !month || month < 1 || month > 12) {
-    redirect(
-      "/dashboard/payroll/new?error=" +
-        encodeURIComponent("الشهر والسنة مطلوبين"),
-    );
-  }
+  // Derive a year+month label from start_date so old queries that read
+  // those columns (sidebar list, payroll page header) still work.
+  const startD = new Date(startDate + "T00:00:00");
+  const year = startD.getFullYear();
+  const month = startD.getMonth() + 1;
 
-  // Check if period already exists
+  // Idempotency: same (frequency, start_date) => same period.
   const { data: existing } = await supabase
     .from("payroll_periods")
     .select("id")
     .eq("company_id", companyId)
-    .eq("year", year)
-    .eq("month", month)
+    .eq("frequency", frequency)
+    .eq("start_date", startDate)
     .maybeSingle();
 
   if (existing) {
     redirect(`/dashboard/payroll/${existing.id}`);
   }
 
-  // Create the period
   const { data: period, error: periodError } = await supabase
     .from("payroll_periods")
     .insert({
       company_id: companyId,
       year,
       month,
+      frequency,
+      start_date: startDate,
+      end_date: endDate,
       working_days: workingDays,
       status: "draft",
     })
@@ -107,23 +143,18 @@ export async function generatePayrollPeriod(formData: FormData) {
   if (periodError || !period) {
     redirect(
       "/dashboard/payroll/new?error=" +
-        encodeURIComponent(periodError?.message ?? "Failed to create period"),
+        encodeURIComponent(arabicizeDbError(periodError?.message ?? "Failed to create period")),
     );
   }
-
-  // Fetch active employees + their attendance for the month + the
-  // company's payroll toggles (default: insurance + tax both OFF).
-  const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
-  const lastDay = new Date(year, month, 0).getDate();
-  const endDate = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
 
   const [employeesRes, attendanceRes, companyRes] = await Promise.all([
     supabase
       .from("employees")
       .select(
-        "id, full_name, basic_salary, housing_allowance, transport_allowance, other_allowances, incentive_allowance",
+        "id, full_name, basic_salary, housing_allowance, transport_allowance, other_allowances, incentive_allowance, pay_frequency",
       )
       .eq("status", "active")
+      .eq("pay_frequency", frequency)
       .returns<EmployeeRow[]>(),
     supabase
       .from("attendance")

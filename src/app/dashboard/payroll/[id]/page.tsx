@@ -13,6 +13,9 @@ type Period = {
   id: string;
   year: number;
   month: number;
+  frequency: "monthly" | "weekly" | null;
+  start_date: string | null;
+  end_date: string | null;
   status: "draft" | "approved" | "paid" | "cancelled";
   working_days: number;
   approved_at: string | null;
@@ -37,6 +40,11 @@ const ARABIC_MONTHS = [
   "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
   "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر",
 ];
+
+function formatIsoDate(iso: string): string {
+  const [y, m, d] = iso.split("-");
+  return `${d}/${m}/${y}`;
+}
 
 export default async function PayrollPeriodPage({ params }: PageProps) {
   const { id } = await params;
@@ -93,7 +101,20 @@ export default async function PayrollPeriodPage({ params }: PageProps) {
         <header className="flex flex-wrap items-start justify-between gap-3 mb-8">
           <div>
             <h1 className="text-3xl font-black font-cairo text-slate-800 mb-1">
-              مرتبات {ARABIC_MONTHS[period.month - 1]} {period.year}
+              {period.frequency === "weekly" ? "مرتب أسبوعي" : "مرتب شهري"}
+              {period.start_date && period.end_date ? (
+                <>
+                  {" · "}
+                  <span className="text-slate-600">
+                    {formatIsoDate(period.start_date)} → {formatIsoDate(period.end_date)}
+                  </span>
+                </>
+              ) : (
+                <>
+                  {" · "}
+                  {ARABIC_MONTHS[period.month - 1]} {period.year}
+                </>
+              )}
             </h1>
             <p className="text-sm text-slate-500 font-cairo">
               {entries.length} موظف · {period.working_days} يوم عمل · حالة: <strong>{period.status === "draft" ? "مسودة" : period.status === "approved" ? "معتمد" : period.status === "paid" ? "مدفوع" : "ملغي"}</strong>

@@ -17,7 +17,19 @@ type Params = Promise<{ saved?: string; error?: string }>;
 type CompanyRow = {
   social_insurance_enabled: boolean | null;
   income_tax_enabled: boolean | null;
+  monthly_cycle_start_day: number | null;
+  weekly_cycle_start_dow: number | null;
 };
+
+const DAY_NAMES = [
+  "الأحد",
+  "الإثنين",
+  "الثلاثاء",
+  "الأربعاء",
+  "الخميس",
+  "الجمعة",
+  "السبت",
+];
 
 export default async function PayrollSettingsPage({
   searchParams,
@@ -31,12 +43,16 @@ export default async function PayrollSettingsPage({
 
   const { data: company } = await supabase
     .from("companies")
-    .select("social_insurance_enabled, income_tax_enabled")
+    .select(
+      "social_insurance_enabled, income_tax_enabled, monthly_cycle_start_day, weekly_cycle_start_dow",
+    )
     .eq("id", profile.company_id)
     .single<CompanyRow>();
 
   const insuranceOn = company?.social_insurance_enabled === true;
   const taxOn = company?.income_tax_enabled === true;
+  const monthlyStartDay = company?.monthly_cycle_start_day ?? 1;
+  const weeklyStartDow = company?.weekly_cycle_start_dow ?? 6;
 
   return (
     <main className="flex-1 px-6 py-8 bg-gradient-to-b from-slate-50 via-white to-cyan-50/30 min-h-screen">
@@ -82,6 +98,71 @@ export default async function PayrollSettingsPage({
         )}
 
         <form action={updatePayrollSettings} className="space-y-4">
+          {/* Cycle windows (migration 026) — comes first because it
+              changes the meaning of every other setting below. */}
+          <div className="rounded-2xl border-2 border-slate-200 bg-white p-5">
+            <div className="mb-4">
+              <h3 className="font-bold text-slate-800 font-cairo text-base mb-1">
+                📅 دورات صرف الرواتب
+              </h3>
+              <p className="text-xs text-slate-500 font-cairo leading-relaxed">
+                النظام بيدعم دورتين متوازيتين: شهرية لموظفين الإدارة،
+                وأسبوعية لعمال الإنتاج. هنا بتحدد بداية كل دورة.
+              </p>
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div>
+                <label
+                  htmlFor="monthly_cycle_start_day"
+                  className="block text-xs font-bold text-slate-700 mb-1 font-cairo"
+                >
+                  بداية الدورة الشهرية
+                </label>
+                <select
+                  id="monthly_cycle_start_day"
+                  name="monthly_cycle_start_day"
+                  defaultValue={String(monthlyStartDay)}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 outline-none text-sm font-cairo focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20"
+                >
+                  {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
+                    <option key={d} value={d}>
+                      يوم {d} من الشهر
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-slate-500 mt-1 font-cairo leading-relaxed">
+                  مثلًا: لو اخترت يوم 21 يبقى الدورة تبدأ 21 لحد 20 من
+                  الشهر الي بعده.
+                </p>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="weekly_cycle_start_dow"
+                  className="block text-xs font-bold text-slate-700 mb-1 font-cairo"
+                >
+                  بداية الدورة الأسبوعية
+                </label>
+                <select
+                  id="weekly_cycle_start_dow"
+                  name="weekly_cycle_start_dow"
+                  defaultValue={String(weeklyStartDow)}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 outline-none text-sm font-cairo focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20"
+                >
+                  {DAY_NAMES.map((name, i) => (
+                    <option key={i} value={i}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-slate-500 mt-1 font-cairo leading-relaxed">
+                  أيام العمل في مصر بتبدأ السبت — السبت لـ الجمعة الي بعده.
+                </p>
+              </div>
+            </div>
+          </div>
+
           <ToggleCard
             name="social_insurance_enabled"
             defaultChecked={insuranceOn}

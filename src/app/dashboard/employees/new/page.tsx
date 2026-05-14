@@ -145,6 +145,28 @@ export default async function NewEmployeePage({
               <p className="text-xs text-slate-500 mb-3 font-cairo">
                 دي القيم اللي السيستم هيستخدمها لما تحسب المرتب الشهري. اتركها صفر لو الموظف لسه مش معتمد عليه راتب.
               </p>
+
+              <div className="mb-4">
+                <label htmlFor="pay_frequency" className="block text-sm font-medium text-slate-700 mb-2 font-cairo">
+                  دورة الصرف
+                  <span className="text-xs text-slate-400 mr-2 font-normal">
+                    (بيتحسب معاهم في أي فترة مرتبات)
+                  </span>
+                </label>
+                <select
+                  id="pay_frequency"
+                  name="pay_frequency"
+                  defaultValue="monthly"
+                  className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none transition text-slate-900 font-cairo"
+                >
+                  <option value="monthly">شهري — موظف إدارة / مكاتب</option>
+                  <option value="weekly">أسبوعي — عامل إنتاج باليومية</option>
+                </select>
+                <p className="text-[11px] text-slate-500 mt-1 font-cairo">
+                  الموظفين الشهريين بياخدوا مرتب مع فترة شهرية، والأسبوعيين مع فترة أسبوعية.
+                </p>
+              </div>
+
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="basic_salary" className="block text-sm font-medium text-slate-700 mb-2 font-cairo">

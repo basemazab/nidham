@@ -30,6 +30,10 @@ export async function createEmployee(formData: FormData) {
     redirect("/dashboard/employees/new?error=" + encodeURIComponent("اسم الموظف مطلوب"));
   }
 
+  const payFrequencyRaw = asText(formData.get("pay_frequency"));
+  const payFrequency =
+    payFrequencyRaw === "weekly" ? "weekly" : "monthly";
+
   const { error } = await supabase.from("employees").insert({
     full_name: fullName,
     employee_code: asText(formData.get("employee_code")),
@@ -43,6 +47,7 @@ export async function createEmployee(formData: FormData) {
     transport_allowance: asNumber(formData.get("transport_allowance")),
     other_allowances: asNumber(formData.get("other_allowances")),
     incentive_allowance: asNumber(formData.get("incentive_allowance")),
+    pay_frequency: payFrequency,
     national_id: asText(formData.get("national_id")),
     social_insurance_number: asText(formData.get("social_insurance_number")),
     bank_name: asText(formData.get("bank_name")),
@@ -78,6 +83,10 @@ export async function updateEmployee(id: string, formData: FormData) {
     );
   }
 
+  const payFrequencyRaw = asText(formData.get("pay_frequency"));
+  const payFrequency =
+    payFrequencyRaw === "weekly" ? "weekly" : "monthly";
+
   const { error } = await supabase
     .from("employees")
     .update({
@@ -92,7 +101,8 @@ export async function updateEmployee(id: string, formData: FormData) {
       housing_allowance: asNumber(formData.get("housing_allowance")),
       transport_allowance: asNumber(formData.get("transport_allowance")),
       other_allowances: asNumber(formData.get("other_allowances")),
-    incentive_allowance: asNumber(formData.get("incentive_allowance")),
+      incentive_allowance: asNumber(formData.get("incentive_allowance")),
+      pay_frequency: payFrequency,
       national_id: asText(formData.get("national_id")),
       social_insurance_number: asText(formData.get("social_insurance_number")),
       bank_name: asText(formData.get("bank_name")),

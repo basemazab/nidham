@@ -7,6 +7,9 @@ type Period = {
   id: string;
   year: number;
   month: number;
+  frequency: "monthly" | "weekly" | null;
+  start_date: string | null;
+  end_date: string | null;
   status: "draft" | "approved" | "paid" | "cancelled";
   working_days: number;
   approved_at: string | null;
@@ -20,6 +23,21 @@ const ARABIC_MONTHS = [
   "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
   "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر",
 ];
+
+function formatCycleLabel(p: Period): string {
+  // Prefer the explicit window (migration 026); fall back to the
+  // legacy year+month label for any pre-migration row that wasn't
+  // backfilled for some reason.
+  if (p.start_date && p.end_date) {
+    return `${formatIsoDate(p.start_date)} → ${formatIsoDate(p.end_date)}`;
+  }
+  return `${ARABIC_MONTHS[p.month - 1]} ${p.year}`;
+}
+
+function formatIsoDate(iso: string): string {
+  const [y, m, d] = iso.split("-");
+  return `${d}/${m}/${y}`;
+}
 
 const STATUS_LABELS: Record<Period["status"], { text: string; classes: string }> = {
   draft: { text: "مسودة", classes: "bg-amber-50 text-amber-700 border-amber-200" },
@@ -37,7 +55,10 @@ export default async function PayrollPage() {
 
   const { data: periods } = await supabase
     .from("payroll_periods")
-    .select("id, year, month, status, working_days, approved_at, paid_at, created_at")
+    .select(
+      "id, year, month, frequency, start_date, end_date, status, working_days, approved_at, paid_at, created_at",
+    )
+    .order("start_date", { ascending: false, nullsFirst: false })
     .order("year", { ascending: false })
     .order("month", { ascending: false })
     .returns<Period[]>();
@@ -130,7 +151,8 @@ export default async function PayrollPage() {
             <table className="w-full text-right">
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
-                  <th className="px-5 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider font-cairo">الشهر</th>
+                  <th className="px-5 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider font-cairo">الفترة</th>
+                  <th className="px-5 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider font-cairo">النوع</th>
                   <th className="px-5 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider font-cairo">عدد الموظفين</th>
                   <th className="px-5 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider font-cairo">إجمالي الصافي</th>
                   <th className="px-5 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider font-cairo">أيام العمل</th>
@@ -142,12 +164,24 @@ export default async function PayrollPage() {
                 {list.map((p) => {
                   const status = STATUS_LABELS[p.status];
                   const agg = totals.get(p.id) ?? { count: 0, total: 0 };
+                  const isWeekly = p.frequency === "weekly";
                   return (
                     <tr key={p.id} className="hover:bg-slate-50 transition">
                       <td className="px-5 py-4">
                         <Link href={`/dashboard/payroll/${p.id}`} className="font-bold text-brand-cyan-dark hover:text-brand-cyan font-cairo">
-                          {ARABIC_MONTHS[p.month - 1]} {p.year}
+                          {formatCycleLabel(p)}
                         </Link>
+                      </td>
+                      <td className="px-5 py-4">
+                        <span
+                          className={`inline-block px-2.5 py-1 rounded-full text-xs font-bold border font-cairo ${
+                            isWeekly
+                              ? "bg-violet-50 text-violet-700 border-violet-200"
+                              : "bg-sky-50 text-sky-700 border-sky-200"
+                          }`}
+                        >
+                          {isWeekly ? "أسبوعي" : "شهري"}
+                        </span>
                       </td>
                       <td className="px-5 py-4 text-slate-700 font-bold">{agg.count}</td>
                       <td className="px-5 py-4 font-bold text-emerald-700 font-cairo">{formatEGP(agg.total)}</td>
