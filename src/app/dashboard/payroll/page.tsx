@@ -83,13 +83,22 @@ export default async function PayrollPage() {
             </p>
           </div>
 
-          <Link
-            href="/dashboard/payroll/new"
-            className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-brand-cyan to-brand-cyan-dark text-white font-bold shadow-lg shadow-cyan-500/30 hover:shadow-cyan-500/50 hover:-translate-y-0.5 transition-all font-cairo"
-          >
-            <span className="text-lg leading-none">+</span>
-            <span>شهر مرتبات جديد</span>
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/dashboard/payroll/settings"
+              className="inline-flex items-center gap-2 px-4 py-3 rounded-xl border border-slate-200 text-slate-700 font-bold text-sm hover:bg-slate-50 transition font-cairo"
+            >
+              <span>⚙</span>
+              <span>إعدادات الرواتب</span>
+            </Link>
+            <Link
+              href="/dashboard/payroll/new"
+              className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-brand-cyan to-brand-cyan-dark text-white font-bold shadow-lg shadow-cyan-500/30 hover:shadow-cyan-500/50 hover:-translate-y-0.5 transition-all font-cairo"
+            >
+              <span className="text-lg leading-none">+</span>
+              <span>شهر مرتبات جديد</span>
+            </Link>
+          </div>
         </header>
 
         {list.length === 0 ? (

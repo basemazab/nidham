@@ -88,10 +88,30 @@ export default async function SubscriptionPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  // For non-super-admin users the view_own_subscription RLS policy
+  // returns at most one row. But super_admin gets the bypass policy
+  // from migration 008 and sees every tenant's subscription -- in
+  // which case .single() blows up. Resolve the caller's company
+  // explicitly and filter so this page is always tenant-scoped.
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("company_id")
+    .eq("id", user.id)
+    .single<{ company_id: string }>();
+
+  if (!profile) {
+    return (
+      <main className="p-8 text-center font-cairo">
+        <p>محصلش لاقي حساب. سجّل دخول تاني.</p>
+      </main>
+    );
+  }
+
   const { data: subscription } = await supabase
     .from("subscriptions")
     .select("plan, status, starts_at, ends_at, monthly_value")
-    .single<Subscription>();
+    .eq("company_id", profile.company_id)
+    .maybeSingle<Subscription>();
 
   if (!subscription) {
     // shouldn't happen — trigger auto-creates — but handle gracefully

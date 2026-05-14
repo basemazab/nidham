@@ -195,6 +195,7 @@ export function PDFImportFlow() {
               <th className="px-3 py-2 text-right">إيميل</th>
               <th className="px-3 py-2 text-right">تاريخ التعيين</th>
               <th className="px-3 py-2 text-right">المرتب</th>
+              <th className="px-3 py-2 text-right">حافز</th>
               <th className="px-3 py-2 text-right">رقم قومي</th>
             </tr>
           </thead>
@@ -246,6 +247,17 @@ export function PDFImportFlow() {
                   value={r.basic_salary != null ? String(r.basic_salary) : ""}
                   onChange={(v) =>
                     updateRow(i, "basic_salary", v ? Number(v) : null)
+                  }
+                  align="left"
+                />
+                <PreviewCell
+                  value={
+                    r.incentive_allowance != null
+                      ? String(r.incentive_allowance)
+                      : ""
+                  }
+                  onChange={(v) =>
+                    updateRow(i, "incentive_allowance", v ? Number(v) : null)
                   }
                   align="left"
                 />

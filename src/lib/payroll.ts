@@ -99,10 +99,21 @@ export type SalaryStructure = {
   housingAllowance: number;
   transportAllowance: number;
   otherAllowances: number;
-  bonuses?: number;          // مكافآت لمرة واحدة (هذا الشهر)
-  overtime?: number;         // قيمة الـ overtime
-  loanDeduction?: number;    // قسط قرض
-  otherDeductions?: number;  // خصومات إضافية
+  incentiveAllowance?: number; // حافز -- recurring monthly incentive
+  bonuses?: number;            // مكافآت لمرة واحدة (هذا الشهر)
+  overtime?: number;           // قيمة الـ overtime
+  loanDeduction?: number;      // قسط قرض
+  otherDeductions?: number;    // خصومات إضافية
+};
+
+// Per-company toggles for the two auto-applied statutory deductions.
+// Default: both off, matching the reality that most Egyptian SMBs
+// don't formally file social-insurance / income-tax monthly. The
+// company can switch them on from /dashboard/payroll/settings once
+// they're ready to comply.
+export type PayrollSettings = {
+  socialInsuranceEnabled?: boolean;
+  incomeTaxEnabled?: boolean;
 };
 
 export type PayrollResult = {
@@ -111,6 +122,7 @@ export type PayrollResult = {
   housingAllowance: number;
   transportAllowance: number;
   otherAllowances: number;
+  incentiveAllowance: number;
   bonuses: number;
   overtime: number;
   grossSalary: number;
@@ -136,6 +148,7 @@ export function calculatePayroll(
   salary: SalaryStructure,
   attendance: AttendanceBreakdown,
   workingDays = 22,
+  settings: PayrollSettings = {},
 ): PayrollResult {
   // 1. Effective attended days (paid days)
   const effectiveAttended =
@@ -144,11 +157,13 @@ export function calculatePayroll(
     attendance.leave; // paid leave counts as worked
 
   // 2. Base monthly compensation (before attendance adjustment)
+  const incentiveAllowance = salary.incentiveAllowance ?? 0;
   const monthlyBase =
     salary.basicSalary +
     salary.housingAllowance +
     salary.transportAllowance +
-    salary.otherAllowances;
+    salary.otherAllowances +
+    incentiveAllowance;
 
   // 3. Daily rate
   const dailyRate = monthlyBase / workingDays;
@@ -162,12 +177,20 @@ export function calculatePayroll(
   const overtime = salary.overtime ?? 0;
   const grossSalary = monthlyBase + bonuses + overtime - absenceDeduction;
 
-  // 6. Social insurance (on insurable wage, capped)
-  const socialInsurance = calculateSocialInsurance(grossSalary);
+  // 6. Social insurance (on insurable wage, capped) -- opt-in per company.
+  //    Most SMBs don't file with NOSI; default off keeps net = gross.
+  const socialInsurance = settings.socialInsuranceEnabled
+    ? calculateSocialInsurance(grossSalary)
+    : 0;
 
-  // 7. Income tax on taxable income (gross - social insurance)
-  const monthlyTaxable = Math.max(0, grossSalary - socialInsurance);
-  const incomeTax = Math.round(calculateMonthlyIncomeTax(monthlyTaxable) * 100) / 100;
+  // 7. Income tax on taxable income (gross - social insurance) -- opt-in.
+  //    Default off matches the cash-paid pattern of most Egyptian SMBs.
+  const incomeTax = settings.incomeTaxEnabled
+    ? Math.round(
+        calculateMonthlyIncomeTax(Math.max(0, grossSalary - socialInsurance)) *
+          100,
+      ) / 100
+    : 0;
 
   // 8. Other deductions
   const loanDeduction = salary.loanDeduction ?? 0;
@@ -194,6 +217,7 @@ export function calculatePayroll(
     housingAllowance: salary.housingAllowance,
     transportAllowance: salary.transportAllowance,
     otherAllowances: salary.otherAllowances,
+    incentiveAllowance,
     bonuses,
     overtime,
     grossSalary,

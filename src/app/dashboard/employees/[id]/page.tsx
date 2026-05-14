@@ -28,6 +28,7 @@ type Employee = {
   housing_allowance: number | null;
   transport_allowance: number | null;
   other_allowances: number | null;
+  incentive_allowance: number | null;
   national_id: string | null;
   social_insurance_number: string | null;
   bank_name: string | null;
@@ -305,6 +306,24 @@ export default async function EditEmployeePage({ params, searchParams }: PagePro
                     step="0.01"
                     min="0"
                     defaultValue={employee.other_allowances ?? ""}
+                    placeholder="0"
+                    className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none transition text-slate-900"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="incentive_allowance" className="block text-sm font-medium text-slate-700 mb-2 font-cairo">
+                    حافز شهري
+                    <span className="text-xs text-slate-400 mr-2 font-normal">
+                      (Hafiz)
+                    </span>
+                  </label>
+                  <input
+                    id="incentive_allowance"
+                    name="incentive_allowance"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    defaultValue={employee.incentive_allowance ?? ""}
                     placeholder="0"
                     className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none transition text-slate-900"
                   />

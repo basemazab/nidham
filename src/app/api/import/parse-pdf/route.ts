@@ -55,6 +55,12 @@ const employeeSchema = z.object({
     .describe(
       "Basic monthly salary in EGP as a number; null if missing or written as range",
     ),
+  incentive_allowance: z
+    .number()
+    .nullable()
+    .describe(
+      "Monthly incentive (حافز) in EGP, separate from basic salary; null if not in the doc",
+    ),
   national_id: z
     .string()
     .nullable()
@@ -85,6 +91,7 @@ const SYSTEM_INSTRUCTIONS = `أنت مساعد لاستخراج بيانات ا�
 - **الإيميل**: أي نص فيه @ (مثال: ahmed@company.com)
 - **تاريخ التعيين**: تواريخ في صيغ مختلفة (15/3/2024 أو 2024-03-15 أو 15 مارس 2024) -- خصوصًا تحت "تاريخ التعيين" / "Hire" / "Joining"
 - **المرتب**: أرقام كبيرة (3000+) جنب كلمات مرتب / راتب / Basic / Salary -- ادّيها أهمية لو فيها فواصل (5,000)
+- **الحافز** (incentive_allowance): رقم تحت "حافز" / "الحافز" / "Incentive" -- دي قيمة شهرية ثابتة منفصلة عن المرتب الأساسي
 - **الرقم القومي**: 14 رقم متتالي بالظبط -- تحت "قومي" / "بطاقة" / "National ID"
 
 قواعد دقيقة:

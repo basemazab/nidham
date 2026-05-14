@@ -46,6 +46,7 @@ type EmployeeRow = {
   housing_allowance: number | null;
   transport_allowance: number | null;
   other_allowances: number | null;
+  incentive_allowance: number | null;
 };
 
 type AttendanceRecord = {
@@ -110,16 +111,17 @@ export async function generatePayrollPeriod(formData: FormData) {
     );
   }
 
-  // Fetch active employees + their attendance for the month
+  // Fetch active employees + their attendance for the month + the
+  // company's payroll toggles (default: insurance + tax both OFF).
   const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
   const lastDay = new Date(year, month, 0).getDate();
   const endDate = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
 
-  const [employeesRes, attendanceRes] = await Promise.all([
+  const [employeesRes, attendanceRes, companyRes] = await Promise.all([
     supabase
       .from("employees")
       .select(
-        "id, full_name, basic_salary, housing_allowance, transport_allowance, other_allowances",
+        "id, full_name, basic_salary, housing_allowance, transport_allowance, other_allowances, incentive_allowance",
       )
       .eq("status", "active")
       .returns<EmployeeRow[]>(),
@@ -129,7 +131,20 @@ export async function generatePayrollPeriod(formData: FormData) {
       .gte("date", startDate)
       .lte("date", endDate)
       .returns<AttendanceRecord[]>(),
+    supabase
+      .from("companies")
+      .select("social_insurance_enabled, income_tax_enabled")
+      .eq("id", companyId)
+      .single<{
+        social_insurance_enabled: boolean | null;
+        income_tax_enabled: boolean | null;
+      }>(),
   ]);
+
+  const payrollSettings = {
+    socialInsuranceEnabled: companyRes.data?.social_insurance_enabled === true,
+    incomeTaxEnabled: companyRes.data?.income_tax_enabled === true,
+  };
 
   const employees = employeesRes.data ?? [];
   const attendance = attendanceRes.data ?? [];
@@ -174,10 +189,12 @@ export async function generatePayrollPeriod(formData: FormData) {
         housingAllowance: emp.housing_allowance ?? 0,
         transportAllowance: emp.transport_allowance ?? 0,
         otherAllowances: emp.other_allowances ?? 0,
+        incentiveAllowance: emp.incentive_allowance ?? 0,
         loanDeduction,
       },
       breakdown,
       workingDays,
+      payrollSettings,
     );
 
     return {
@@ -192,6 +209,7 @@ export async function generatePayrollPeriod(formData: FormData) {
       housing_allowance: emp.housing_allowance ?? 0,
       transport_allowance: emp.transport_allowance ?? 0,
       other_allowances: emp.other_allowances ?? 0,
+      incentive_allowance: emp.incentive_allowance ?? 0,
       bonuses: 0,
       overtime: 0,
       gross_salary: result.grossSalary,
@@ -267,10 +285,21 @@ export async function updatePayrollEntry(entryId: string, formData: FormData) {
   const housing = asNumber(formData.get("housing_allowance"));
   const transport = asNumber(formData.get("transport_allowance"));
   const other = asNumber(formData.get("other_allowances"));
+  const incentive = asNumber(formData.get("incentive_allowance"));
   const bonuses = asNumber(formData.get("bonuses"));
   const overtime = asNumber(formData.get("overtime"));
   const loan = asNumber(formData.get("loan_deduction"));
   const otherDed = asNumber(formData.get("other_deductions"));
+
+  // Per-company toggles drive whether the auto deductions apply.
+  const { data: companyRow } = await supabase
+    .from("companies")
+    .select("social_insurance_enabled, income_tax_enabled")
+    .eq("id", companyId)
+    .single<{
+      social_insurance_enabled: boolean | null;
+      income_tax_enabled: boolean | null;
+    }>();
 
   const result = calculatePayroll(
     {
@@ -278,6 +307,7 @@ export async function updatePayrollEntry(entryId: string, formData: FormData) {
       housingAllowance: housing,
       transportAllowance: transport,
       otherAllowances: other,
+      incentiveAllowance: incentive,
       bonuses,
       overtime,
       loanDeduction: loan,
@@ -285,6 +315,10 @@ export async function updatePayrollEntry(entryId: string, formData: FormData) {
     },
     { attended, halfDay, leave, absent },
     period.working_days ?? 22,
+    {
+      socialInsuranceEnabled: companyRow?.social_insurance_enabled === true,
+      incomeTaxEnabled: companyRow?.income_tax_enabled === true,
+    },
   );
 
   await supabase
@@ -298,6 +332,7 @@ export async function updatePayrollEntry(entryId: string, formData: FormData) {
       housing_allowance: housing,
       transport_allowance: transport,
       other_allowances: other,
+      incentive_allowance: incentive,
       bonuses,
       overtime,
       gross_salary: result.grossSalary,

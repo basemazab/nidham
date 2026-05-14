@@ -17,6 +17,7 @@ export type EmployeeImportRow = {
   email: string | null;
   hire_date: string | null;
   basic_salary: number | null;
+  incentive_allowance: number | null;
   national_id: string | null;
 };
 
@@ -110,6 +111,7 @@ export async function confirmPdfImport(rows: EmployeeImportRow[]) {
       email: r.email,
       hire_date: r.hire_date,
       basic_salary: r.basic_salary,
+      incentive_allowance: r.incentive_allowance,
       national_id: r.national_id,
       status: "active",
     });
@@ -256,6 +258,13 @@ const HEADER_ALIASES: Record<string, string> = {
   "joining date": "hire_date",
   "start date": "hire_date",
   "date of hire": "hire_date",
+  // incentive_allowance (حافز)
+  "حافز": "incentive_allowance",
+  "الحافز": "incentive_allowance",
+  "حافز شهري": "incentive_allowance",
+  "incentive": "incentive_allowance",
+  "incentive allowance": "incentive_allowance",
+  "monthly incentive": "incentive_allowance",
   // basic_salary
   "المرتب": "basic_salary",
   "المرتب الأساسي": "basic_salary",
@@ -293,6 +302,7 @@ type ParsedRow = {
   email: string | null;
   hireDate: string | null;
   basicSalary: number | null;
+  incentiveAllowance: number | null;
   nationalId: string | null;
 };
 
@@ -427,6 +437,7 @@ export async function importEmployees(formData: FormData) {
       email:        asText(get("email")),
       hireDate:     normalizeDate(get("hire_date")),
       basicSalary:  asNumber(get("basic_salary")),
+      incentiveAllowance: asNumber(get("incentive_allowance")),
       nationalId:   asText(get("national_id")),
     };
   });
@@ -490,6 +501,7 @@ export async function importEmployees(formData: FormData) {
       email: r.email,
       hire_date: r.hireDate,
       basic_salary: r.basicSalary,
+      incentive_allowance: r.incentiveAllowance,
       national_id: r.nationalId,
       status: "active",
     });

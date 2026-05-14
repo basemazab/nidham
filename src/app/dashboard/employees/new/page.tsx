@@ -202,6 +202,26 @@ export default async function NewEmployeePage({
                     className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none transition text-slate-900"
                   />
                 </div>
+                <div>
+                  <label htmlFor="incentive_allowance" className="block text-sm font-medium text-slate-700 mb-2 font-cairo">
+                    حافز شهري
+                    <span className="text-xs text-slate-400 mr-2 font-normal">
+                      (Hafiz / incentive)
+                    </span>
+                  </label>
+                  <input
+                    id="incentive_allowance"
+                    name="incentive_allowance"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0"
+                    className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none transition text-slate-900"
+                  />
+                  <p className="text-[11px] text-slate-500 mt-1 font-cairo">
+                    حافز ثابت كل شهر. مكافأة لمرة واحدة (مُكافأة) ضيفها من شهر المرتب نفسه.
+                  </p>
+                </div>
               </div>
             </div>
 
