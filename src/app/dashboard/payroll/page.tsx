@@ -83,7 +83,14 @@ export default async function PayrollPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Link
+              href="/dashboard/payroll/advances"
+              className="inline-flex items-center gap-2 px-4 py-3 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-800 font-bold text-sm hover:bg-emerald-100 transition font-cairo"
+            >
+              <span>💵</span>
+              <span>صرف سلف (الأربعاء)</span>
+            </Link>
             <Link
               href="/dashboard/payroll/settings"
               className="inline-flex items-center gap-2 px-4 py-3 rounded-xl border border-slate-200 text-slate-700 font-bold text-sm hover:bg-slate-50 transition font-cairo"
