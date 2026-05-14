@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { formatEGP } from "@/lib/payroll";
 import { PrintButton } from "./print-button";
+import { DownloadPdfButton } from "@/components/download-pdf-button";
 
 type PageProps = {
   params: Promise<{ id: string; entryId: string }>;
@@ -124,11 +125,18 @@ export default async function PayslipPage({ params }: PageProps) {
         >
           ← الرجوع لشهر المرتبات
         </Link>
-        <PrintButton />
+        <div className="flex flex-wrap gap-2 items-center">
+          <DownloadPdfButton
+            targetSelector="#payslip-pdf"
+            filename={`payslip-${emp?.full_name?.replace(/\s+/g, "-") ?? entryId.slice(0, 8)}.pdf`}
+          />
+          <PrintButton />
+        </div>
       </div>
 
       {/* The payslip card — A4-friendly */}
       <article
+        id="payslip-pdf"
         className="max-w-3xl mx-auto bg-white shadow-lg print:shadow-none print:max-w-none rounded-2xl print:rounded-none border border-slate-200 print:border-0 overflow-hidden"
         dir="rtl"
       >

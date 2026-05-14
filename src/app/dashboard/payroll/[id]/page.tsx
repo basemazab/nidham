@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { approvePayrollPeriod, markPayrollAsPaid, deletePayrollPeriod } from "../actions";
 import { formatEGP } from "@/lib/payroll";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
+import { DownloadPdfButton } from "@/components/download-pdf-button";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -122,13 +123,18 @@ export default async function PayrollPeriodPage({ params }: PageProps) {
           </div>
 
           <div className="flex flex-wrap gap-2">
+            <DownloadPdfButton
+              targetSelector="#payroll-period-pdf"
+              filename={`payroll-${period.start_date ?? `${period.year}-${period.month}`}.pdf`}
+              label="📥 تنزيل كشف المرتبات PDF"
+            />
             <Link
               href={`/print/payroll-summary/${id}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="px-4 py-2 rounded-lg bg-gradient-to-r from-brand-cyan to-brand-cyan-dark text-white font-bold text-sm font-cairo transition shadow-md hover:shadow-lg"
+              className="px-4 py-2 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 font-bold text-sm font-cairo transition"
             >
-              🖨 طباعة كشف المرتبات
+              🖨 طباعة من المتصفح
             </Link>
             {period.status === "draft" && (
               <form action={async () => { "use server"; await approvePayrollPeriod(id); }}>
@@ -156,6 +162,12 @@ export default async function PayrollPeriodPage({ params }: PageProps) {
             )}
           </div>
         </header>
+
+        {/* Everything inside #payroll-period-pdf is captured by the
+            "Download PDF" button above. Action buttons / link cells
+            inside this block must carry `pdf-hide` so they're excluded
+            from the rendered PDF. */}
+        <div id="payroll-period-pdf">
 
         {/* Summary cards */}
         <div className="grid md:grid-cols-4 gap-4 mb-6">
@@ -195,7 +207,7 @@ export default async function PayrollPeriodPage({ params }: PageProps) {
                   <th className="px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider font-cairo">تأمينات</th>
                   <th className="px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider font-cairo">ضريبة</th>
                   <th className="px-4 py-3 text-xs font-bold text-emerald-700 uppercase tracking-wider font-cairo">الصافي</th>
-                  <th className="px-4 py-3"></th>
+                  <th className="px-4 py-3 pdf-hide"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -213,7 +225,7 @@ export default async function PayrollPeriodPage({ params }: PageProps) {
                     <td className="px-4 py-3 text-amber-700 font-cairo">{formatEGP(e.social_insurance)}</td>
                     <td className="px-4 py-3 text-red-600 font-cairo">{formatEGP(e.income_tax)}</td>
                     <td className="px-4 py-3 font-black text-emerald-700 font-cairo">{formatEGP(e.net_salary)}</td>
-                    <td className="px-4 py-3 whitespace-nowrap">
+                    <td className="px-4 py-3 whitespace-nowrap pdf-hide">
                       <Link
                         href={`/dashboard/payroll/${id}/${e.id}`}
                         className="text-xs text-brand-cyan-dark hover:text-brand-cyan font-cairo font-bold ml-2"
@@ -233,6 +245,9 @@ export default async function PayrollPeriodPage({ params }: PageProps) {
             </table>
           </div>
         )}
+
+        </div>
+        {/* end #payroll-period-pdf */}
 
         <p className="text-center text-xs text-slate-400 mt-6 font-cairo">
           {isLocked && "🔒 الشهر مقفول — مينفعش يتعدل"}
