@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { MobileAppQR } from "@/components/mobile-app-qr";
 
 type SearchParams = Promise<{
   error?: string;
@@ -79,6 +80,11 @@ export default async function Home({
           >
             تسجيل الدخول
           </Link>
+        </div>
+
+        {/* Mobile app callout */}
+        <div className="mt-10 max-w-md mx-auto">
+          <MobileAppQR variant="card" />
         </div>
 
         {/* Footer */}

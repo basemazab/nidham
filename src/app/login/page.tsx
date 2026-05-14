@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { login } from "./actions";
 import { SubmitButton } from "@/components/submit-button";
+import { MobileAppQR } from "@/components/mobile-app-qr";
 
 type SearchParams = Promise<{ error?: string }>;
 
@@ -95,6 +96,13 @@ export default async function LoginPage({
             >
               اعمل حساب جديد
             </Link>
+          </p>
+        </div>
+
+        <div className="mt-6">
+          <MobileAppQR variant="card" />
+          <p className="text-center text-[11px] text-slate-500 mt-3 font-cairo">
+            موظف؟ التطبيق على الموبايل أسهل لك. صوّر الكود من جيبك.
           </p>
         </div>
       </div>

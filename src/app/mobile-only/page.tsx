@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { logout } from "@/app/login/actions";
+import { MobileAppQR } from "@/components/mobile-app-qr";
 
 // Landing page for employee-role accounts that try to access the
 // HR-only /dashboard. The layout redirects them here so they get a
@@ -55,6 +56,10 @@ export default function MobileOnlyPage() {
           هتلاقي التطبيق على Google Play و App Store قريبًا.
           <br />
           لو HR طلب منك تستلم كود دعوة، التطبيق هيسألك عليه عند أول تسجيل دخول.
+        </div>
+
+        <div className="text-right">
+          <MobileAppQR variant="compact" />
         </div>
 
         <div className="flex gap-3 pt-2">
