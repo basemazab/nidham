@@ -48,7 +48,7 @@ export default async function AIPage() {
 
         <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-2 text-[11px] font-cairo">
           <div className="px-3 py-2 rounded-lg bg-white border border-slate-200 text-slate-600">
-            🔧 <strong>٧ أدوات تنفيذية</strong> — بحث، حضور، طلبات، مرتبات...
+            🔧 <strong>١٠ أدوات تنفيذية</strong> — بحث، حضور، طلبات، مرتبات، احتفاظ بالموظفين، رفع ملفات...
           </div>
           <div className="px-3 py-2 rounded-lg bg-white border border-slate-200 text-slate-600">
             🛡 <strong>حماية مزدوجة</strong> — أي تنفيذ بيطلب موافقتك الصريحة
