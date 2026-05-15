@@ -1316,8 +1316,15 @@ export async function POST(req: Request) {
   // --------------------------------------------------------------------
   // Stream the response
   // --------------------------------------------------------------------
+  // Model choice: gemini-2.5-flash-lite (default) sits on Google's free
+  // tier with 60 RPM + 1500 RPD — 3× the headroom of gemini-2.5-flash
+  // (20 RPM) for the same Arabic tool-calling quality our agent needs.
+  // Override with AI_AGENT_MODEL env var if the tenant pays for higher
+  // quality (e.g. AI_AGENT_MODEL=gemini-2.5-flash or =gemini-2.5-pro).
+  const agentModel = process.env.AI_AGENT_MODEL ?? "gemini-2.5-flash-lite";
+
   const result = streamText({
-    model: google("gemini-2.5-flash"),
+    model: google(agentModel),
     system: systemPrompt,
     messages,
     tools,
