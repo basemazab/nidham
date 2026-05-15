@@ -27,7 +27,6 @@
 // - The model NEVER receives data outside the caller's company_id
 //   (RLS handles tenant isolation).
 
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { streamText, stepCountIs, tool } from "ai";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
@@ -38,10 +37,7 @@ import {
   type EmployeeSignals,
   monthsBetween,
 } from "@/lib/retention";
-
-const google = createGoogleGenerativeAI({
-  apiKey: process.env.GEMINI_API_KEY,
-});
+import { pickAgentModel } from "@/lib/ai-models";
 
 export const maxDuration = 60;
 
@@ -258,10 +254,14 @@ export async function POST(req: Request) {
     );
   }
 
-  if (!process.env.GEMINI_API_KEY) {
+  // Pre-flight: at least ONE provider key must be configured. The actual
+  // model is picked later via pickAgentModel(). If neither key is set,
+  // surface a clear bilingual error so the operator knows what to do.
+  if (!process.env.GROQ_API_KEY && !process.env.GEMINI_API_KEY) {
     return new Response(
       JSON.stringify({
-        error: "AI configuration missing — GEMINI_API_KEY not set",
+        error:
+          "إعدادات الذكاء الاصطناعي ناقصة — ابعت GROQ_API_KEY أو GEMINI_API_KEY في Vercel Environment Variables",
       }),
       { status: 500 },
     );
@@ -1314,17 +1314,16 @@ export async function POST(req: Request) {
   };
 
   // --------------------------------------------------------------------
-  // Stream the response
+  // Stream the response — uses pickAgentModel() for multi-provider
+  // fallback. Default order:
+  //   Groq Llama 3.3 70B → Groq Llama 3.1 8B → Gemini 2.5 Flash Lite
+  // Combined free quota is ~30,000 RPD, ~120 RPM — effectively unlimited
+  // for SMB workloads without ever enabling billing. See /lib/ai-models.ts.
   // --------------------------------------------------------------------
-  // Model choice: gemini-2.5-flash-lite (default) sits on Google's free
-  // tier with 60 RPM + 1500 RPD — 3× the headroom of gemini-2.5-flash
-  // (20 RPM) for the same Arabic tool-calling quality our agent needs.
-  // Override with AI_AGENT_MODEL env var if the tenant pays for higher
-  // quality (e.g. AI_AGENT_MODEL=gemini-2.5-flash or =gemini-2.5-pro).
-  const agentModel = process.env.AI_AGENT_MODEL ?? "gemini-2.5-flash-lite";
+  const picked = pickAgentModel();
 
   const result = streamText({
-    model: google(agentModel),
+    model: picked.model,
     system: systemPrompt,
     messages,
     tools,
