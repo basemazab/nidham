@@ -149,15 +149,30 @@ export async function generatePayrollPeriod(formData: FormData) {
     );
   }
 
+  // Employee filter: for monthly cycles we include rows whose
+  // pay_frequency is NULL too — those are legacy employees imported
+  // before migration 026 added the column with default 'monthly'. A
+  // weekly cycle stays strict: a worker MUST be explicitly flagged as
+  // weekly to land in the weekly payroll.
+  const employeesQuery =
+    frequency === "monthly"
+      ? supabase
+          .from("employees")
+          .select(
+            "id, full_name, basic_salary, housing_allowance, transport_allowance, other_allowances, incentive_allowance, pay_frequency",
+          )
+          .eq("status", "active")
+          .or("pay_frequency.eq.monthly,pay_frequency.is.null")
+      : supabase
+          .from("employees")
+          .select(
+            "id, full_name, basic_salary, housing_allowance, transport_allowance, other_allowances, incentive_allowance, pay_frequency",
+          )
+          .eq("status", "active")
+          .eq("pay_frequency", "weekly");
+
   const [employeesRes, attendanceRes, companyRes] = await Promise.all([
-    supabase
-      .from("employees")
-      .select(
-        "id, full_name, basic_salary, housing_allowance, transport_allowance, other_allowances, incentive_allowance, pay_frequency",
-      )
-      .eq("status", "active")
-      .eq("pay_frequency", frequency)
-      .returns<EmployeeRow[]>(),
+    employeesQuery.returns<EmployeeRow[]>(),
     supabase
       .from("attendance")
       .select(

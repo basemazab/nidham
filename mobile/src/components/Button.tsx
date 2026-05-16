@@ -3,9 +3,11 @@ import {
   Text,
   ActivityIndicator,
   StyleSheet,
+  type GestureResponderEvent,
   type PressableProps,
   type ViewStyle,
 } from "react-native";
+import * as Haptics from "expo-haptics";
 import { colors, fontSize, radius, spacing } from "@/lib/theme";
 
 type Variant = "primary" | "secondary" | "ghost";
@@ -15,6 +17,9 @@ type Props = Omit<PressableProps, "style"> & {
   variant?: Variant;
   loading?: boolean;
   style?: ViewStyle;
+  /** Disable the built-in haptic tap. Useful when the action itself
+      will fire a stronger haptic (e.g. clock-in success). */
+  noHaptic?: boolean;
 };
 
 export function Button({
@@ -23,17 +28,32 @@ export function Button({
   loading,
   disabled,
   style,
+  noHaptic,
+  onPress,
   ...rest
 }: Props) {
   const isDisabled = disabled || loading;
+
+  // Wrap onPress so every Button press fires a light tap haptic
+  // unconditionally — gives the whole app a tactile feel without
+  // touching call sites. Stronger haptics for success/error stay
+  // in the calling code.
+  const handlePress = (e: GestureResponderEvent) => {
+    if (!noHaptic) {
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+    onPress?.(e);
+  };
+
   return (
     <Pressable
       {...rest}
+      onPress={handlePress}
       disabled={isDisabled}
       style={({ pressed }) => [
         styles.base,
         variantStyles[variant],
-        pressed && !isDisabled && { opacity: 0.85 },
+        pressed && !isDisabled && { opacity: 0.85, transform: [{ scale: 0.98 }] },
         isDisabled && { opacity: 0.5 },
         style,
       ]}

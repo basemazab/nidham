@@ -108,6 +108,46 @@ export default async function PayrollPeriodPage({
   const period = periodRes.data;
   const rawEntries = entriesRes.data ?? [];
 
+  // Diagnostic counts — only computed when the period is empty, so HR can
+  // see WHY no entries were created (wrong frequency? no active employees?
+  // no salaries entered?). Lazy: skip the round-trips when entries exist.
+  let diagnostics: {
+    activeMonthly: number;
+    activeWeekly: number;
+    activeNoFreq: number;
+    activeNoSalary: number;
+  } | null = null;
+  if (rawEntries.length === 0) {
+    const [monthlyRes, weeklyRes, noFreqRes, noSalaryRes] = await Promise.all([
+      supabase
+        .from("employees")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "active")
+        .eq("pay_frequency", "monthly"),
+      supabase
+        .from("employees")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "active")
+        .eq("pay_frequency", "weekly"),
+      supabase
+        .from("employees")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "active")
+        .is("pay_frequency", null),
+      supabase
+        .from("employees")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "active")
+        .or("basic_salary.is.null,basic_salary.eq.0"),
+    ]);
+    diagnostics = {
+      activeMonthly: monthlyRes.count ?? 0,
+      activeWeekly: weeklyRes.count ?? 0,
+      activeNoFreq: noFreqRes.count ?? 0,
+      activeNoSalary: noSalaryRes.count ?? 0,
+    };
+  }
+
   // Flatten for the client component
   const entries: PeriodEntry[] = rawEntries.map((e) => ({
     id: e.id,
@@ -286,13 +326,12 @@ export default async function PayrollPeriodPage({
 
           {/* Band 2: Searchable explorer */}
           {entries.length === 0 ? (
-            <div className="bg-white rounded-2xl shadow-md border border-slate-100 p-16 text-center">
-              <div className="text-5xl mb-3">📋</div>
-              <p className="text-slate-500 font-cairo">
-                مفيش موظفين في الدورة دي. تأكد إن فيه موظفين بحالة «نشط»
-                وعندهم راتب أساسي.
-              </p>
-            </div>
+            <EmptyPeriodDiagnostic
+              frequency={period.frequency ?? "monthly"}
+              diagnostics={diagnostics}
+              periodId={id}
+              canRegenerate={period.status === "draft"}
+            />
           ) : (
             <PeriodEntriesExplorer entries={entries} periodId={id} />
           )}
@@ -354,6 +393,158 @@ function StatusChip({ status }: { status: Period["status"] }) {
     >
       {m.text}
     </span>
+  );
+}
+
+function EmptyPeriodDiagnostic({
+  frequency,
+  diagnostics,
+  periodId,
+  canRegenerate,
+}: {
+  frequency: "monthly" | "weekly";
+  diagnostics: {
+    activeMonthly: number;
+    activeWeekly: number;
+    activeNoFreq: number;
+    activeNoSalary: number;
+  } | null;
+  periodId: string;
+  canRegenerate: boolean;
+}) {
+  const matchingCount = frequency === "monthly"
+    ? (diagnostics?.activeMonthly ?? 0) + (diagnostics?.activeNoFreq ?? 0)
+    : (diagnostics?.activeWeekly ?? 0);
+
+  return (
+    <div className="bg-white rounded-2xl shadow-md border border-amber-200 p-8">
+      <div className="flex items-start gap-4 mb-4">
+        <div className="text-4xl">⚠</div>
+        <div className="flex-1 min-w-0">
+          <h3 className="text-lg font-black font-cairo text-slate-800 mb-1">
+            الدورة دي اتعملت لكن مفيش موظفين متطابقين
+          </h3>
+          <p className="text-sm text-slate-600 font-cairo leading-relaxed">
+            النظام دور على موظفين بحالة <strong>«نشط»</strong> وتكرار راتب{" "}
+            <strong>{frequency === "monthly" ? "«شهري»" : "«أسبوعي»"}</strong>{" "}
+            وما لقاش حد.
+          </p>
+        </div>
+      </div>
+
+      {/* Diagnostic counts */}
+      {diagnostics && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+          <DiagCard
+            label="موظفين شهري"
+            count={diagnostics.activeMonthly}
+            tone={frequency === "monthly" ? "emerald" : "slate"}
+          />
+          <DiagCard
+            label="موظفين أسبوعي"
+            count={diagnostics.activeWeekly}
+            tone={frequency === "weekly" ? "emerald" : "slate"}
+          />
+          <DiagCard
+            label="بدون تكرار محدد"
+            count={diagnostics.activeNoFreq}
+            tone={diagnostics.activeNoFreq > 0 ? "amber" : "slate"}
+          />
+          <DiagCard
+            label="بدون راتب أساسي"
+            count={diagnostics.activeNoSalary}
+            tone={diagnostics.activeNoSalary > 0 ? "amber" : "slate"}
+          />
+        </div>
+      )}
+
+      {/* Helpful advice */}
+      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-5 space-y-2 text-sm font-cairo text-slate-700">
+        <div className="font-bold text-amber-800">🔎 الحلول الممكنة:</div>
+        {matchingCount === 0 && (
+          <p>
+            <strong>1.</strong> روح على صفحة{" "}
+            <Link
+              href="/dashboard/employees"
+              className="text-amber-700 hover:text-amber-900 underline font-bold"
+            >
+              الموظفين
+            </Link>{" "}
+            وتأكد إن فيه موظفين بحالة «نشط» ودورة صرف «
+            {frequency === "monthly" ? "شهري" : "أسبوعي"}».
+          </p>
+        )}
+        {diagnostics && diagnostics.activeNoFreq > 0 && frequency === "weekly" && (
+          <p>
+            <strong>2.</strong> عندك {diagnostics.activeNoFreq} موظف بدون تكرار
+            محدد — افتح ملفهم وحط <strong>«أسبوعي»</strong> لو من عمال
+            الإنتاج.
+          </p>
+        )}
+        {diagnostics && diagnostics.activeNoSalary > 0 && (
+          <p>
+            <strong>3.</strong> {diagnostics.activeNoSalary} موظف نشط
+            <strong> بدون راتب أساسي</strong> — افتح ملفاتهم وحط الراتب علشان
+            النظام يحسب لهم.
+          </p>
+        )}
+        <p>
+          <strong>4.</strong> لو الـ Migration 026 لسه ما اتطبقتش على
+          Supabase، الموظفين القدام pay_frequency بتاعهم NULL — Migration بتعمل
+          تحديث تلقائي.
+        </p>
+      </div>
+
+      {/* Recovery actions */}
+      <div className="flex flex-wrap gap-2">
+        <Link
+          href="/dashboard/employees"
+          className="px-4 py-2 rounded-lg bg-cyan-50 hover:bg-cyan-100 text-cyan-700 border border-cyan-200 font-bold text-sm font-cairo transition"
+        >
+          👥 افتح صفحة الموظفين
+        </Link>
+        {canRegenerate && (
+          <Link
+            href={`/dashboard/payroll/new?freq=${frequency}`}
+            className="px-4 py-2 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 font-bold text-sm font-cairo transition"
+          >
+            🔄 جرّب إنشاء دورة جديدة
+          </Link>
+        )}
+        <form action={async () => { "use server"; await deletePayrollPeriod(periodId); }}>
+          <button
+            type="submit"
+            className="px-4 py-2 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 font-bold text-sm font-cairo transition"
+          >
+            🗑 احذف الدورة الفاضية
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function DiagCard({
+  label,
+  count,
+  tone,
+}: {
+  label: string;
+  count: number;
+  tone: "emerald" | "amber" | "slate";
+}) {
+  const cls = {
+    emerald: "bg-emerald-50 border-emerald-200 text-emerald-800",
+    amber: "bg-amber-50 border-amber-200 text-amber-800",
+    slate: "bg-slate-50 border-slate-200 text-slate-700",
+  }[tone];
+  return (
+    <div className={`p-3 rounded-xl border ${cls}`}>
+      <div className="text-[10px] font-bold font-cairo opacity-75">
+        {label}
+      </div>
+      <div className="text-2xl font-black font-cairo">{count}</div>
+    </div>
   );
 }
 
