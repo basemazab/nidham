@@ -2,6 +2,20 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { formatEGP } from "@/lib/payroll";
+import { formatNumber } from "@/lib/format";
+
+type YtdRow = {
+  year: number;
+  periods_count: number;
+  paid_periods_count: number;
+  employees_total: number;
+  gross_total: number;
+  net_total: number;
+  deductions_total: number;
+  insurance_total: number;
+  tax_total: number;
+  bonuses_total: number;
+};
 
 type SearchParams = Promise<{ freq?: string }>;
 
@@ -69,10 +83,12 @@ export default async function PayrollPage({
         ? "weekly"
         : "all";
 
-  // Fetch periods + per-frequency employee counts in parallel.
-  // The employee counts power the buttons in the header ("X موظف شهري")
-  // so HR knows at a glance whether a weekly run is worthwhile.
-  const [periodsRes, monthlyEmpRes, weeklyEmpRes] = await Promise.all([
+  // Fetch periods + per-frequency employee counts + YTD totals in parallel.
+  // The employee counts power the buttons in the header. The YTD roll-up
+  // sits at the top of the page and tells the owner at a glance how much
+  // payroll has cost so far this year + how much went to bonuses, tax,
+  // and insurance.
+  const [periodsRes, monthlyEmpRes, weeklyEmpRes, ytdRes] = await Promise.all([
     (filter === "all"
       ? supabase
           .from("payroll_periods")
@@ -102,11 +118,14 @@ export default async function PayrollPage({
       .select("id", { count: "exact", head: true })
       .eq("status", "active")
       .eq("pay_frequency", "weekly"),
+    supabase.rpc("ytd_payroll_totals"),
   ]);
 
   const list = periodsRes.data ?? [];
   const monthlyEmpCount = monthlyEmpRes.count ?? 0;
   const weeklyEmpCount = weeklyEmpRes.count ?? 0;
+  const ytd =
+    (ytdRes.data as YtdRow[] | null)?.[0] ?? null;
 
   // Aggregate net salary per period
   const { data: entries } = await supabase
@@ -164,6 +183,39 @@ export default async function PayrollPage({
             </Link>
           </div>
         </header>
+
+        {/* YTD KPI strip — only shown when there's payroll data this year */}
+        {ytd && ytd.periods_count > 0 && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+            <YtdCard
+              icon="💰"
+              label={`الصافي المصروف ${ytd.year}`}
+              value={formatEGP(Number(ytd.net_total))}
+              tone="emerald"
+            />
+            <YtdCard
+              icon="📋"
+              label="دورات معتمدة"
+              value={`${formatNumber(Number(ytd.paid_periods_count))}/${formatNumber(Number(ytd.periods_count))}`}
+              subtext="مدفوعة / إجمالي"
+              tone="cyan"
+            />
+            <YtdCard
+              icon="🎁"
+              label="إجمالي المكافآت"
+              value={formatEGP(Number(ytd.bonuses_total))}
+              tone="amber"
+            />
+            <YtdCard
+              icon="🏛"
+              label="تأمينات + ضرايب"
+              value={formatEGP(
+                Number(ytd.insurance_total) + Number(ytd.tax_total),
+              )}
+              tone="rose"
+            />
+          </div>
+        )}
 
         {/* Two prominent "new period" buttons -- one for monthly office
             staff, one for the weekly production roster. The employee
@@ -325,6 +377,55 @@ export default async function PayrollPage({
         )}
       </div>
     </main>
+  );
+}
+
+function YtdCard({
+  icon,
+  label,
+  value,
+  subtext,
+  tone,
+}: {
+  icon: string;
+  label: string;
+  value: string;
+  subtext?: string;
+  tone: "emerald" | "cyan" | "amber" | "rose";
+}) {
+  const bg = {
+    emerald: "from-emerald-50 to-white border-emerald-200",
+    cyan: "from-cyan-50 to-white border-cyan-200",
+    amber: "from-amber-50 to-white border-amber-200",
+    rose: "from-rose-50 to-white border-rose-200",
+  }[tone];
+  const txt = {
+    emerald: "text-emerald-700",
+    cyan: "text-cyan-700",
+    amber: "text-amber-700",
+    rose: "text-rose-700",
+  }[tone];
+  return (
+    <div
+      className={`p-4 rounded-2xl bg-gradient-to-br ${bg} border shadow-sm`}
+    >
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xl">{icon}</span>
+        <span
+          className={`text-[10px] font-bold uppercase font-cairo ${txt} tracking-wider`}
+        >
+          {label}
+        </span>
+      </div>
+      <div className="text-xl md:text-2xl font-black text-slate-800 font-cairo">
+        {value}
+      </div>
+      {subtext && (
+        <div className="text-[11px] text-slate-500 font-cairo mt-1">
+          {subtext}
+        </div>
+      )}
+    </div>
   );
 }
 

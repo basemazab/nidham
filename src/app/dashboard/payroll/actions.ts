@@ -478,3 +478,306 @@ export async function deletePayrollPeriod(periodId: string) {
   bustDashboardCache();
   redirect("/dashboard/payroll");
 }
+
+// ============================================================================
+// CANCEL / REOPEN — corrections workflow
+// ============================================================================
+//
+// Two new actions on top of the draft -> approved -> paid flow:
+//
+//   cancelPayrollPeriod  — flip status to "cancelled" with a reason. Used
+//                          when HR realises a generated period was wrong
+//                          (e.g. wrong cycle window, missing imports) AFTER
+//                          approval but BEFORE/AFTER payment. Cancellation
+//                          freezes the period read-only and excludes it
+//                          from all dashboards + reports.
+//
+//   reopenPayrollPeriod  — flip status back: paid -> approved, approved ->
+//                          draft. Increments reopened_count for the audit
+//                          trail. Admin-only because it un-locks money flow.
+//
+// Both require a typed confirmation word from the form so a misclick on
+// "Reopen" doesn't silently undo a payroll.
+
+export async function cancelPayrollPeriod(formData: FormData) {
+  const { profile } = await requireAdmin();
+  const supabase = await createClient();
+
+  const periodId = String(formData.get("period_id") ?? "").trim();
+  const reason = String(formData.get("reason") ?? "").trim();
+  const confirm = String(formData.get("confirm") ?? "").trim();
+
+  if (!/^[0-9a-f-]{36}$/i.test(periodId)) {
+    redirect("/dashboard/payroll");
+  }
+  if (confirm !== "إلغاء") {
+    redirect(
+      `/dashboard/payroll/${periodId}?error=` +
+        encodeURIComponent("لازم تكتب 'إلغاء' للتأكيد"),
+    );
+  }
+  if (reason.length < 5) {
+    redirect(
+      `/dashboard/payroll/${periodId}?error=` +
+        encodeURIComponent("اكتب سبب الإلغاء (5 حروف على الأقل)"),
+    );
+  }
+
+  const { error } = await supabase
+    .from("payroll_periods")
+    .update({
+      status: "cancelled",
+      cancelled_at: new Date().toISOString(),
+      cancelled_by: profile.id,
+      cancellation_reason: reason,
+    })
+    .eq("id", periodId)
+    .in("status", ["draft", "approved", "paid"]);
+
+  if (error) {
+    redirect(
+      `/dashboard/payroll/${periodId}?error=` +
+        encodeURIComponent(arabicizeDbError(error.message)),
+    );
+  }
+
+  revalidatePath(`/dashboard/payroll/${periodId}`);
+  revalidatePath("/dashboard/payroll");
+  bustDashboardCache();
+  redirect(`/dashboard/payroll/${periodId}?cancelled=1`);
+}
+
+export async function reopenPayrollPeriod(formData: FormData) {
+  const { profile } = await requireAdmin();
+  const supabase = await createClient();
+
+  const periodId = String(formData.get("period_id") ?? "").trim();
+  const confirm = String(formData.get("confirm") ?? "").trim();
+
+  if (!/^[0-9a-f-]{36}$/i.test(periodId)) {
+    redirect("/dashboard/payroll");
+  }
+  if (confirm !== "فتح") {
+    redirect(
+      `/dashboard/payroll/${periodId}?error=` +
+        encodeURIComponent("لازم تكتب 'فتح' للتأكيد"),
+    );
+  }
+
+  // Read current status to know what to roll back to.
+  const { data: period } = await supabase
+    .from("payroll_periods")
+    .select("status, reopened_count")
+    .eq("id", periodId)
+    .single<{ status: string; reopened_count: number }>();
+
+  if (!period) {
+    redirect("/dashboard/payroll");
+  }
+
+  let nextStatus: "draft" | "approved" | null = null;
+  const updates: Record<string, unknown> = {
+    reopened_count: (period.reopened_count ?? 0) + 1,
+    last_reopened_at: new Date().toISOString(),
+    last_reopened_by: profile.id,
+  };
+
+  if (period.status === "paid") {
+    nextStatus = "approved";
+    updates.status = "approved";
+    updates.paid_at = null;
+  } else if (period.status === "approved") {
+    nextStatus = "draft";
+    updates.status = "draft";
+    updates.approved_at = null;
+    updates.approved_by = null;
+  } else if (period.status === "cancelled") {
+    nextStatus = "draft";
+    updates.status = "draft";
+    updates.cancelled_at = null;
+    updates.cancelled_by = null;
+    updates.cancellation_reason = null;
+  } else {
+    redirect(
+      `/dashboard/payroll/${periodId}?error=` +
+        encodeURIComponent("الدورة دي مش ممكن تفتحها (draft بالفعل)"),
+    );
+  }
+
+  const { error } = await supabase
+    .from("payroll_periods")
+    .update(updates)
+    .eq("id", periodId);
+
+  if (error) {
+    redirect(
+      `/dashboard/payroll/${periodId}?error=` +
+        encodeURIComponent(arabicizeDbError(error.message)),
+    );
+  }
+
+  revalidatePath(`/dashboard/payroll/${periodId}`);
+  revalidatePath("/dashboard/payroll");
+  bustDashboardCache();
+  redirect(
+    `/dashboard/payroll/${periodId}?reopened=${nextStatus ?? "1"}`,
+  );
+}
+
+// ============================================================================
+// BULK BONUS — apply the same bonus to every entry in a period
+// ============================================================================
+//
+// HR's most common bulk operation: "صرف عيدية ٥٠٠ ج لكل الموظفين".
+// Without this, they edit 50 entries one by one. This action takes
+// the amount, an Arabic reason, and an optional employee allow-list
+// (defaults to "everyone in the period"), then updates each entry's
+// `bonuses` column AND recalculates gross/deductions/net so the totals
+// stay consistent.
+//
+// Every run also logs to bulk_bonus_runs so admins can see what was
+// applied, by whom, when.
+
+export async function applyBulkBonus(formData: FormData) {
+  const { supabase, profile } = await requireHR();
+
+  const periodId = String(formData.get("period_id") ?? "").trim();
+  const amountRaw = formData.get("amount_each");
+  const reason = String(formData.get("reason") ?? "").trim();
+  const recipientsRaw = formData.get("recipients"); // "all" or comma-sep ids
+
+  if (!/^[0-9a-f-]{36}$/i.test(periodId)) {
+    redirect("/dashboard/payroll");
+  }
+  const amount = parseFloat(String(amountRaw ?? "0"));
+  if (!Number.isFinite(amount) || amount <= 0) {
+    redirect(
+      `/dashboard/payroll/${periodId}/bulk-bonus?error=` +
+        encodeURIComponent("المبلغ لازم يكون أكبر من صفر"),
+    );
+  }
+  if (reason.length < 3) {
+    redirect(
+      `/dashboard/payroll/${periodId}/bulk-bonus?error=` +
+        encodeURIComponent("اكتب سبب المكافأة (مثلاً: عيدية الفطر)"),
+    );
+  }
+
+  // Period must still be editable
+  const { data: period } = await supabase
+    .from("payroll_periods")
+    .select("status, working_days")
+    .eq("id", periodId)
+    .single<{ status: string; working_days: number }>();
+  if (!period) {
+    redirect("/dashboard/payroll");
+  }
+  if (period.status === "paid" || period.status === "cancelled") {
+    redirect(
+      `/dashboard/payroll/${periodId}?error=` +
+        encodeURIComponent("الدورة مقفولة — افتحها قبل التعديل"),
+    );
+  }
+
+  // Fetch entries to update
+  const filterIds =
+    recipientsRaw && recipientsRaw !== "all"
+      ? String(recipientsRaw)
+          .split(",")
+          .map((s) => s.trim())
+          .filter((s) => /^[0-9a-f-]{36}$/i.test(s))
+      : null;
+
+  let entriesQuery = supabase
+    .from("payroll_entries")
+    .select(
+      "id, employee_id, attended_days, half_day_days, leave_days, absent_days, basic_salary, housing_allowance, transport_allowance, other_allowances, incentive_allowance, bonuses, overtime, loan_deduction, other_deductions",
+    )
+    .eq("period_id", periodId);
+  if (filterIds && filterIds.length > 0) {
+    entriesQuery = entriesQuery.in("id", filterIds);
+  }
+  const { data: entries } = await entriesQuery;
+
+  const list = entries ?? [];
+  if (list.length === 0) {
+    redirect(
+      `/dashboard/payroll/${periodId}/bulk-bonus?error=` +
+        encodeURIComponent("مفيش موظفين للصرف عليهم"),
+    );
+  }
+
+  // Per-company toggles drive whether the auto deductions apply.
+  const { data: companyRow } = await supabase
+    .from("companies")
+    .select("social_insurance_enabled, income_tax_enabled")
+    .eq("id", profile.company_id)
+    .single<{
+      social_insurance_enabled: boolean | null;
+      income_tax_enabled: boolean | null;
+    }>();
+
+  const settings = {
+    socialInsuranceEnabled: companyRow?.social_insurance_enabled === true,
+    incomeTaxEnabled: companyRow?.income_tax_enabled === true,
+  };
+
+  // Recalculate each entry with bonuses + amount (idempotent within
+  // this run — the existing bonuses get TOPPED UP, not overwritten,
+  // so HR can run "عيدية" first then "حافز قسم" later without
+  // wiping the first run).
+  let appliedCount = 0;
+  await Promise.all(
+    list.map(async (e) => {
+      const newBonuses = Number(e.bonuses ?? 0) + amount;
+      const result = calculatePayroll(
+        {
+          basicSalary: Number(e.basic_salary ?? 0),
+          housingAllowance: Number(e.housing_allowance ?? 0),
+          transportAllowance: Number(e.transport_allowance ?? 0),
+          otherAllowances: Number(e.other_allowances ?? 0),
+          incentiveAllowance: Number(e.incentive_allowance ?? 0),
+          bonuses: newBonuses,
+          overtime: Number(e.overtime ?? 0),
+          loanDeduction: Number(e.loan_deduction ?? 0),
+          otherDeductions: Number(e.other_deductions ?? 0),
+        },
+        {
+          attended: Number(e.attended_days ?? 0),
+          halfDay: Number(e.half_day_days ?? 0),
+          leave: Number(e.leave_days ?? 0),
+          absent: Number(e.absent_days ?? 0),
+        },
+        period.working_days ?? 22,
+        settings,
+      );
+      const { error } = await supabase
+        .from("payroll_entries")
+        .update({
+          bonuses: newBonuses,
+          bonus_reason: reason,
+          gross_salary: result.grossSalary,
+          social_insurance: result.socialInsurance,
+          income_tax: result.incomeTax,
+          total_deductions: result.totalDeductions,
+          net_salary: result.netSalary,
+        })
+        .eq("id", e.id);
+      if (!error) appliedCount += 1;
+    }),
+  );
+
+  // Audit log
+  await supabase.from("bulk_bonus_runs").insert({
+    company_id: profile.company_id,
+    period_id: periodId,
+    amount_each: amount,
+    reason,
+    recipients_count: appliedCount,
+    total_amount: appliedCount * amount,
+    applied_by: profile.id,
+  });
+
+  revalidatePath(`/dashboard/payroll/${periodId}`);
+  redirect(`/dashboard/payroll/${periodId}?bulk_bonus=${appliedCount}`);
+}

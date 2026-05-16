@@ -21,6 +21,7 @@ type Entry = {
   other_allowances: number;
   incentive_allowance: number;
   bonuses: number;
+  bonus_reason: string | null;
   overtime: number;
   gross_salary: number;
   absence_deduction: number;
@@ -30,6 +31,7 @@ type Entry = {
   loan_deduction: number;
   other_deductions: number;
   total_deductions: number;
+  eos_gratuity: number;
   net_salary: number;
   notes: string | null;
   employees: {
@@ -226,8 +228,21 @@ export default async function PayslipPage({ params }: PageProps) {
               <LineItem label="بدل انتقال" value={entry.transport_allowance} />
               <LineItem label="بدلات أخرى" value={entry.other_allowances} />
               <LineItem label="حافز" value={entry.incentive_allowance} />
-              <LineItem label="مكافأة" value={entry.bonuses} />
+              <LineItem
+                label={
+                  entry.bonus_reason
+                    ? `مكافأة (${entry.bonus_reason})`
+                    : "مكافأة"
+                }
+                value={entry.bonuses}
+              />
               <LineItem label="أوفر تايم" value={entry.overtime} />
+              {entry.eos_gratuity > 0 && (
+                <LineItem
+                  label="🚪 مكافأة نهاية الخدمة"
+                  value={entry.eos_gratuity}
+                />
+              )}
               <div className="pt-2 mt-2 border-t border-slate-200 flex justify-between font-bold text-emerald-700">
                 <span>إجمالي الإيرادات</span>
                 <span>
@@ -238,7 +253,8 @@ export default async function PayslipPage({ params }: PageProps) {
                       entry.other_allowances +
                       entry.incentive_allowance +
                       entry.bonuses +
-                      entry.overtime,
+                      entry.overtime +
+                      entry.eos_gratuity,
                   )}
                 </span>
               </div>
