@@ -142,15 +142,27 @@ export default async function EditEmployeePage({ params, searchParams }: PagePro
               {employee.full_name} · تم إضافته في {new Date(employee.created_at).toLocaleDateString("ar-EG")}
             </p>
           </div>
-          {isAdmin && employee.status === "active" && (
-            <TerminateEmployeeModal
-              employeeId={employee.id}
-              employeeName={employee.full_name}
-              isActive={employee.status === "active"}
-              previewAction={previewEOSGratuity}
-              terminateAction={terminateEmployee}
-            />
-          )}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* HR forms shortcut — opens the forms hub pre-filled for
+                this employee. The hub then forwards employeeId to each
+                individual form. */}
+            <Link
+              href={`/dashboard/forms?employeeId=${employee.id}`}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-amber-300 bg-amber-50 text-amber-800 font-bold text-sm hover:bg-amber-100 transition font-cairo"
+            >
+              <span>📄</span>
+              <span>نماذج HR للموظف</span>
+            </Link>
+            {isAdmin && employee.status === "active" && (
+              <TerminateEmployeeModal
+                employeeId={employee.id}
+                employeeName={employee.full_name}
+                isActive={employee.status === "active"}
+                previewAction={previewEOSGratuity}
+                terminateAction={terminateEmployee}
+              />
+            )}
+          </div>
         </header>
 
         {/* If the employee was already terminated, show a banner with

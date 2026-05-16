@@ -44,6 +44,7 @@ const NAV_ITEMS: readonly NavItem[] = [
   { href: "/dashboard/customers", label: "العملاء", icon: "💼", section: "main" },
   { href: "/dashboard/interactions", label: "التفاعلات", icon: "💬", section: "main" },
   { href: "/dashboard/contracts", label: "العقود", icon: "📋", section: "main" },
+  { href: "/dashboard/forms", label: "النماذج 📋", icon: "📄", section: "main" },
   { href: "/dashboard/team", label: "فريق الشركة", icon: "🤝", section: "main", visibleTo: ["admin"] },
   { href: "/dashboard/ai", label: "المساعد الذكي ✦", icon: "🤖", section: "ai", feature: "ai_assistant" },
   { href: "/dashboard/retention", label: "احتفاظ بالموظفين 🎯", icon: "🎯", section: "ai", feature: "retention_insights" },

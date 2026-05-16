@@ -361,6 +361,22 @@ export default async function DashboardPage() {
             </h3>
             <p className="text-xs text-amber-700 font-bold">زيادات · مكافآت · إنذارات</p>
           </Link>
+
+          <Link
+            href="/dashboard/forms"
+            className="bg-gradient-to-br from-amber-50 via-yellow-50 to-cyan-50 p-6 rounded-2xl border-2 border-amber-200 hover:border-amber-400 hover:shadow-lg hover:-translate-y-0.5 transition-all relative overflow-hidden"
+          >
+            <div className="absolute top-2 left-2 text-[10px] text-amber-700 font-bold tracking-wider">
+              ✦ جديد
+            </div>
+            <div className="text-3xl mb-2">📄</div>
+            <h3 className="font-bold font-cairo mb-1 text-slate-800">
+              نماذج HR الرسمية
+            </h3>
+            <p className="text-xs text-amber-700 font-bold">
+              ٨ نماذج جاهزة للطباعة
+            </p>
+          </Link>
         </div>
 
         {/* Reports section */}
