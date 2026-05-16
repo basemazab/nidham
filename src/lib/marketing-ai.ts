@@ -12,7 +12,7 @@
 
 import { generateObject } from "ai";
 import { z } from "zod";
-import { pickAgentModel } from "./ai-models";
+import { callWithFallback } from "./ai-models";
 
 // ----------------------------------------------------------------------------
 // 1) PRODUCT ANALYZER
@@ -91,7 +91,6 @@ export async function analyzeProduct(input: {
   industry?: string | null;
   target_market?: string;
 }): Promise<ProductAnalysis> {
-  const picked = pickAgentModel();
   const userPrompt = `**وصف المنتج:** ${input.product_summary}
 ${input.industry ? `**الصناعة:** ${input.industry}` : ""}
 ${input.target_market ? `**السوق المستهدف:** ${input.target_market}` : "**السوق المستهدف:** مصر"}
@@ -99,14 +98,16 @@ ${input.target_market ? `**السوق المستهدف:** ${input.target_market}
 اعمل تحليل تسويقي عميق لإيه عملاء الشركة المثاليين، إزاي تتميز عن
 المنافسين، أي قنوات تسويق هتجيب أفضل ROI، واستراتيجية تسعير منطقية.`;
 
-  const { object } = await generateObject({
-    model: picked.model,
-    schema: productAnalysisSchema,
-    system: PRODUCT_ANALYSIS_SYSTEM,
-    prompt: userPrompt,
-    temperature: 0.6,
+  return callWithFallback(async (picked) => {
+    const { object } = await generateObject({
+      model: picked.model,
+      schema: productAnalysisSchema,
+      system: PRODUCT_ANALYSIS_SYSTEM,
+      prompt: userPrompt,
+      temperature: 0.6,
+    });
+    return object;
   });
-  return object;
 }
 
 // ----------------------------------------------------------------------------
@@ -225,7 +226,6 @@ export async function generatePersonas(input: {
   industry?: string | null;
   analysis?: ProductAnalysis;
 }): Promise<PersonasResponse> {
-  const picked = pickAgentModel();
   const analysisStr = input.analysis
     ? `\n\n**تحليل المنتج السابق:**\n${JSON.stringify(input.analysis, null, 0)}`
     : "";
@@ -235,14 +235,16 @@ ${input.industry ? `**الصناعة:** ${input.industry}` : ""}${analysisStr}
 ابني 2-4 buyer personas للسوق المصري للمنتج ده، مع targeting parameters
 كاملة لـ Facebook + Google Ads.`;
 
-  const { object } = await generateObject({
-    model: picked.model,
-    schema: personasResponseSchema,
-    system: PERSONAS_SYSTEM,
-    prompt: userPrompt,
-    temperature: 0.7,
+  return callWithFallback(async (picked) => {
+    const { object } = await generateObject({
+      model: picked.model,
+      schema: personasResponseSchema,
+      system: PERSONAS_SYSTEM,
+      prompt: userPrompt,
+      temperature: 0.7,
+    });
+    return object;
   });
-  return object;
 }
 
 // ----------------------------------------------------------------------------
@@ -332,7 +334,6 @@ export async function generateAdCopy(input: {
   goal: string; // awareness / leads / sales / etc.
   count?: number;
 }): Promise<AdCreativesResponse> {
-  const picked = pickAgentModel();
   const personaStr = input.persona
     ? `\n\n**الـ Persona المستهدف:**\n${JSON.stringify(input.persona, null, 0)}`
     : "";
@@ -344,14 +345,16 @@ export async function generateAdCopy(input: {
 اكتب ${input.count ?? 5} إعلانات مختلفة (variants) للمنصات المحددة.
 كل إعلان: headline + body + cta + creative_concept. ركّز على التحويل.`;
 
-  const { object } = await generateObject({
-    model: picked.model,
-    schema: adCreativesResponseSchema,
-    system: AD_COPY_SYSTEM,
-    prompt: userPrompt,
-    temperature: 0.85,
+  return callWithFallback(async (picked) => {
+    const { object } = await generateObject({
+      model: picked.model,
+      schema: adCreativesResponseSchema,
+      system: AD_COPY_SYSTEM,
+      prompt: userPrompt,
+      temperature: 0.85,
+    });
+    return object;
   });
-  return object;
 }
 
 // ----------------------------------------------------------------------------
@@ -445,7 +448,6 @@ export async function suggestKeywords(input: {
   industry?: string | null;
   current_url?: string | null;
 }): Promise<KeywordsResponse> {
-  const picked = pickAgentModel();
   const userPrompt = `**المنتج/الخدمة:** ${input.product_summary}
 ${input.industry ? `**الصناعة:** ${input.industry}` : ""}
 ${input.current_url ? `**موقع الشركة الحالي:** ${input.current_url}` : ""}
@@ -456,14 +458,16 @@ ${input.current_url ? `**موقع الشركة الحالي:** ${input.current_u
 - Long-term focus (كلمات هي اللي هتاخد العميل لـ #1)
 - استراتيجية محتوى عامة`;
 
-  const { object } = await generateObject({
-    model: picked.model,
-    schema: keywordsResponseSchema,
-    system: SEO_SYSTEM,
-    prompt: userPrompt,
-    temperature: 0.5,
+  return callWithFallback(async (picked) => {
+    const { object } = await generateObject({
+      model: picked.model,
+      schema: keywordsResponseSchema,
+      system: SEO_SYSTEM,
+      prompt: userPrompt,
+      temperature: 0.5,
+    });
+    return object;
   });
-  return object;
 }
 
 // ----------------------------------------------------------------------------
@@ -584,7 +588,6 @@ export async function diagnosePagesIssues(input: {
   website_url?: string | null;
   current_issues?: string | null;
 }): Promise<PageDoctorResponse> {
-  const picked = pickAgentModel();
   const urls = [
     input.facebook_url ? `Facebook: ${input.facebook_url}` : "",
     input.instagram_url ? `Instagram: ${input.instagram_url}` : "",
@@ -606,14 +609,16 @@ ${input.current_issues ? `**مشاكل لاحظها صاحب الشركة:**\n${
 هتقلل من أداء الإعلانات الممولة، وإزاي يصلحها خطوة بخطوة. الهدف:
 صاحب الشركة يطلع بـ action list يقدر يطبقه قبل ما يطلق أي إعلان جديد.`;
 
-  const { object } = await generateObject({
-    model: picked.model,
-    schema: pageDoctorResponseSchema,
-    system: PAGE_DOCTOR_SYSTEM,
-    prompt: userPrompt,
-    temperature: 0.4, // diagnostic — lower temperature for consistency
+  return callWithFallback(async (picked) => {
+    const { object } = await generateObject({
+      model: picked.model,
+      schema: pageDoctorResponseSchema,
+      system: PAGE_DOCTOR_SYSTEM,
+      prompt: userPrompt,
+      temperature: 0.4, // diagnostic — lower temperature for consistency
+    });
+    return object;
   });
-  return object;
 }
 
 // ----------------------------------------------------------------------------
@@ -694,7 +699,6 @@ export async function generateCampaignStrategy(input: {
   personas?: Persona[];
   platforms?: string[];
 }): Promise<CampaignStrategy> {
-  const picked = pickAgentModel();
   const personasStr = input.personas?.length
     ? `\n\n**الـ Personas:**\n${JSON.stringify(input.personas, null, 0)}`
     : "";
@@ -711,12 +715,14 @@ ${input.platforms?.length ? `**منصات يفضّلها العميل:** ${input
 - التوقعات الواقعية + المخاطر
 - Next steps`;
 
-  const { object } = await generateObject({
-    model: picked.model,
-    schema: campaignStrategySchema,
-    system: CAMPAIGN_SYSTEM,
-    prompt: userPrompt,
-    temperature: 0.5,
+  return callWithFallback(async (picked) => {
+    const { object } = await generateObject({
+      model: picked.model,
+      schema: campaignStrategySchema,
+      system: CAMPAIGN_SYSTEM,
+      prompt: userPrompt,
+      temperature: 0.5,
+    });
+    return object;
   });
-  return object;
 }

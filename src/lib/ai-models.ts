@@ -174,6 +174,91 @@ export function isQuotaError(err: unknown): boolean {
 }
 
 // ----------------------------------------------------------------------------
+// isRetryableError — broader detector covering quota AND transient
+// provider-side outages (model overload, 5xx, "high demand", timeouts).
+// We retry these via the fallback chain instead of bubbling them up.
+// ----------------------------------------------------------------------------
+export function isRetryableError(err: unknown): boolean {
+  if (!err) return false;
+  const msg =
+    typeof err === "string"
+      ? err
+      : err instanceof Error
+        ? err.message
+        : JSON.stringify(err);
+  const lower = msg.toLowerCase();
+  return (
+    isQuotaError(err) ||
+    lower.includes("overloaded") ||
+    lower.includes("high demand") ||
+    lower.includes("currently experiencing") ||
+    lower.includes("temporarily") ||
+    lower.includes("service unavailable") ||
+    lower.includes("internal server error") ||
+    lower.includes("bad gateway") ||
+    lower.includes("gateway timeout") ||
+    lower.includes("503") ||
+    lower.includes("502") ||
+    lower.includes("504") ||
+    lower.includes("500") ||
+    lower.includes("etimedout") ||
+    lower.includes("econnreset") ||
+    lower.includes("aborted")
+  );
+}
+
+// ----------------------------------------------------------------------------
+// callWithFallback — run an AI request through the model chain. If the
+// primary returns a retryable error (overload, quota, 5xx), automatically
+// retry with the next model in the fallback chain. Surfaces the LAST
+// error if every provider in the chain fails.
+//
+// Use this from any feature that wants resilient AI calls without
+// hand-rolling the retry logic per call site.
+// ----------------------------------------------------------------------------
+export async function callWithFallback<T>(
+  fn: (model: AgentModelInfo) => Promise<T>,
+): Promise<T> {
+  const tried: string[] = [];
+  let lastError: unknown = null;
+
+  // Build the chain dynamically — primary, then primary-fallback, then
+  // primary-fallback-fallback. Three tiers covers the realistic case:
+  //   Groq 70B -> Groq 8B -> Gemini Flash Lite
+  // (or Gemini -> Groq 70B if Gemini was primary)
+  let cursor: AgentModelInfo | null = pickAgentModel();
+  for (let i = 0; i < 3 && cursor; i++) {
+    const label = `${cursor.provider}:${cursor.modelName}`;
+    tried.push(label);
+    try {
+      return await fn(cursor);
+    } catch (err) {
+      lastError = err;
+      // eslint-disable-next-line no-console
+      console.warn(`[ai-models] ${label} failed:`, errorSummary(err));
+      if (!isRetryableError(err)) {
+        // Non-retryable: bail immediately (e.g. bad schema, auth issue).
+        throw err;
+      }
+      cursor = pickFallbackAgentModel(cursor);
+    }
+  }
+
+  const msg =
+    lastError instanceof Error ? lastError.message : String(lastError);
+  throw new Error(
+    `كل الـ AI providers مزدحمين دلوقتي. جرّب بعد دقيقة. (${tried.join(" → ")}) — ${msg.slice(0, 100)}`,
+  );
+}
+
+function errorSummary(err: unknown): string {
+  if (err instanceof Error) {
+    return err.message.slice(0, 200);
+  }
+  return String(err).slice(0, 200);
+}
+
+// ----------------------------------------------------------------------------
 // pickPdfModel — multimodal model for PDF OCR/extraction.
 // Groq's Llama lineup doesn't support image/PDF input, so we always use
 // Gemini here. The chat agent's higher-RPM path doesn't apply because
