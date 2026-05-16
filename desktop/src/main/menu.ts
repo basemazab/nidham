@@ -10,7 +10,19 @@ export function buildAppMenu(getWindow: () => BrowserWindow | null): Menu {
       submenu: [
         {
           label: "تحديث",
+          // Two accelerators: F5 (Windows convention) + Ctrl+R (web/Mac
+          // convention). Electron's MenuItem.accelerator is single-binding
+          // only — we add a hidden duplicate item below to register the
+          // second shortcut.
           accelerator: "F5",
+          click: () => getWindow()?.webContents.reload(),
+        },
+        // Hidden duplicate so Ctrl+R also reloads. Setting `visible: false`
+        // keeps it out of the menu UI while still binding the accelerator.
+        {
+          label: "Reload (Ctrl+R)",
+          accelerator: "CmdOrCtrl+R",
+          visible: false,
           click: () => getWindow()?.webContents.reload(),
         },
         {

@@ -1,4 +1,14 @@
-import { app, BrowserWindow, ipcMain, Menu, shell, net } from "electron";
+import {
+  app,
+  BrowserWindow,
+  ipcMain,
+  Menu,
+  screen,
+  shell,
+  net,
+  session,
+  dialog,
+} from "electron";
 import path from "node:path";
 import squirrelStartup from "electron-squirrel-startup";
 import {
@@ -23,6 +33,35 @@ if (squirrelStartup) {
   app.quit();
 }
 
+// Single-instance lock. Double-clicking the desktop shortcut while the
+// app is already running used to spin up a second window with its own
+// session, which split the user's login cookie across two processes
+// and confused everyone. Now the second instance immediately quits and
+// asks the first instance to surface its window.
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.quit();
+}
+
+// Catch otherwise-unhandled promise rejections + sync exceptions so the
+// process doesn't die silently. We log to the console (visible in dev)
+// and pop up a dialog in production so the HR user has a chance to
+// screenshot the error.
+process.on("uncaughtException", (err) => {
+  // eslint-disable-next-line no-console
+  console.error("[main] uncaughtException:", err);
+  if (app.isReady()) {
+    dialog.showErrorBox(
+      "خطأ غير متوقع في Nidham",
+      `حصل خطأ في النظام. حاول تعيد فتح البرنامج.\n\n${err?.stack ?? err}`,
+    );
+  }
+});
+process.on("unhandledRejection", (reason) => {
+  // eslint-disable-next-line no-console
+  console.error("[main] unhandledRejection:", reason);
+});
+
 // Enable Chrome DevTools Protocol on port 9222 in dev mode so we can
 // automate / inspect the renderer remotely (e.g. via Puppeteer or curl
 // against /json/version). Harmless if no one connects.
@@ -42,7 +81,14 @@ let mainWindow: BrowserWindow | null = null;
 // ----------------------------------------------------------------------------
 
 function createWindow(loadUrl: string, isSetup: boolean): BrowserWindow {
-  const bounds = getWindowBounds();
+  const bounds = sanitizeBounds(getWindowBounds());
+
+  // Resolve the window icon path with a dev/prod fallback. In a packaged
+  // build the assets live under `resources/assets/`; in dev (`npm start`)
+  // there is no resources dir, so fall back to the source `desktop/assets/`.
+  const iconPath = app.isPackaged
+    ? path.join(process.resourcesPath, "assets", "icon.png")
+    : path.join(__dirname, "..", "..", "assets", "icon.png");
 
   const window = new BrowserWindow({
     width: bounds.width,
@@ -54,7 +100,7 @@ function createWindow(loadUrl: string, isSetup: boolean): BrowserWindow {
     title: "Nidham",
     backgroundColor: "#0a1428", // brand navy -- matches Nidham's loading screen
     show: false, // wait for first paint to prevent white flash
-    icon: path.join(process.resourcesPath, "assets", "icon.png"),
+    icon: iconPath,
     autoHideMenuBar: isSetup, // hide menu on first-run setup
     webPreferences: {
       // Both main.js and preload.js end up in .vite/build/ side by side
@@ -67,10 +113,13 @@ function createWindow(loadUrl: string, isSetup: boolean): BrowserWindow {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false, // off so preload can use 'electron' module
-      // Apply the persisted zoom level on first paint
-      zoomFactor: zoomLevelToFactor(getZoomLevel()),
     },
   });
+
+  // Track recent error-page renders so a server that's down doesn't
+  // bounce the user between the error page and a retry forever. Reset
+  // whenever a real navigation succeeds.
+  let recentErrorPageAt = 0;
 
   window.once("ready-to-show", () => {
     window.show();
@@ -84,26 +133,85 @@ function createWindow(loadUrl: string, isSetup: boolean): BrowserWindow {
     }
   });
 
-  // Persist size/position as the user moves the window
+  // Persist size/position as the user moves the window. Debounced because
+  // a single drag fires `move` ~60 times per second; writing to disk on
+  // every event hammers the FS and slows the drag visibly.
+  let persistTimer: NodeJS.Timeout | null = null;
   const persistBounds = () => {
-    if (window.isDestroyed() || window.isMinimized() || window.isFullScreen()) return;
-    setWindowBounds(window.getBounds());
+    if (window.isDestroyed() || window.isMinimized() || window.isFullScreen())
+      return;
+    if (persistTimer) clearTimeout(persistTimer);
+    persistTimer = setTimeout(() => {
+      if (!window.isDestroyed()) setWindowBounds(window.getBounds());
+    }, 400);
   };
   window.on("resize", persistBounds);
   window.on("move", persistBounds);
+  window.on("closed", () => {
+    if (persistTimer) clearTimeout(persistTimer);
+  });
 
-  // Open external links in the system browser instead of inside Electron
+  // Open external links in the system browser instead of inside Electron.
+  // Same-origin links (the user's Nidham server) stay in the window so
+  // the SPA navigation works correctly.
   window.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith("http://") || url.startsWith("https://")) {
-      const configured = getServerUrl();
-      // Same-origin (the user's Nidham server) -> open in this window
-      if (configured && url.startsWith(configured)) {
-        return { action: "allow" };
-      }
+      if (isSameOrigin(url, getServerUrl())) return { action: "allow" };
       shell.openExternal(url);
       return { action: "deny" };
     }
     return { action: "deny" };
+  });
+
+  // SECURITY: prevent the renderer from navigating to an unrelated
+  // origin. Without this, a phishing link inside Nidham — or a redirect
+  // chain through a compromised dependency — could take over the whole
+  // window. The configured server origin is allow-listed; everything
+  // else is opened in the system browser and the navigation cancelled.
+  window.webContents.on("will-navigate", (event, url) => {
+    if (url.startsWith("data:") || url.startsWith("about:")) return; // internal recovery pages OK
+    if (isSameOrigin(url, getServerUrl())) return;
+    event.preventDefault();
+    if (url.startsWith("http://") || url.startsWith("https://")) {
+      shell.openExternal(url);
+    }
+  });
+
+  // SECURITY: deny all permission requests by default. The web app
+  // running inside Nidham asks for geolocation (for GPS attendance) —
+  // we let that one through if the request comes from the configured
+  // server origin. Everything else (notifications, camera, mic, etc.)
+  // is denied. The user can still grant explicitly from their browser
+  // if they really need it.
+  session.defaultSession.setPermissionRequestHandler(
+    (webContents, permission, callback, details) => {
+      const allowGeolocation =
+        permission === "geolocation" &&
+        isSameOrigin(details.requestingUrl, getServerUrl());
+      callback(!!allowGeolocation);
+    },
+  );
+
+  // Recovery: if the renderer process crashes (OOM, native panic, etc.)
+  // Electron shows a blank window. Detect it and offer a one-click reload.
+  window.webContents.on("render-process-gone", (_event, details) => {
+    // "clean-exit" / "exited-from-renderer" are normal shutdowns; only
+    // act on actual crashes.
+    if (details.reason === "clean-exit") return;
+    const result = dialog.showMessageBoxSync(window, {
+      type: "error",
+      title: "Nidham توقّف فجأة",
+      message: "صفحة Nidham وقفت بسبب خطأ غير متوقع.",
+      detail: `السبب: ${details.reason}\n\nتقدر تعيد تحميل الصفحة أو تقفل البرنامج.`,
+      buttons: ["إعادة تحميل", "إغلاق البرنامج"],
+      defaultId: 0,
+      cancelId: 1,
+    });
+    if (result === 0) {
+      window.webContents.reload();
+    } else {
+      app.quit();
+    }
   });
 
   if (isSetup) {
@@ -125,14 +233,23 @@ function createWindow(loadUrl: string, isSetup: boolean): BrowserWindow {
     // Recovery overlay: when the renderer fails to load (network error,
     // 5xx response, CSP block, etc.) Electron shows a raw chrome error
     // page that's confusing in Arabic. Replace it with our own panel
-    // that gives the HR user a 1-click "try again" + "go to login" +
-    // "reset server URL".
+    // that gives the HR user a 1-click "try again" + "go to login".
+    //
+    // Loop guard: if the user clicks "retry" on a server that's still
+    // down, we'll receive another did-fail-load and re-render the error
+    // page. That's the right behaviour ONCE, but if it happens twice
+    // within 2 seconds we suppress the second render — Electron's
+    // default chrome error page shows instead, which is honest about
+    // the persistent failure.
     window.webContents.on(
       "did-fail-load",
       (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
         if (!isMainFrame) return; // ignore sub-resource failures
-        // -3 = ABORTED, fires on legitimate navigations -- skip.
-        if (errorCode === -3) return;
+        if (errorCode === -3) return; // ABORTED — fires on legitimate navs
+
+        const now = Date.now();
+        if (now - recentErrorPageAt < 2000) return; // loop guard
+        recentErrorPageAt = now;
 
         const url = getServerUrl() ?? "";
         const html = renderErrorPage({
@@ -146,6 +263,12 @@ function createWindow(loadUrl: string, isSetup: boolean): BrowserWindow {
         );
       },
     );
+
+    // Clear the loop guard on every successful navigation, so a retry
+    // that finally lands resets the counter for future failures.
+    window.webContents.on("did-finish-load", () => {
+      recentErrorPageAt = 0;
+    });
   }
 
   return window;
@@ -236,8 +359,9 @@ ipcMain.handle("setup:test-connection", async (_evt, rawUrl: string) => {
 
   // Hard timeout: Electron's net.request has NO default deadline and will
   // happily wait forever on a wrong host. Without this, an HR typo would
-  // hang the spinner indefinitely.
-  const TIMEOUT_MS = 8000;
+  // hang the spinner indefinitely. 15s tolerates slow Egyptian 3G + the
+  // Vercel cold-start latency that Pro free tenants sometimes see.
+  const TIMEOUT_MS = 15000;
 
   return new Promise<{ ok: boolean; error?: string }>((resolve) => {
     let settled = false;
@@ -254,7 +378,11 @@ ipcMain.handle("setup:test-connection", async (_evt, rawUrl: string) => {
     };
 
     const timer = setTimeout(
-      () => settle({ ok: false, error: "السيرفر مش بيرد (انتهت المهلة 8 ثواني)" }),
+      () =>
+        settle({
+          ok: false,
+          error: "السيرفر مش بيرد (انتهت المهلة 15 ثانية)",
+        }),
       TIMEOUT_MS,
     );
 
@@ -305,19 +433,43 @@ ipcMain.handle("setup:save-and-open", (_evt, rawUrl: string) => {
 // App lifecycle
 // ----------------------------------------------------------------------------
 
-app.whenReady().then(() => {
-  const savedUrl = getServerUrl();
-
-  if (savedUrl) {
-    // Returning user -- jump straight to the app
-    mainWindow = createWindow(savedUrl, /* isSetup */ false);
-    Menu.setApplicationMenu(buildAppMenu(() => mainWindow));
-  } else {
-    // First run -- show the setup form
-    mainWindow = createWindow("", /* isSetup */ true);
-    Menu.setApplicationMenu(null);
+// When a second instance is launched (user double-clicks the shortcut
+// again), Electron fires this on the FIRST instance. Bring its window
+// forward instead of starting a new process.
+app.on("second-instance", () => {
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
   }
 });
+
+app
+  .whenReady()
+  .then(() => {
+    const savedUrl = getServerUrl();
+
+    if (savedUrl) {
+      // Returning user -- jump straight to the app
+      mainWindow = createWindow(savedUrl, /* isSetup */ false);
+      Menu.setApplicationMenu(buildAppMenu(() => mainWindow));
+    } else {
+      // First run -- show the setup form
+      mainWindow = createWindow("", /* isSetup */ true);
+      Menu.setApplicationMenu(null);
+    }
+  })
+  .catch((err) => {
+    // eslint-disable-next-line no-console
+    console.error("[main] whenReady failed:", err);
+    dialog.showErrorBox(
+      "تعذّر بدء Nidham",
+      `حصل خطأ أثناء فتح البرنامج:\n\n${
+        err instanceof Error ? err.stack : String(err)
+      }`,
+    );
+    app.exit(1);
+  });
 
 app.on("window-all-closed", () => {
   // Standard Electron pattern: stay alive on Mac, quit elsewhere
@@ -358,8 +510,59 @@ function arabicizeNetError(message: string): string {
   return message;
 }
 
-function zoomLevelToFactor(level: number): number {
-  // Electron's `zoomFactor` is a multiplier (1.0 = 100%). Each `zoomLevel`
-  // step is roughly a 20% change. -3 -> 0.5x, +3 -> ~1.75x.
-  return Math.pow(1.2, level);
+// ----------------------------------------------------------------------------
+// sanitizeBounds — make sure persisted window position is still on a
+// visible display. Saving (x: 1800, y: 200) on a 3-monitor setup and
+// then launching the app on a single laptop screen would open the
+// window completely off-screen with no way to drag it back. We clamp
+// to the work area of the nearest monitor.
+// ----------------------------------------------------------------------------
+function sanitizeBounds(b: ReturnType<typeof getWindowBounds>) {
+  const width = Math.max(1024, Math.min(b.width ?? 1280, 3840));
+  const height = Math.max(600, Math.min(b.height ?? 800, 2160));
+
+  if (b.x === undefined || b.y === undefined) {
+    return { width, height };
+  }
+
+  // Find the display that contains the requested top-left point. If
+  // none does, we'll have to re-center on the primary display.
+  const displays = screen.getAllDisplays();
+  const inside = displays.find((d) => {
+    const wa = d.workArea;
+    return (
+      b.x! >= wa.x &&
+      b.y! >= wa.y &&
+      b.x! < wa.x + wa.width &&
+      b.y! < wa.y + wa.height
+    );
+  });
+
+  if (!inside) {
+    // Off-screen — center on the primary display's work area
+    const wa = screen.getPrimaryDisplay().workArea;
+    return {
+      width,
+      height,
+      x: wa.x + Math.max(0, Math.round((wa.width - width) / 2)),
+      y: wa.y + Math.max(0, Math.round((wa.height - height) / 2)),
+    };
+  }
+
+  return { width, height, x: b.x, y: b.y };
+}
+
+// ----------------------------------------------------------------------------
+// isSameOrigin — compares the navigation URL's origin to the configured
+// server origin. Used by setWindowOpenHandler + will-navigate to keep
+// the app pinned to the user's Nidham instance and bounce everything
+// else out to the system browser.
+// ----------------------------------------------------------------------------
+function isSameOrigin(url: string, serverUrl: string | null): boolean {
+  if (!serverUrl) return false;
+  try {
+    return new URL(url).origin === new URL(serverUrl).origin;
+  } catch {
+    return false;
+  }
 }
