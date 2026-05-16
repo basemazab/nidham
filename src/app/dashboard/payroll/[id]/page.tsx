@@ -7,6 +7,7 @@ import {
   deletePayrollPeriod,
   cancelPayrollPeriod,
   reopenPayrollPeriod,
+  regeneratePeriodEntries,
 } from "../actions";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { DownloadPdfButton } from "@/components/download-pdf-button";
@@ -24,6 +25,7 @@ type PageProps = {
     cancelled?: string;
     reopened?: string;
     bulk_bonus?: string;
+    regenerated?: string;
   }>;
 };
 
@@ -245,6 +247,11 @@ export default async function PayrollPeriodPage({
             ✅ تم صرف المكافأة الجماعية على {sp.bulk_bonus} موظف.
           </FlashMessage>
         )}
+        {sp.regenerated && (
+          <FlashMessage tone="emerald">
+            ✅ تم إعادة توليد القسائم لـ {sp.regenerated} موظف بنجاح.
+          </FlashMessage>
+        )}
         {sp.error && (
           <FlashMessage tone="rose">⚠ {decodeURIComponent(sp.error)}</FlashMessage>
         )}
@@ -303,13 +310,14 @@ export default async function PayrollPeriodPage({
           </div>
         </header>
 
-        {/* Actions bar (search, export, bulk bonus, cancel/reopen, PDF) */}
+        {/* Actions bar (search, export, bulk bonus, regenerate, cancel/reopen, PDF) */}
         <div className="pdf-hide">
           <PeriodActionsBar
             periodId={id}
             status={period.status}
             cancelAction={cancelPayrollPeriod}
             reopenAction={reopenPayrollPeriod}
+            regenerateAction={regeneratePeriodEntries}
           />
         </div>
 
@@ -330,7 +338,7 @@ export default async function PayrollPeriodPage({
               frequency={period.frequency ?? "monthly"}
               diagnostics={diagnostics}
               periodId={id}
-              canRegenerate={period.status === "draft"}
+              isDraft={period.status === "draft"}
             />
           ) : (
             <PeriodEntriesExplorer entries={entries} periodId={id} />
@@ -400,7 +408,7 @@ function EmptyPeriodDiagnostic({
   frequency,
   diagnostics,
   periodId,
-  canRegenerate,
+  isDraft,
 }: {
   frequency: "monthly" | "weekly";
   diagnostics: {
@@ -410,11 +418,16 @@ function EmptyPeriodDiagnostic({
     activeNoSalary: number;
   } | null;
   periodId: string;
-  canRegenerate: boolean;
+  isDraft: boolean;
 }) {
-  const matchingCount = frequency === "monthly"
-    ? (diagnostics?.activeMonthly ?? 0) + (diagnostics?.activeNoFreq ?? 0)
-    : (diagnostics?.activeWeekly ?? 0);
+  // Are there actually employees matching this period's frequency?
+  // If yes, "Regenerate" is the right CTA — the period was likely
+  // created before our payroll fix and just needs fresh entries.
+  const matchingCount =
+    frequency === "monthly"
+      ? (diagnostics?.activeMonthly ?? 0) + (diagnostics?.activeNoFreq ?? 0)
+      : (diagnostics?.activeWeekly ?? 0);
+  const canRegenerate = isDraft && matchingCount > 0;
 
   return (
     <div className="bg-white rounded-2xl shadow-md border border-amber-200 p-8">
@@ -431,6 +444,39 @@ function EmptyPeriodDiagnostic({
           </p>
         </div>
       </div>
+
+      {/* Big green CTA when we DO have matching employees — most common
+          case for users hitting this state after our recent fix. */}
+      {canRegenerate && (
+        <div className="bg-gradient-to-l from-emerald-50 to-cyan-50 border-2 border-emerald-300 rounded-xl p-4 mb-5">
+          <div className="flex items-start gap-3 mb-3">
+            <span className="text-2xl">✦</span>
+            <div className="flex-1">
+              <div className="font-black font-cairo text-emerald-800 mb-1">
+                لقينا {matchingCount} موظف{" "}
+                {frequency === "monthly" ? "شهري" : "أسبوعي"} ينفعوا للدورة دي!
+              </div>
+              <p className="text-sm text-emerald-700 font-cairo leading-relaxed">
+                المشكلة إن الدورة اتعملت قبل ما يدخل النظام إصلاح، أو في
+                موظفين جداد بعد إنشائها. اضغط زرار <strong>إعادة توليد
+                القسائم</strong> وهيتم توليدهم كلهم تلقائياً.
+              </p>
+            </div>
+          </div>
+          <form action={regeneratePeriodEntries}>
+            <input type="hidden" name="period_id" value={periodId} />
+            <button
+              type="submit"
+              className="w-full px-5 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-white font-black font-cairo text-base shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50 transition-all"
+            >
+              🔄 إعادة توليد القسائم لكل الموظفين ({matchingCount})
+            </button>
+          </form>
+          <p className="text-[10px] text-emerald-700 font-cairo mt-2 text-center">
+            ⚠ ده هيمسح أي تعديلات يدوية موجودة على entries الدورة دي.
+          </p>
+        </div>
+      )}
 
       {/* Diagnostic counts */}
       {diagnostics && (
@@ -458,42 +504,41 @@ function EmptyPeriodDiagnostic({
         </div>
       )}
 
-      {/* Helpful advice */}
-      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-5 space-y-2 text-sm font-cairo text-slate-700">
-        <div className="font-bold text-amber-800">🔎 الحلول الممكنة:</div>
-        {matchingCount === 0 && (
-          <p>
-            <strong>1.</strong> روح على صفحة{" "}
-            <Link
-              href="/dashboard/employees"
-              className="text-amber-700 hover:text-amber-900 underline font-bold"
-            >
-              الموظفين
-            </Link>{" "}
-            وتأكد إن فيه موظفين بحالة «نشط» ودورة صرف «
-            {frequency === "monthly" ? "شهري" : "أسبوعي"}».
-          </p>
-        )}
-        {diagnostics && diagnostics.activeNoFreq > 0 && frequency === "weekly" && (
-          <p>
-            <strong>2.</strong> عندك {diagnostics.activeNoFreq} موظف بدون تكرار
-            محدد — افتح ملفهم وحط <strong>«أسبوعي»</strong> لو من عمال
-            الإنتاج.
-          </p>
-        )}
-        {diagnostics && diagnostics.activeNoSalary > 0 && (
-          <p>
-            <strong>3.</strong> {diagnostics.activeNoSalary} موظف نشط
-            <strong> بدون راتب أساسي</strong> — افتح ملفاتهم وحط الراتب علشان
-            النظام يحسب لهم.
-          </p>
-        )}
-        <p>
-          <strong>4.</strong> لو الـ Migration 026 لسه ما اتطبقتش على
-          Supabase، الموظفين القدام pay_frequency بتاعهم NULL — Migration بتعمل
-          تحديث تلقائي.
-        </p>
-      </div>
+      {/* Helpful advice — only when there's nothing matching */}
+      {!canRegenerate && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-5 space-y-2 text-sm font-cairo text-slate-700">
+          <div className="font-bold text-amber-800">🔎 الحلول الممكنة:</div>
+          {matchingCount === 0 && (
+            <p>
+              <strong>1.</strong> روح على صفحة{" "}
+              <Link
+                href="/dashboard/employees"
+                className="text-amber-700 hover:text-amber-900 underline font-bold"
+              >
+                الموظفين
+              </Link>{" "}
+              وتأكد إن فيه موظفين بحالة «نشط» ودورة صرف «
+              {frequency === "monthly" ? "شهري" : "أسبوعي"}».
+            </p>
+          )}
+          {diagnostics &&
+            diagnostics.activeNoFreq > 0 &&
+            frequency === "weekly" && (
+              <p>
+                <strong>2.</strong> عندك {diagnostics.activeNoFreq} موظف بدون
+                تكرار محدد — افتح ملفهم وحط <strong>«أسبوعي»</strong> لو من
+                عمال الإنتاج.
+              </p>
+            )}
+          {diagnostics && diagnostics.activeNoSalary > 0 && (
+            <p>
+              <strong>3.</strong> {diagnostics.activeNoSalary} موظف نشط
+              <strong> بدون راتب أساسي</strong> — افتح ملفاتهم وحط الراتب علشان
+              النظام يحسب لهم.
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Recovery actions */}
       <div className="flex flex-wrap gap-2">
@@ -503,22 +548,16 @@ function EmptyPeriodDiagnostic({
         >
           👥 افتح صفحة الموظفين
         </Link>
-        {canRegenerate && (
-          <Link
-            href={`/dashboard/payroll/new?freq=${frequency}`}
-            className="px-4 py-2 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 font-bold text-sm font-cairo transition"
-          >
-            🔄 جرّب إنشاء دورة جديدة
-          </Link>
+        {isDraft && (
+          <form action={async () => { "use server"; await deletePayrollPeriod(periodId); }}>
+            <button
+              type="submit"
+              className="px-4 py-2 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 font-bold text-sm font-cairo transition"
+            >
+              🗑 احذف الدورة الفاضية
+            </button>
+          </form>
         )}
-        <form action={async () => { "use server"; await deletePayrollPeriod(periodId); }}>
-          <button
-            type="submit"
-            className="px-4 py-2 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 font-bold text-sm font-cairo transition"
-          >
-            🗑 احذف الدورة الفاضية
-          </button>
-        </form>
       </div>
     </div>
   );

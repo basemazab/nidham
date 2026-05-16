@@ -24,6 +24,7 @@ type Props = {
   status: Status;
   cancelAction: (formData: FormData) => Promise<void> | void;
   reopenAction: (formData: FormData) => Promise<void> | void;
+  regenerateAction: (formData: FormData) => Promise<void> | void;
 };
 
 export function PeriodActionsBar({
@@ -31,9 +32,11 @@ export function PeriodActionsBar({
   status,
   cancelAction,
   reopenAction,
+  regenerateAction,
 }: Props) {
   const [showCancel, setShowCancel] = useState(false);
   const [showReopen, setShowReopen] = useState(false);
+  const [showRegenerate, setShowRegenerate] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
 
   const canCancel =
@@ -96,6 +99,24 @@ export function PeriodActionsBar({
         </Link>
       )}
 
+      {/* Regenerate — drafts only. Re-syncs entries with current
+          employee + attendance data. Useful when attendance got
+          imported AFTER the period was created. */}
+      {status === "draft" && (
+        <button
+          type="button"
+          onClick={() => {
+            setShowRegenerate((v) => !v);
+            setShowCancel(false);
+            setShowReopen(false);
+          }}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-cyan-50 hover:bg-cyan-100 text-cyan-700 font-bold text-sm font-cairo transition border border-cyan-200"
+        >
+          <span>🔄</span>
+          <span>إعادة توليد</span>
+        </button>
+      )}
+
       {/* Spacer pushes destructive actions to the right edge */}
       <span className="flex-1" />
 
@@ -128,6 +149,33 @@ export function PeriodActionsBar({
       )}
 
       {/* Inline confirm panels (full-width, below the bar) */}
+      {showRegenerate && (
+        <ConfirmPanel
+          tone="cyan"
+          title="🔄 إعادة توليد قسائم الدورة"
+          message="هتمسح كل entries الموظفين الحالية في الدورة دي وتعيد توليدها من بيانات الموظفين والحضور الحالية. أي تعديلات يدوية (مكافآت، overtime, خصومات) هتضيع. خصوصاً مفيد لو رفعت الحضور بعد ما الدورة اتعملت."
+        >
+          <form action={regenerateAction}>
+            <input type="hidden" name="period_id" value={periodId} />
+            <div className="flex gap-2">
+              <button
+                type="submit"
+                className="flex-1 px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-700 text-white font-bold text-sm font-cairo transition"
+              >
+                🔄 نفذ إعادة التوليد
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowRegenerate(false)}
+                className="px-3 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 font-bold text-sm font-cairo transition"
+              >
+                إلغاء
+              </button>
+            </div>
+          </form>
+        </ConfirmPanel>
+      )}
+
       {showCancel && (
         <ConfirmPanel
           tone="rose"
@@ -255,12 +303,13 @@ function ConfirmPanel({
 }: {
   title: string;
   message: string;
-  tone: "rose" | "amber";
+  tone: "rose" | "amber" | "cyan";
   children: React.ReactNode;
 }) {
   const bg = {
     rose: "bg-rose-50 border-rose-200",
     amber: "bg-amber-50 border-amber-200",
+    cyan: "bg-cyan-50 border-cyan-200",
   }[tone];
   return (
     <div className={`w-full mt-2 p-4 rounded-xl border ${bg}`}>

@@ -495,6 +495,236 @@ export async function deletePayrollPeriod(periodId: string) {
 }
 
 // ============================================================================
+// REGENERATE PERIOD ENTRIES
+// ============================================================================
+//
+// Re-runs the entry-creation logic against an EXISTING period. Used when:
+//   1) A period was created before a bug fix and ended up empty.
+//   2) Attendance was imported AFTER the period was created — entries
+//      need a fresh recalculation to pick up the new attendance.
+//   3) New employees were added after period creation.
+//
+// Only operates on DRAFT periods. Approved/paid periods stay frozen.
+// Existing entries are deleted and replaced — manual overrides on
+// individual entries (bonus / overtime / other_deductions) get LOST,
+// so the UI warns the user.
+
+export async function regeneratePeriodEntries(formData: FormData) {
+  const { profile } = await requireHR();
+  const supabase = await createClient();
+  const periodId = String(formData.get("period_id") ?? "").trim();
+  if (!/^[0-9a-f-]{36}$/i.test(periodId)) {
+    redirect("/dashboard/payroll");
+  }
+
+  // Load period + verify it's still editable + belongs to caller's tenant
+  const { data: period } = await supabase
+    .from("payroll_periods")
+    .select(
+      "id, company_id, frequency, start_date, end_date, working_days, status",
+    )
+    .eq("id", periodId)
+    .single<{
+      id: string;
+      company_id: string;
+      frequency: "monthly" | "weekly" | null;
+      start_date: string | null;
+      end_date: string | null;
+      working_days: number;
+      status: string;
+    }>();
+
+  if (!period) {
+    redirect("/dashboard/payroll");
+  }
+  if (period.status !== "draft") {
+    redirect(
+      `/dashboard/payroll/${periodId}?error=` +
+        encodeURIComponent("ممكن تعيد توليد الـ entries على المسودات فقط"),
+    );
+  }
+  if (!period.start_date || !period.end_date) {
+    redirect(
+      `/dashboard/payroll/${periodId}?error=` +
+        encodeURIComponent("الدورة دي ناقصة تاريخ بداية أو نهاية"),
+    );
+  }
+
+  const frequency = period.frequency ?? "monthly";
+
+  // Same employee filter as generatePayrollPeriod — monthly accepts NULL
+  // pay_frequency as legacy default, weekly stays strict.
+  const employeesQuery =
+    frequency === "monthly"
+      ? supabase
+          .from("employees")
+          .select(
+            "id, full_name, basic_salary, housing_allowance, transport_allowance, other_allowances, incentive_allowance, pay_frequency",
+          )
+          .eq("status", "active")
+          .or("pay_frequency.eq.monthly,pay_frequency.is.null")
+      : supabase
+          .from("employees")
+          .select(
+            "id, full_name, basic_salary, housing_allowance, transport_allowance, other_allowances, incentive_allowance, pay_frequency",
+          )
+          .eq("status", "active")
+          .eq("pay_frequency", "weekly");
+
+  const [employeesRes, attendanceRes, companyRes] = await Promise.all([
+    employeesQuery.returns<EmployeeRow[]>(),
+    supabase
+      .from("attendance")
+      .select(
+        "employee_id, status, tardiness_minutes, early_leave_minutes",
+      )
+      .gte("date", period.start_date)
+      .lte("date", period.end_date)
+      .returns<AttendanceRecord[]>(),
+    supabase
+      .from("companies")
+      .select("social_insurance_enabled, income_tax_enabled")
+      .eq("id", profile.company_id)
+      .single<{
+        social_insurance_enabled: boolean | null;
+        income_tax_enabled: boolean | null;
+      }>(),
+  ]);
+
+  const payrollSettings = {
+    socialInsuranceEnabled: companyRes.data?.social_insurance_enabled === true,
+    incomeTaxEnabled: companyRes.data?.income_tax_enabled === true,
+  };
+
+  const employees = employeesRes.data ?? [];
+  const attendance = attendanceRes.data ?? [];
+
+  if (employees.length === 0) {
+    redirect(
+      `/dashboard/payroll/${periodId}?error=` +
+        encodeURIComponent(
+          `لسه مفيش موظفين بحالة «نشط» وتكرار «${frequency === "monthly" ? "شهري" : "أسبوعي"}». افتح صفحة الموظفين وعدّل التكرار.`,
+        ),
+    );
+  }
+
+  // Wipe existing entries — keeps the period's audit fields (status,
+  // dates, etc.) but starts fresh on the data side. Manual overrides
+  // (bonuses, overtime) on the per-employee entries are LOST. The UI
+  // warns the user before they click Regenerate.
+  await supabase.from("payroll_entries").delete().eq("period_id", periodId);
+
+  // Auto-link advances per employee for the new period window
+  const advanceDeductions = new Map<string, number>();
+  await Promise.all(
+    employees.map(async (emp) => {
+      const { data } = await supabase.rpc(
+        "compute_advance_deduction_for_period",
+        {
+          p_employee_id: emp.id,
+          p_period_start: period.start_date,
+          p_period_end: period.end_date,
+        },
+      );
+      advanceDeductions.set(emp.id, typeof data === "number" ? data : 0);
+    }),
+  );
+
+  // Compute fresh entries — same logic as generatePayrollPeriod
+  const entries = employees.map((emp) => {
+    const empAttendance = attendance.filter((a) => a.employee_id === emp.id);
+    const attended = empAttendance.filter((a) => a.status === "present").length;
+    const halfDay = empAttendance.filter((a) => a.status === "half_day").length;
+    const absent = empAttendance.filter((a) => a.status === "absent").length;
+    const leave = Math.max(
+      0,
+      empAttendance.length - attended - halfDay - absent,
+    );
+
+    const workdayRows = empAttendance.filter(
+      (a) => a.status === "present" || a.status === "half_day",
+    );
+    const tardinessMinutes = workdayRows.reduce(
+      (s, a) => s + (a.tardiness_minutes ?? 0),
+      0,
+    );
+    const earlyLeaveMinutes = workdayRows.reduce(
+      (s, a) => s + (a.early_leave_minutes ?? 0),
+      0,
+    );
+
+    const breakdown: AttendanceBreakdown = {
+      attended,
+      halfDay,
+      leave,
+      absent,
+      tardinessMinutes,
+      earlyLeaveMinutes,
+    };
+    const loanDeduction = advanceDeductions.get(emp.id) ?? 0;
+
+    const result = calculatePayroll(
+      {
+        basicSalary: emp.basic_salary ?? 0,
+        housingAllowance: emp.housing_allowance ?? 0,
+        transportAllowance: emp.transport_allowance ?? 0,
+        otherAllowances: emp.other_allowances ?? 0,
+        incentiveAllowance: emp.incentive_allowance ?? 0,
+        loanDeduction,
+      },
+      breakdown,
+      period.working_days ?? 22,
+      payrollSettings,
+    );
+
+    return {
+      company_id: profile.company_id,
+      period_id: periodId,
+      employee_id: emp.id,
+      attended_days: breakdown.attended,
+      half_day_days: breakdown.halfDay,
+      leave_days: breakdown.leave,
+      absent_days: breakdown.absent,
+      basic_salary: emp.basic_salary ?? 0,
+      housing_allowance: emp.housing_allowance ?? 0,
+      transport_allowance: emp.transport_allowance ?? 0,
+      other_allowances: emp.other_allowances ?? 0,
+      incentive_allowance: emp.incentive_allowance ?? 0,
+      bonuses: 0,
+      overtime: 0,
+      gross_salary: result.grossSalary,
+      absence_deduction: result.absenceDeduction,
+      tardiness_deduction: result.tardinessDeduction,
+      social_insurance: result.socialInsurance,
+      income_tax: result.incomeTax,
+      loan_deduction: loanDeduction,
+      other_deductions: 0,
+      total_deductions: result.totalDeductions,
+      net_salary: result.netSalary,
+    };
+  });
+
+  if (entries.length > 0) {
+    const { error } = await supabase
+      .from("payroll_entries")
+      .insert(entries);
+    if (error) {
+      redirect(
+        `/dashboard/payroll/${periodId}?error=` +
+          encodeURIComponent(arabicizeDbError(error.message)),
+      );
+    }
+  }
+
+  revalidatePath(`/dashboard/payroll/${periodId}`);
+  revalidatePath("/dashboard/payroll");
+  bustDashboardCache();
+  redirect(
+    `/dashboard/payroll/${periodId}?regenerated=${entries.length}`,
+  );
+}
+
+// ============================================================================
 // CANCEL / REOPEN — corrections workflow
 // ============================================================================
 //
