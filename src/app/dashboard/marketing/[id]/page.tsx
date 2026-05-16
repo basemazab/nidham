@@ -11,6 +11,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { canUseFeature } from "@/lib/subscriptions-server";
 import { UpgradeRequired } from "@/components/upgrade-required";
+import { getProviderStatus } from "@/lib/ai-models";
 import { runProductAnalysis } from "../actions";
 
 type PageProps = {
@@ -77,6 +78,7 @@ export default async function MarketingProjectPage({
   const hasAnalysis =
     project.ai_analysis && Object.keys(project.ai_analysis).length > 0;
   const errorMsg = sp.error ? decodeURIComponent(sp.error) : null;
+  const providers = getProviderStatus();
 
   return (
     <main className="flex-1 px-4 md:px-6 py-6 bg-gradient-to-b from-slate-50 via-white to-amber-50/20 min-h-screen">
@@ -109,8 +111,74 @@ export default async function MarketingProjectPage({
         )}
         {errorMsg && (
           <div className="mb-5 p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 font-cairo text-sm">
-            ⚠ {errorMsg}
+            <div className="flex items-start gap-2">
+              <span>⚠</span>
+              <div className="flex-1 leading-relaxed">{errorMsg}</div>
+            </div>
+            {/* If the message mentions GROQ_API_KEY, surface a direct
+                link to the Groq signup so the user fixes it in 2 minutes. */}
+            {errorMsg.includes("GROQ_API_KEY") && (
+              <div className="mt-3 pt-3 border-t border-red-200">
+                <a
+                  href="https://console.groq.com/keys"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-block px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-bold font-cairo transition"
+                >
+                  افتح Groq وخد مفتاح مجاني (دقيقتين) ↗
+                </a>
+              </div>
+            )}
           </div>
+        )}
+
+        {/* Single-provider warning — shown when only Gemini OR only
+            Groq is configured. Encourages the user to add the second
+            free key so fallback can actually fall back. Not blocking —
+            just preventative. */}
+        {(!providers.groq || !providers.gemini) && (
+          <details className="mb-5">
+            <summary className="cursor-pointer text-xs text-amber-700 hover:text-amber-900 font-cairo">
+              💡 نصيحة: ضيف مفتاح AI ثاني للحماية من انقطاع الخدمة
+            </summary>
+            <div className="mt-2 p-4 rounded-xl bg-amber-50 border border-amber-200 text-xs font-cairo text-amber-800 leading-relaxed">
+              <p className="mb-2">
+                دلوقتي شغّال على <strong>provider واحد بس</strong>:
+                {providers.groq ? " Groq" : " Gemini"}. لو وصل لحده اليومي، الـ
+                Studio هيتوقف لحد بكرة. <strong>ضيف الـ provider التاني</strong>{" "}
+                (مجاناً) عشان النظام يـ fallback تلقائياً.
+              </p>
+              <div className="flex flex-wrap gap-2 mt-3">
+                {!providers.groq && (
+                  <a
+                    href="https://console.groq.com/keys"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold transition"
+                  >
+                    Groq — 14,000/يوم مجاناً ↗
+                  </a>
+                )}
+                {!providers.gemini && (
+                  <a
+                    href="https://aistudio.google.com/app/apikey"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold transition"
+                  >
+                    Gemini — 1,500/يوم مجاناً ↗
+                  </a>
+                )}
+              </div>
+              <p className="mt-3 text-[11px] opacity-80">
+                بعد ما تحصل على المفتاح، ضيفه في Vercel → Settings →
+                Environment Variables باسم{" "}
+                <code className="bg-amber-100 px-1 rounded font-mono">
+                  {providers.groq ? "GEMINI_API_KEY" : "GROQ_API_KEY"}
+                </code>
+              </p>
+            </div>
+          </details>
         )}
 
         {/* Product description card */}

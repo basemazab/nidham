@@ -100,6 +100,7 @@ ${input.target_market ? `**السوق المستهدف:** ${input.target_market}
 
   return callWithFallback(async (picked) => {
     const { object } = await generateObject({
+      maxRetries: 0, // we do our own retry through callWithFallback
       model: picked.model,
       schema: productAnalysisSchema,
       system: PRODUCT_ANALYSIS_SYSTEM,
@@ -237,6 +238,7 @@ ${input.industry ? `**الصناعة:** ${input.industry}` : ""}${analysisStr}
 
   return callWithFallback(async (picked) => {
     const { object } = await generateObject({
+      maxRetries: 0, // we do our own retry through callWithFallback
       model: picked.model,
       schema: personasResponseSchema,
       system: PERSONAS_SYSTEM,
@@ -347,6 +349,7 @@ export async function generateAdCopy(input: {
 
   return callWithFallback(async (picked) => {
     const { object } = await generateObject({
+      maxRetries: 0, // we do our own retry through callWithFallback
       model: picked.model,
       schema: adCreativesResponseSchema,
       system: AD_COPY_SYSTEM,
@@ -460,6 +463,7 @@ ${input.current_url ? `**موقع الشركة الحالي:** ${input.current_u
 
   return callWithFallback(async (picked) => {
     const { object } = await generateObject({
+      maxRetries: 0, // we do our own retry through callWithFallback
       model: picked.model,
       schema: keywordsResponseSchema,
       system: SEO_SYSTEM,
@@ -611,6 +615,7 @@ ${input.current_issues ? `**مشاكل لاحظها صاحب الشركة:**\n${
 
   return callWithFallback(async (picked) => {
     const { object } = await generateObject({
+      maxRetries: 0, // we do our own retry through callWithFallback
       model: picked.model,
       schema: pageDoctorResponseSchema,
       system: PAGE_DOCTOR_SYSTEM,
@@ -717,6 +722,7 @@ ${input.platforms?.length ? `**منصات يفضّلها العميل:** ${input
 
   return callWithFallback(async (picked) => {
     const { object } = await generateObject({
+      maxRetries: 0, // we do our own retry through callWithFallback
       model: picked.model,
       schema: campaignStrategySchema,
       system: CAMPAIGN_SYSTEM,

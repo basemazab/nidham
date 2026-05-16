@@ -244,8 +244,40 @@ export async function callWithFallback<T>(
     }
   }
 
+  // Build a SPECIFIC error message that tells the operator exactly
+  // what's wrong + what to do about it. Three branches:
+  //   1) Only one provider was configured AND it hit quota — biggest
+  //      fix is adding a second free API key (Groq is the easy one).
+  //   2) Both providers were tried + quota — wait or upgrade plan.
+  //   3) Pure transient overload — just retry in a minute.
   const msg =
     lastError instanceof Error ? lastError.message : String(lastError);
+  const isQuota = isQuotaError(lastError);
+  const hasGroq = !!process.env.GROQ_API_KEY;
+  const hasGemini = !!process.env.GEMINI_API_KEY;
+  const onlyOneProvider = !hasGroq || !hasGemini;
+
+  if (isQuota && onlyOneProvider) {
+    const missing = !hasGroq ? "GROQ_API_KEY" : "GEMINI_API_KEY";
+    const signupUrl = !hasGroq
+      ? "https://console.groq.com/keys"
+      : "https://aistudio.google.com/app/apikey";
+    const dailyLimit = !hasGroq
+      ? "14,000 request/يوم مجاناً"
+      : "1,500 request/يوم";
+    throw new Error(
+      `وصلنا للحد اليومي للـ AI ولسه ما عندكش provider ثاني. ` +
+        `الحل: ضيف مفتاح ${missing} (مجاني — ${dailyLimit}) من ${signupUrl} ` +
+        `وحطه في Vercel Environment Variables. اللي اتجرّب: ${tried.join(" → ")}.`,
+    );
+  }
+
+  if (isQuota) {
+    throw new Error(
+      `وصلنا للحد اليومي لكل الـ AI providers. استنى لبكرة (الـ quota بتتجدد كل 24 ساعة) أو ارفع الـ Gemini لخطة مدفوعة. اللي اتجرّب: ${tried.join(" → ")}.`,
+    );
+  }
+
   throw new Error(
     `كل الـ AI providers مزدحمين دلوقتي. جرّب بعد دقيقة. (${tried.join(" → ")}) — ${msg.slice(0, 100)}`,
   );
