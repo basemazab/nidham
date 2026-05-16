@@ -252,6 +252,33 @@ export default async function PayrollPeriodPage({
             ✅ تم إعادة توليد القسائم لـ {sp.regenerated} موظف بنجاح.
           </FlashMessage>
         )}
+
+        {/* "Mark as paid" success — show big CTA to bulk-print payslips.
+            This is the single most important step right after closing
+            payroll: HR needs to hand each employee their payslip. */}
+        {period.status === "paid" && entries.length > 0 && (
+          <div className="mb-4 p-5 rounded-2xl bg-gradient-to-l from-emerald-100 via-emerald-50 to-cyan-50 border-2 border-emerald-300 flex items-start gap-3 flex-wrap">
+            <span className="text-3xl">🧾</span>
+            <div className="flex-1 min-w-0">
+              <div className="font-black font-cairo text-emerald-900 mb-1">
+                الدورة مدفوعة — حان وقت طباعة قسائم الموظفين
+              </div>
+              <p className="text-sm text-emerald-800 font-cairo leading-relaxed">
+                اضغط الزر اليمين عشان النظام يطبعلك كل الـ {entries.length} قسيمة
+                دفعة واحدة (كل قسيمة على صفحة A4 منفصلة) — تقدر تطبع ورقي أو
+                تحفظهم PDF.
+              </p>
+            </div>
+            <Link
+              href={`/print/payslips-bulk/${id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-5 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-white font-black font-cairo shadow-md hover:shadow-lg transition whitespace-nowrap"
+            >
+              🖨 اطبع كل القسائم ({entries.length})
+            </Link>
+          </div>
+        )}
         {sp.error && (
           <FlashMessage tone="rose">⚠ {decodeURIComponent(sp.error)}</FlashMessage>
         )}

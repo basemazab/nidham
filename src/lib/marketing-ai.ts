@@ -467,7 +467,157 @@ ${input.current_url ? `**موقع الشركة الحالي:** ${input.current_u
 }
 
 // ----------------------------------------------------------------------------
-// 5) CAMPAIGN STRATEGY — orchestrates personas + ads + budget
+// 5) PAGE DOCTOR — audit Facebook/Instagram/Website for ad-killer issues
+// ----------------------------------------------------------------------------
+// Diagnoses problems that ruin paid ad performance — even great ads
+// won't convert if the landing destination has these issues. Produces
+// a prioritized fix list with concrete actions.
+
+export const pageDoctorIssueSchema = z.object({
+  category: z.enum([
+    "branding",
+    "content",
+    "trust",
+    "speed",
+    "conversion",
+    "engagement",
+    "completeness",
+    "legal",
+  ]),
+  severity: z.enum(["critical", "high", "medium", "low"]),
+  issue_title: z.string().describe("عنوان قصير للمشكلة"),
+  problem_description: z
+    .string()
+    .describe("شرح للمشكلة وتأثيرها على الإعلان الممول"),
+  ad_impact: z
+    .string()
+    .describe("بالظبط الإعلان هيتأذى ازاي بسبب المشكلة دي (CPC أعلى، CTR أقل، CPA أعلى...)"),
+  fix_steps: z
+    .array(z.string())
+    .min(2)
+    .describe("خطوات عملية للإصلاح، مرقّمة"),
+  estimated_effort: z
+    .enum(["5_minutes", "30_minutes", "1_hour", "half_day", "1_day", "1_week"])
+    .describe("تقدير الوقت اللازم للإصلاح"),
+  estimated_impact: z
+    .string()
+    .describe("لو اتعمل الإصلاح، توقّع التحسّن في الأداء (نسبة أو وصف)"),
+});
+
+export const pageDoctorResponseSchema = z.object({
+  overall_health_score: z
+    .number()
+    .int()
+    .min(0)
+    .max(100)
+    .describe("درجة الصحة الإجمالية للصفحة (0-100)"),
+  health_summary: z
+    .string()
+    .describe("ملخص حالة الصفحة في فقرة قصيرة"),
+  issues: z.array(pageDoctorIssueSchema).min(3).max(15),
+  quick_wins: z
+    .array(z.string())
+    .describe("3-5 تحسينات سريعة (≤30 دقيقة) ذات أثر فوري على الإعلان"),
+  blockers: z
+    .array(z.string())
+    .describe(
+      "مشاكل خطيرة لازم تتحل قبل ما تشغّل أي إعلان ممول (مثلاً: مفيش رقم تواصل واضح، مفيش صور للمنتج، الصفحة فيها بلاغات)",
+    ),
+  pre_launch_checklist: z
+    .array(z.string())
+    .describe("شيك ليست تتحقق منها قبل ضغط 'Publish' على أي حملة"),
+});
+
+export type PageDoctorIssue = z.infer<typeof pageDoctorIssueSchema>;
+export type PageDoctorResponse = z.infer<typeof pageDoctorResponseSchema>;
+
+const PAGE_DOCTOR_SYSTEM = `أنت Conversion Rate Optimization (CRO) Expert + Paid Social Auditor
+في وكالة Big Agency، خبرة 12 سنة في تشخيص ليه الإعلانات بتفشل.
+المشاكل اللي بتقتل الحملات الإعلانية لكن أصحاب الشركات بيتجاهلوها:
+
+CATEGORY GUIDE:
+- branding: لوجو ضعيف، ألوان متنافرة، تنسيق غير احترافي
+- content: صور قليلة، فيديوهات ضعيفة، نص غير واضح
+- trust: مفيش reviews، مفيش social proof، مفيش رقم اتصال واضح
+- speed: الصفحة بطيئة، صور ثقيلة (يخفض الـ Quality Score)
+- conversion: مفيش CTA واضح، طرق التواصل صعبة، landing page معطّلة
+- engagement: تفاعل قليل على البوستات، رد بطيء على الرسائل
+- completeness: معلومات ناقصة، مفيش About، مفيش ساعات عمل
+- legal: مفيش سياسة خصوصية، شروط استخدام، meta verification
+
+قواعدك:
+1. **عميقة، لا سطحية** — متقولش "حسّن الصفحة". قول "أضف 5 صور
+   احترافية للمنتج بحد أدنى 1080×1080 px + اكتب alt text مفصّل لكل
+   صورة عشان Facebook algorithm يفهم محتواها."
+
+2. **ربط مع الإعلان** — لكل مشكلة، اشرح بالظبط الإعلان هيتأذى ازاي:
+   - CTR أقل (الناس مش بتضغط)
+   - CPC أعلى (الـ Quality Score بيهبط)
+   - CPA أعلى (الناس بتضغط لكن مش بتكمل)
+   - Reach أقل (الـ algorithm بيخفّض priority الصفحة)
+   - Account restricted (مشاكل قانونية)
+
+3. **خطوات مرقّمة وعملية** — كل step كان واحد يقدر ينفذه. متقولش
+   "احسّن السرعة"، قول:
+   - استخدم TinyPNG.com لضغط كل الصور
+   - افتح PageSpeed Insights واتبع التوصيات
+   - فعّل Lazy Loading في WordPress من Settings > Reading
+
+4. **Quick Wins حقيقية** — مهام ≤30 دقيقة ليها تأثير فوري:
+   - تحديث صورة الـ Cover للصفحة
+   - إضافة رقم واتساب في About
+   - إخفاء رسائل التشات السلبية
+   - حذف بوست قديم بنتائج ضعيفة
+
+5. **Blockers صريحة** — لو في حاجة بتمنع إطلاق الإعلان أصلاً
+   (مثلاً: page restricted، حذف صفحة، مفيش payment method), حطها
+   في blockers.
+
+6. **عربي عملي** — مفيش "بدا الأمر مستلزماً". قول "في مشكلة"
+   و "محتاج تعمل كذا".`;
+
+export async function diagnosePagesIssues(input: {
+  product_summary: string;
+  page_info: string;
+  facebook_url?: string | null;
+  instagram_url?: string | null;
+  website_url?: string | null;
+  current_issues?: string | null;
+}): Promise<PageDoctorResponse> {
+  const picked = pickAgentModel();
+  const urls = [
+    input.facebook_url ? `Facebook: ${input.facebook_url}` : "",
+    input.instagram_url ? `Instagram: ${input.instagram_url}` : "",
+    input.website_url ? `Website: ${input.website_url}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const userPrompt = `**المنتج/الخدمة:** ${input.product_summary}
+
+**معلومات الصفحة (اللي قدمها صاحب الشركة):**
+${input.page_info}
+
+${urls ? `**الروابط:**\n${urls}` : ""}
+
+${input.current_issues ? `**مشاكل لاحظها صاحب الشركة:**\n${input.current_issues}` : ""}
+
+اعمل تشخيص شامل للصفحة من منظور paid ads expert: أين المشاكل اللي
+هتقلل من أداء الإعلانات الممولة، وإزاي يصلحها خطوة بخطوة. الهدف:
+صاحب الشركة يطلع بـ action list يقدر يطبقه قبل ما يطلق أي إعلان جديد.`;
+
+  const { object } = await generateObject({
+    model: picked.model,
+    schema: pageDoctorResponseSchema,
+    system: PAGE_DOCTOR_SYSTEM,
+    prompt: userPrompt,
+    temperature: 0.4, // diagnostic — lower temperature for consistency
+  });
+  return object;
+}
+
+// ----------------------------------------------------------------------------
+// 6) CAMPAIGN STRATEGY — orchestrates personas + ads + budget
 // ----------------------------------------------------------------------------
 
 export const campaignStrategySchema = z.object({

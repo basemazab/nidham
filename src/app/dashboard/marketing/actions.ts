@@ -26,6 +26,7 @@ import {
   generateAdCopy,
   suggestKeywords,
   generateCampaignStrategy,
+  diagnosePagesIssues,
 } from "@/lib/marketing-ai";
 
 async function gateEnterprise() {
@@ -385,6 +386,84 @@ export async function runSeoMaster(formData: FormData) {
 
   revalidatePath(`/dashboard/marketing/${projectId}/seo`);
   redirect(`/dashboard/marketing/${projectId}/seo?generated=1`);
+}
+
+// ----------------------------------------------------------------------------
+// Page Doctor — diagnose page issues that hurt paid ad performance
+// ----------------------------------------------------------------------------
+export async function runPageDoctor(formData: FormData) {
+  const { profile, supabase } = await gateEnterprise();
+  const projectId = String(formData.get("project_id") ?? "").trim();
+  const pageInfo = String(formData.get("page_info") ?? "").trim();
+  const facebookUrl =
+    String(formData.get("facebook_url") ?? "").trim() || null;
+  const instagramUrl =
+    String(formData.get("instagram_url") ?? "").trim() || null;
+  const websiteUrl =
+    String(formData.get("website_url") ?? "").trim() || null;
+  const currentIssues =
+    String(formData.get("current_issues") ?? "").trim() || null;
+
+  if (pageInfo.length < 30) {
+    redirect(
+      `/dashboard/marketing/${projectId}/page-doctor?error=` +
+        encodeURIComponent(
+          "اشرح صفحتك بتفاصيل أكتر — على الأقل 30 حرف",
+        ),
+    );
+  }
+
+  const { data: project } = await supabase
+    .from("marketing_projects")
+    .select("product_summary, ai_analysis")
+    .eq("id", projectId)
+    .eq("company_id", profile.company_id)
+    .maybeSingle();
+
+  if (!project?.product_summary) {
+    redirect(
+      `/dashboard/marketing/${projectId}/page-doctor?error=` +
+        encodeURIComponent("اكتب وصف المنتج أولاً في صفحة المشروع"),
+    );
+  }
+
+  try {
+    const result = await diagnosePagesIssues({
+      product_summary: project.product_summary,
+      page_info: pageInfo,
+      facebook_url: facebookUrl,
+      instagram_url: instagramUrl,
+      website_url: websiteUrl,
+      current_issues: currentIssues,
+    });
+
+    // Save diagnostic in the project's ai_analysis under "page_doctor"
+    const currentAnalysis =
+      (project.ai_analysis as Record<string, unknown> | null) ?? {};
+    await supabase
+      .from("marketing_projects")
+      .update({
+        ai_analysis: {
+          ...currentAnalysis,
+          page_doctor: result,
+          page_doctor_at: new Date().toISOString(),
+        },
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", projectId);
+  } catch (err) {
+    redirect(
+      `/dashboard/marketing/${projectId}/page-doctor?error=` +
+        encodeURIComponent(
+          err instanceof Error
+            ? err.message.slice(0, 150)
+            : "فشل التشخيص — جرّب تاني",
+        ),
+    );
+  }
+
+  revalidatePath(`/dashboard/marketing/${projectId}/page-doctor`);
+  redirect(`/dashboard/marketing/${projectId}/page-doctor?diagnosed=1`);
 }
 
 // ----------------------------------------------------------------------------

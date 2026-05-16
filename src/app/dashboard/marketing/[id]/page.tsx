@@ -181,6 +181,21 @@ export default async function MarketingProjectPage({
             color="emerald"
           />
           <ToolCard
+            href={`/dashboard/marketing/${id}/page-doctor`}
+            icon="🩺"
+            title="Page Doctor"
+            description="تشخيص مشاكل الصفحة + خطة إصلاح"
+            count={
+              (
+                project.ai_analysis as {
+                  page_doctor?: { issues?: unknown[] };
+                } | null
+              )?.page_doctor?.issues?.length ?? 0
+            }
+            countLabel="مشكلة"
+            color="rose"
+          />
+          <ToolCard
             href={`/dashboard/marketing/${id}/campaign`}
             icon="🚀"
             title="معالج الحملات"

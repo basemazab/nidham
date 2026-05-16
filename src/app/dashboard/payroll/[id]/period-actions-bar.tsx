@@ -99,6 +99,20 @@ export function PeriodActionsBar({
         </Link>
       )}
 
+      {/* Print ALL payslips — works on every status (draft / approved /
+          paid / cancelled). The most important button for HR: instead
+          of clicking each employee individually, one click renders +
+          prints every payslip in the period. */}
+      <Link
+        href={`/print/payslips-bulk/${periodId}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-sm font-cairo transition border border-emerald-200"
+      >
+        <span>🧾</span>
+        <span>طباعة كل القسائم</span>
+      </Link>
+
       {/* Regenerate — drafts only. Re-syncs entries with current
           employee + attendance data. Useful when attendance got
           imported AFTER the period was created. */}
