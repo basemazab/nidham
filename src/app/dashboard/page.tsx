@@ -393,6 +393,26 @@ export default async function DashboardPage() {
               ٧ جهات تفتيش · مكتب العمل + التأمينات + الضرائب
             </p>
           </Link>
+
+          {/* Enterprise-only Marketing Studio module — gold gradient
+              + crown badge so the upsell is obvious to non-Enterprise
+              tenants. The page itself enforces the gate via
+              canUseFeature("marketing_studio"). */}
+          <Link
+            href="/dashboard/marketing"
+            className="bg-gradient-to-br from-amber-100 via-yellow-50 to-orange-100 p-6 rounded-2xl border-2 border-amber-400 hover:border-amber-500 hover:shadow-lg hover:-translate-y-0.5 transition-all relative overflow-hidden"
+          >
+            <div className="absolute top-2 left-2 text-[10px] text-amber-700 font-bold tracking-wider">
+              👑 Enterprise
+            </div>
+            <div className="text-3xl mb-2">✦</div>
+            <h3 className="font-black font-cairo mb-1 text-slate-800">
+              Marketing Studio
+            </h3>
+            <p className="text-xs text-amber-800 font-bold">
+              وكالة تسويق ذكية · إعلانات + SEO + حملات
+            </p>
+          </Link>
         </div>
 
         {/* Reports section */}

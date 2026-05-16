@@ -25,6 +25,7 @@ const FEATURE_TITLES: Partial<Record<Feature, string>> = {
   crm: "إدارة العملاء (CRM)",
   recruitment: "نظام التوظيف",
   retention_insights: "توصيات الاحتفاظ بالموظفين 🎯",
+  marketing_studio: "Marketing Studio ✦",
 };
 
 export function UpgradeRequired({

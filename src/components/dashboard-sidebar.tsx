@@ -48,6 +48,7 @@ const NAV_ITEMS: readonly NavItem[] = [
   { href: "/dashboard/compliance", label: "دليل الامتثال ⚖", icon: "🏛", section: "main" },
   { href: "/dashboard/team", label: "فريق الشركة", icon: "🤝", section: "main", visibleTo: ["admin"] },
   { href: "/dashboard/ai", label: "المساعد الذكي ✦", icon: "🤖", section: "ai", feature: "ai_assistant" },
+  { href: "/dashboard/marketing", label: "Marketing Studio 👑", icon: "✦", section: "ai", feature: "marketing_studio" },
   { href: "/dashboard/retention", label: "احتفاظ بالموظفين 🎯", icon: "🎯", section: "ai", feature: "retention_insights" },
   { href: "/dashboard/reports/attendance", label: "تقرير الحضور", icon: "📊", section: "reports" },
   { href: "/dashboard/reports/bridge", label: "Bridge ✦", icon: "✦", section: "reports", feature: "bridge_analytics" },

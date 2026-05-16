@@ -61,7 +61,12 @@ export type Feature =
   | "bridge_analytics"
   | "audit_log"
   | "custom_branding"
-  | "premium_support";
+  | "premium_support"
+  // Enterprise-only marketing suite — AI-powered digital marketing
+  // agency-in-a-box: product analyzer, audience builder, ad copy
+  // generator, SEO master, campaign wizard. The "wow" feature that
+  // earns the enterprise tier upgrade.
+  | "marketing_studio";
 
 // Minimum tier (by rank) that unlocks the feature. trial bypasses
 // all gates because trial rank is 100.
@@ -84,6 +89,7 @@ const FEATURE_RANK: Record<Feature, number> = {
   audit_log: 3,
   custom_branding: 3,
   premium_support: 3,
+  marketing_studio: 3, // enterprise-only — the AI marketing agency
 };
 
 // ----------------------------------------------------------------------------
