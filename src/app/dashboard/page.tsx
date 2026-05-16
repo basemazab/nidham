@@ -374,7 +374,23 @@ export default async function DashboardPage() {
               نماذج HR الرسمية
             </h3>
             <p className="text-xs text-amber-700 font-bold">
-              ٨ نماذج جاهزة للطباعة
+              ٩ نماذج جاهزة للطباعة
+            </p>
+          </Link>
+
+          <Link
+            href="/dashboard/compliance"
+            className="bg-gradient-to-br from-cyan-50 via-amber-50 to-rose-50 p-6 rounded-2xl border-2 border-amber-200 hover:border-amber-400 hover:shadow-lg hover:-translate-y-0.5 transition-all relative overflow-hidden"
+          >
+            <div className="absolute top-2 left-2 text-[10px] text-rose-600 font-bold tracking-wider">
+              ✦ جديد
+            </div>
+            <div className="text-3xl mb-2">🏛</div>
+            <h3 className="font-bold font-cairo mb-1 text-slate-800">
+              دليل الامتثال
+            </h3>
+            <p className="text-xs text-amber-700 font-bold">
+              ٧ جهات تفتيش · مكتب العمل + التأمينات + الضرائب
             </p>
           </Link>
         </div>
