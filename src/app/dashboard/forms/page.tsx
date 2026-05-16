@@ -71,9 +71,16 @@ const FORMS: FormCard[] = [
   },
   {
     href: "/dashboard/forms/performance-evaluation",
-    title: "نموذج تقييم أداء",
+    title: "نموذج تقييم أداء سنوي",
     description: "تقييم سنوي بنظام النقاط 1-5 على ٧ معايير + ملخص وتوصيات",
     icon: "📊",
+    category: "evaluation",
+  },
+  {
+    href: "/dashboard/forms/monthly-evaluation",
+    title: "نموذج تقييم شهري",
+    description: "متابعة شهرية سريعة على ٥ معايير + اقتراح مكافأة + توصية الشهر القادم",
+    icon: "📈",
     category: "evaluation",
   },
   {
