@@ -73,6 +73,17 @@ export async function createMarketingProject(formData: FormData) {
     .single();
 
   if (error || !data) {
+    // Log full error to server console — visible in Vercel logs so an
+    // admin can debug if the user reports the surfaced Arabic message
+    // is still unclear.
+    // eslint-disable-next-line no-console
+    console.error("[marketing/createProject] insert failed:", {
+      code: error?.code,
+      message: error?.message,
+      details: error?.details,
+      hint: error?.hint,
+      companyId: profile.company_id,
+    });
     redirect(
       "/dashboard/marketing?error=" +
         encodeURIComponent(arabicizeDbError(error?.message ?? "فشل الإنشاء")),

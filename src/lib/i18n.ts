@@ -10,6 +10,26 @@
 // message is already Arabic by design, so we pass it through.
 
 const PATTERNS: ReadonlyArray<readonly [RegExp, string]> = [
+  // Missing table/relation/function — most common after a feature ships
+  // without the matching migration. Surfacing this clearly is critical:
+  // "حاول تاني" wastes hours when the actual fix is one SQL run.
+  [
+    /relation .* does not exist|table .* does not exist|42P01/i,
+    "الجدول مش موجود في قاعدة البيانات — لازم تطبق آخر Migration على Supabase",
+  ],
+  [
+    /function .* does not exist|42883/i,
+    "الـ function في قاعدة البيانات مش موجود — لازم تطبق آخر Migration على Supabase",
+  ],
+  [
+    /column .* does not exist|42703/i,
+    "عمود مش موجود في قاعدة البيانات — في Migration ناقصة",
+  ],
+  [
+    /schema cache|PGRST205|PGRST204/i,
+    "Supabase ما عملش refresh للـ schema — استنى دقيقة وحاول تاني، أو اعمل reload في Supabase Dashboard",
+  ],
+
   // Postgres unique-violation errors come in two flavours -- the
   // Supabase REST one ("duplicate key value violates unique constraint")
   // and the older error code 23505.
@@ -38,6 +58,16 @@ const PATTERNS: ReadonlyArray<readonly [RegExp, string]> = [
 
   // Rate limiting (Supabase Auth + our own).
   [/rate limit|too many requests/i, "حاولت كتير في وقت قصير -- استنى دقيقة"],
+
+  // AI provider quota / API key issues
+  [
+    /api[_ ]?key|invalid.*key|unauthorized.*api/i,
+    "مفتاح الـ AI غير صحيح — راجع GROQ_API_KEY / GEMINI_API_KEY في Vercel",
+  ],
+  [
+    /quota|resource_exhausted|429/i,
+    "وصلنا للحد اليومي للـ AI — استنى ساعة أو ضيف مفتاح ثاني (Groq أو Gemini)",
+  ],
 ];
 
 export function arabicizeDbError(message: string | null | undefined): string {
@@ -52,5 +82,10 @@ export function arabicizeDbError(message: string | null | undefined): string {
   for (const [pattern, replacement] of PATTERNS) {
     if (pattern.test(m)) return replacement;
   }
-  return "حصلت مشكلة -- حاول تاني";
+
+  // Fallback: include the first 80 chars of the raw error so an admin can
+  // grep logs. Better than the opaque "حصلت مشكلة" — at least HR can
+  // tell the developer what they saw.
+  const snippet = m.slice(0, 80);
+  return `حصلت مشكلة: ${snippet}${m.length > 80 ? "..." : ""}`;
 }

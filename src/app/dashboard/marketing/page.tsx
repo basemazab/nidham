@@ -61,7 +61,7 @@ export default async function MarketingHubPage({
   const sp = await searchParams;
   const errorMsg = sp.error ? decodeURIComponent(sp.error) : null;
 
-  const { data } = await supabase
+  const { data, error: fetchError } = await supabase
     .from("marketing_projects")
     .select(
       "id, name, product_summary, industry, status, created_at, updated_at",
@@ -71,6 +71,15 @@ export default async function MarketingHubPage({
     .returns<Project[]>();
 
   const projects = data ?? [];
+
+  // Detect "table does not exist" so we can render an instructive
+  // banner instead of just the empty state. Most common reason is the
+  // tenant hasn't applied Migration 037 yet.
+  const tableMissing =
+    !!fetchError &&
+    /relation .* does not exist|42P01|schema cache|PGRST205/i.test(
+      fetchError.message ?? "",
+    );
 
   return (
     <main className="flex-1 px-4 md:px-6 py-6 bg-gradient-to-b from-slate-50 via-white to-amber-50/20 min-h-screen">
@@ -102,6 +111,56 @@ export default async function MarketingHubPage({
         {errorMsg && (
           <div className="mb-5 bg-red-50 border-2 border-red-200 rounded-xl p-4 text-red-700 font-cairo text-sm">
             ⚠ {errorMsg}
+          </div>
+        )}
+
+        {/* Migration not applied warning — the most likely reason for
+            "table not found" errors. Tells the operator exactly which
+            SQL file to apply where, with a one-click copy path. */}
+        {tableMissing && (
+          <div className="mb-5 bg-amber-50 border-2 border-amber-300 rounded-2xl p-5 font-cairo">
+            <div className="flex items-start gap-3">
+              <span className="text-3xl">⚠</span>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-black text-amber-900 mb-2 text-base">
+                  Migration 037 لسه ما اتطبقتش على Supabase
+                </h3>
+                <p className="text-sm text-amber-800 leading-relaxed mb-3">
+                  جداول الـ Marketing Studio (marketing_projects،
+                  marketing_personas، marketing_campaigns، marketing_keywords،
+                  marketing_ad_creatives) محتاجين Migration 037 يتعمله apply
+                  الأول. الـ Studio مش هيشتغل من غيرها.
+                </p>
+                <div className="bg-white border border-amber-200 rounded-lg p-3 mb-3">
+                  <div className="text-[10px] font-bold text-amber-700 mb-1">
+                    📋 خطوات التفعيل:
+                  </div>
+                  <ol className="text-sm text-slate-700 space-y-1.5 list-decimal pr-5">
+                    <li>افتح Supabase Dashboard</li>
+                    <li>روح على SQL Editor → New query</li>
+                    <li>
+                      انسخ والصق محتوى الملف:
+                      <code className="block bg-slate-100 text-xs font-mono p-2 mt-1 rounded text-slate-800" dir="ltr">
+                        db/migrations/037_marketing_studio.sql
+                      </code>
+                    </li>
+                    <li>اضغط Run</li>
+                    <li>ارجع هنا وحدّث الصفحة</li>
+                  </ol>
+                </div>
+                <p className="text-xs text-amber-700">
+                  💡 الـ Studio بيستخدم Groq Llama 3.3 + Gemini Flash. تأكد إن{" "}
+                  <code className="bg-amber-100 px-1.5 py-0.5 rounded text-[11px] font-mono">
+                    GROQ_API_KEY
+                  </code>{" "}
+                  أو{" "}
+                  <code className="bg-amber-100 px-1.5 py-0.5 rounded text-[11px] font-mono">
+                    GEMINI_API_KEY
+                  </code>{" "}
+                  متعيّن في Vercel Environment Variables.
+                </p>
+              </div>
+            </div>
           </div>
         )}
 
