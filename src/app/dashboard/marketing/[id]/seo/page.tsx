@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import { canUseFeature } from "@/lib/subscriptions-server";
 import { UpgradeRequired } from "@/components/upgrade-required";
 import { runSeoMaster } from "../../actions";
+import { AiErrorBanner } from "@/components/ai-error-banner";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -138,11 +139,7 @@ export default async function SeoPage({ params, searchParams }: PageProps) {
             ✅ تم بناء استراتيجية SEO كاملة. ركّز على Quick Wins أولاً.
           </div>
         )}
-        {errorMsg && (
-          <div className="mb-5 p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 font-cairo text-sm">
-            ⚠ {errorMsg}
-          </div>
-        )}
+        <AiErrorBanner message={errorMsg} />
 
         {/* Strategy summary */}
         {seoStrategy?.seo_strategy && (

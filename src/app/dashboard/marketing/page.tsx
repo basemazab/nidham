@@ -15,6 +15,7 @@ import { createClient } from "@/lib/supabase/server";
 import { canUseFeature } from "@/lib/subscriptions-server";
 import { UpgradeRequired } from "@/components/upgrade-required";
 import { createMarketingProject, archiveMarketingProject } from "./actions";
+import { AiErrorBanner } from "@/components/ai-error-banner";
 
 type Project = {
   id: string;
@@ -108,11 +109,7 @@ export default async function MarketingHubPage({
           </p>
         </header>
 
-        {errorMsg && (
-          <div className="mb-5 bg-red-50 border-2 border-red-200 rounded-xl p-4 text-red-700 font-cairo text-sm">
-            ⚠ {errorMsg}
-          </div>
-        )}
+        <AiErrorBanner message={errorMsg} />
 
         {/* Migration not applied warning — the most likely reason for
             "table not found" errors. Tells the operator exactly which

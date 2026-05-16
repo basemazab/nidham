@@ -13,6 +13,7 @@ import { canUseFeature } from "@/lib/subscriptions-server";
 import { UpgradeRequired } from "@/components/upgrade-required";
 import { getProviderStatus } from "@/lib/ai-models";
 import { runProductAnalysis } from "../actions";
+import { AiErrorBanner } from "@/components/ai-error-banner";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -109,28 +110,7 @@ export default async function MarketingProjectPage({
             ✅ تم تحليل المنتج بنجاح. شوف النتيجة تحت.
           </div>
         )}
-        {errorMsg && (
-          <div className="mb-5 p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 font-cairo text-sm">
-            <div className="flex items-start gap-2">
-              <span>⚠</span>
-              <div className="flex-1 leading-relaxed">{errorMsg}</div>
-            </div>
-            {/* If the message mentions GROQ_API_KEY, surface a direct
-                link to the Groq signup so the user fixes it in 2 minutes. */}
-            {errorMsg.includes("GROQ_API_KEY") && (
-              <div className="mt-3 pt-3 border-t border-red-200">
-                <a
-                  href="https://console.groq.com/keys"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-block px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-bold font-cairo transition"
-                >
-                  افتح Groq وخد مفتاح مجاني (دقيقتين) ↗
-                </a>
-              </div>
-            )}
-          </div>
-        )}
+        <AiErrorBanner message={errorMsg} />
 
         {/* Single-provider warning — shown when only Gemini OR only
             Groq is configured. Encourages the user to add the second

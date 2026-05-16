@@ -12,6 +12,7 @@ import { createClient } from "@/lib/supabase/server";
 import { canUseFeature } from "@/lib/subscriptions-server";
 import { UpgradeRequired } from "@/components/upgrade-required";
 import { runPageDoctor } from "../../actions";
+import { AiErrorBanner } from "@/components/ai-error-banner";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -155,11 +156,7 @@ export default async function PageDoctorPage({ params, searchParams }: PageProps
             ✅ تم تشخيص الصفحة بنجاح. شوف النتيجة تحت.
           </div>
         )}
-        {errorMsg && (
-          <div className="mb-5 p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 font-cairo text-sm">
-            ⚠ {errorMsg}
-          </div>
-        )}
+        <AiErrorBanner message={errorMsg} />
 
         {/* Diagnosis form */}
         <section className="bg-white border border-slate-200 rounded-2xl p-5 mb-6">

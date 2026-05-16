@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import { canUseFeature } from "@/lib/subscriptions-server";
 import { UpgradeRequired } from "@/components/upgrade-required";
 import { runAudienceBuilder } from "../../actions";
+import { AiErrorBanner } from "@/components/ai-error-banner";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -128,11 +129,7 @@ export default async function PersonasPage({ params, searchParams }: PageProps) 
             الـ targeting parameters في Facebook/Google Ads Manager.
           </div>
         )}
-        {errorMsg && (
-          <div className="mb-5 p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 font-cairo text-sm">
-            ⚠ {errorMsg}
-          </div>
-        )}
+        <AiErrorBanner message={errorMsg} />
 
         {personas.length === 0 ? (
           <div className="bg-white border border-slate-200 rounded-2xl p-10 text-center">
