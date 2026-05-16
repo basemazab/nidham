@@ -12,13 +12,32 @@ import { createClient } from "@/lib/supabase/server";
 import { canUseFeature } from "@/lib/subscriptions-server";
 import { UpgradeRequired } from "@/components/upgrade-required";
 import { getProviderStatus } from "@/lib/ai-models";
-import { runProductAnalysis } from "../actions";
+import { runProductAnalysis, updateMarketingProject } from "../actions";
 import { AiErrorBanner } from "@/components/ai-error-banner";
 
 type PageProps = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ analyzed?: string; error?: string }>;
+  searchParams: Promise<{
+    analyzed?: string;
+    error?: string;
+    saved?: string;
+  }>;
 };
+
+const INDUSTRIES = [
+  { value: "real_estate", label: "عقارات" },
+  { value: "manufacturing", label: "تصنيع" },
+  { value: "retail", label: "تجارة وعدد" },
+  { value: "services", label: "خدمات" },
+  { value: "saas", label: "تكنولوجيا / SaaS" },
+  { value: "food", label: "أكل ومشروبات" },
+  { value: "education", label: "تعليم" },
+  { value: "healthcare", label: "صحة" },
+  { value: "fashion", label: "موضة" },
+  { value: "automotive", label: "سيارات" },
+  { value: "construction", label: "إنشاء ومقاولات" },
+  { value: "other", label: "أخرى" },
+];
 
 type Project = {
   id: string;
@@ -110,6 +129,11 @@ export default async function MarketingProjectPage({
             ✅ تم تحليل المنتج بنجاح. شوف النتيجة تحت.
           </div>
         )}
+        {sp.saved && (
+          <div className="mb-5 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 font-cairo text-sm">
+            ✅ تم حفظ التعديلات. تقدر دلوقتي تشغّل أي أداة AI.
+          </div>
+        )}
         <AiErrorBanner message={errorMsg} />
 
         {/* Single-provider warning — shown when only Gemini OR only
@@ -161,35 +185,15 @@ export default async function MarketingProjectPage({
           </details>
         )}
 
-        {/* Product description card */}
-        <section className="bg-white border border-slate-200 rounded-2xl p-5 mb-6">
-          <div className="flex items-start justify-between mb-3 flex-wrap gap-2">
-            <h2 className="font-black font-cairo text-slate-800">
-              📝 وصف المنتج
-            </h2>
-            <form action={runProductAnalysis}>
-              <input type="hidden" name="project_id" value={id} />
-              <button
-                type="submit"
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold text-sm font-cairo shadow-md hover:shadow-lg transition"
-              >
-                <span>🔬</span>
-                <span>
-                  {hasAnalysis ? "إعادة التحليل" : "حلّل المنتج بالـ AI"}
-                </span>
-              </button>
-            </form>
-          </div>
-          {project.product_summary ? (
-            <p className="text-sm text-slate-700 font-cairo leading-relaxed whitespace-pre-line">
-              {project.product_summary}
-            </p>
-          ) : (
-            <p className="text-sm text-slate-400 font-cairo">
-              لم يتم إضافة وصف للمنتج بعد.
-            </p>
-          )}
-        </section>
+        {/* Product description card — handles BOTH viewing/editing the
+            summary AND triggering the AI analysis. When summary is empty
+            the edit form is shown directly so the user can never get stuck
+            with a half-created project. */}
+        <ProductSummarySection
+          projectId={id}
+          project={project}
+          hasAnalysis={!!hasAnalysis}
+        />
 
         {/* AI Analysis results */}
         {hasAnalysis && (
@@ -255,6 +259,168 @@ export default async function MarketingProjectPage({
         </div>
       </div>
     </main>
+  );
+}
+
+// ----------------------------------------------------------------------------
+// ProductSummarySection — view + inline-edit + run-AI-analysis
+// ----------------------------------------------------------------------------
+// Two modes:
+//   1. summary present → show it + "✏ تعديل" details disclosure
+//                       + "🔬 حلّل بالـ AI" button
+//   2. summary missing → show the edit form directly (no toggle), with
+//                       a yellow callout explaining all tools need it
+//                       before they can run.
+//
+// Critical for UX: every AI tool short-circuits with "اكتب وصف المنتج
+// أولاً" when summary is empty, and there was no UI to set it after
+// creation. Without this section, an empty-summary project was a
+// dead-end.
+function ProductSummarySection({
+  projectId,
+  project,
+  hasAnalysis,
+}: {
+  projectId: string;
+  project: Project;
+  hasAnalysis: boolean;
+}) {
+  const hasSummary =
+    !!project.product_summary && project.product_summary.length > 0;
+
+  return (
+    <section className="bg-white border border-slate-200 rounded-2xl p-5 mb-6">
+      <div className="flex items-start justify-between mb-3 flex-wrap gap-2">
+        <h2 className="font-black font-cairo text-slate-800">
+          📝 وصف المنتج
+        </h2>
+        {hasSummary && (
+          <form action={runProductAnalysis}>
+            <input type="hidden" name="project_id" value={projectId} />
+            <button
+              type="submit"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold text-sm font-cairo shadow-md hover:shadow-lg transition"
+            >
+              <span>🔬</span>
+              <span>
+                {hasAnalysis ? "إعادة التحليل" : "حلّل المنتج بالـ AI"}
+              </span>
+            </button>
+          </form>
+        )}
+      </div>
+
+      {hasSummary ? (
+        <>
+          <p className="text-sm text-slate-700 font-cairo leading-relaxed whitespace-pre-line mb-3">
+            {project.product_summary}
+          </p>
+          <details className="text-xs">
+            <summary className="cursor-pointer text-slate-500 hover:text-amber-700 font-cairo">
+              ✏ تعديل الوصف أو الصناعة أو السوق
+            </summary>
+            <div className="mt-3 pt-3 border-t border-slate-100">
+              <ProductSummaryForm projectId={projectId} project={project} />
+            </div>
+          </details>
+        </>
+      ) : (
+        <>
+          <div className="mb-4 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs font-cairo leading-relaxed">
+            ⚠ المشروع ده معندوش وصف للمنتج. كل أدوات الـ AI (SEO، باني
+            الجمهور، كاتب الإعلانات، معالج الحملات، Page Doctor) محتاجة
+            الوصف عشان تشتغل. اكتبه دلوقتي:
+          </div>
+          <ProductSummaryForm projectId={projectId} project={project} />
+        </>
+      )}
+    </section>
+  );
+}
+
+function ProductSummaryForm({
+  projectId,
+  project,
+}: {
+  projectId: string;
+  project: Project;
+}) {
+  return (
+    <form action={updateMarketingProject} className="grid md:grid-cols-2 gap-3">
+      <input type="hidden" name="project_id" value={projectId} />
+
+      <div className="md:col-span-2">
+        <label className="block text-xs font-bold text-slate-700 mb-1 font-cairo">
+          اسم المشروع <span className="text-rose-500">*</span>
+        </label>
+        <input
+          type="text"
+          name="name"
+          required
+          minLength={2}
+          defaultValue={project.name}
+          className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-amber-400 outline-none text-sm font-cairo"
+        />
+      </div>
+
+      <div className="md:col-span-2">
+        <label className="block text-xs font-bold text-slate-700 mb-1 font-cairo">
+          وصف المنتج/الخدمة <span className="text-rose-500">*</span>{" "}
+          <span className="text-slate-400">(30 حرف على الأقل)</span>
+        </label>
+        <textarea
+          name="product_summary"
+          required
+          minLength={30}
+          rows={5}
+          defaultValue={project.product_summary ?? ""}
+          placeholder="اشرح المنتج: إيه هو، عميله المثالي، فايدته الرئيسية، سعره، اللي يميزه عن المنافسين..."
+          className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-amber-400 focus:ring-2 focus:ring-amber-200 outline-none text-sm font-cairo resize-y"
+        />
+        <p className="text-[10px] text-slate-500 font-cairo mt-1">
+          💡 كل ما الوصف أوضح، كل ما النتايج أدق.
+        </p>
+      </div>
+
+      <div>
+        <label className="block text-xs font-bold text-slate-700 mb-1 font-cairo">
+          الصناعة
+        </label>
+        <select
+          name="industry"
+          defaultValue={project.industry ?? ""}
+          className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-amber-400 outline-none text-sm font-cairo"
+        >
+          <option value="">— اختر —</option>
+          {INDUSTRIES.map((i) => (
+            <option key={i.value} value={i.value}>
+              {i.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div>
+        <label className="block text-xs font-bold text-slate-700 mb-1 font-cairo">
+          السوق المستهدف
+        </label>
+        <input
+          type="text"
+          name="target_market"
+          defaultValue={project.target_market ?? "Egypt"}
+          className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-amber-400 outline-none text-sm font-cairo"
+        />
+      </div>
+
+      <div className="md:col-span-2">
+        <button
+          type="submit"
+          className="w-full px-5 py-3 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 text-white font-black font-cairo shadow-md hover:shadow-lg transition"
+        >
+          💾 احفظ التعديلات
+        </button>
+      </div>
+    </form>
   );
 }
 

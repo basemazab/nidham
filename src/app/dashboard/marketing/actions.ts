@@ -58,13 +58,25 @@ export async function createMarketingProject(formData: FormData) {
         encodeURIComponent("اسم المشروع لازم 2 حروف على الأقل"),
     );
   }
+  // All five AI tools depend on product_summary. Enforcing a real
+  // minimum at creation time prevents the "I made a project and now
+  // I can't run anything" dead-end. The number 30 ≈ a meaningful
+  // sentence and matches the validation in updateMarketingProject.
+  if (product_summary.length < 30) {
+    redirect(
+      "/dashboard/marketing?error=" +
+        encodeURIComponent(
+          "وصف المنتج لازم 30 حرف على الأقل — اشرح المنتج، عميله المثالي، فايدته، اللي يميزه",
+        ),
+    );
+  }
 
   const { data, error } = await supabase
     .from("marketing_projects")
     .insert({
       company_id: profile.company_id,
       name,
-      product_summary: product_summary || null,
+      product_summary,
       industry,
       target_market,
       created_by: profile.id,
@@ -108,6 +120,79 @@ export async function archiveMarketingProject(formData: FormData) {
 
   revalidatePath("/dashboard/marketing");
   redirect("/dashboard/marketing");
+}
+
+/**
+ * Update product description / industry / target market on an existing
+ * project. Used by the inline edit form on /dashboard/marketing/[id].
+ *
+ * The downstream AI tools (SEO, Personas, Ads, Campaign, Page Doctor) all
+ * gate on `project.product_summary` being non-empty. Without an edit path,
+ * a user who left it blank at creation would be stuck — that's the bug
+ * this fixes.
+ */
+export async function updateMarketingProject(formData: FormData) {
+  const { profile, supabase } = await gateEnterprise();
+
+  const projectId = String(formData.get("project_id") ?? "").trim();
+  if (!/^[0-9a-f-]{36}$/i.test(projectId)) {
+    redirect("/dashboard/marketing");
+  }
+
+  const name = String(formData.get("name") ?? "").trim();
+  const product_summary = String(formData.get("product_summary") ?? "").trim();
+  const industry = String(formData.get("industry") ?? "").trim() || null;
+  const target_market =
+    String(formData.get("target_market") ?? "").trim() || "Egypt";
+
+  // Validate: the description is the single most important input. The
+  // existing tools refuse to run without it, so we enforce a real minimum
+  // here (30 chars ≈ a meaningful sentence) instead of accepting empty
+  // or one-word entries.
+  if (name.length < 2) {
+    redirect(
+      `/dashboard/marketing/${projectId}?error=` +
+        encodeURIComponent("اسم المشروع لازم 2 حروف على الأقل"),
+    );
+  }
+  if (product_summary.length < 30) {
+    redirect(
+      `/dashboard/marketing/${projectId}?error=` +
+        encodeURIComponent(
+          "وصف المنتج لازم 30 حرف على الأقل — اشرح المنتج، عميله المثالي، فايدته، اللي يميزه",
+        ),
+    );
+  }
+
+  const { error } = await supabase
+    .from("marketing_projects")
+    .update({
+      name,
+      product_summary,
+      industry,
+      target_market,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", projectId)
+    .eq("company_id", profile.company_id);
+
+  if (error) {
+    // eslint-disable-next-line no-console
+    console.error("[marketing/updateProject] update failed:", {
+      code: error.code,
+      message: error.message,
+      projectId,
+      companyId: profile.company_id,
+    });
+    redirect(
+      `/dashboard/marketing/${projectId}?error=` +
+        encodeURIComponent(arabicizeDbError(error.message)),
+    );
+  }
+
+  revalidatePath(`/dashboard/marketing/${projectId}`);
+  revalidatePath("/dashboard/marketing");
+  redirect(`/dashboard/marketing/${projectId}?saved=1`);
 }
 
 // ----------------------------------------------------------------------------

@@ -222,16 +222,19 @@ export default async function MarketingHubPage({
             </div>
             <div className="md:col-span-2">
               <label className="block text-xs font-bold text-slate-700 mb-1 font-cairo">
-                وصف المنتج/الخدمة (الأهم — كل الأدوات هتستخدمه)
+                وصف المنتج/الخدمة <span className="text-rose-500">*</span>{" "}
+                <span className="text-slate-400">(الأهم — كل الأدوات هتستخدمه)</span>
               </label>
               <textarea
                 name="product_summary"
+                required
+                minLength={30}
                 rows={4}
                 placeholder="اشرح المنتج: إيه هو، عميله المثالي، فايدته الرئيسية، سعره، اللي يميزه عن المنافسين..."
                 className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-amber-400 focus:ring-2 focus:ring-amber-200 outline-none text-sm font-cairo resize-y"
               />
               <p className="text-[10px] text-slate-500 font-cairo mt-1">
-                💡 كل ما الوصف أوضح، كل ما النتايج أدق. متبخلش في التفاصيل.
+                💡 لازم 30 حرف على الأقل. كل ما الوصف أوضح، كل ما النتايج أدق.
               </p>
             </div>
             <div>

@@ -11,15 +11,27 @@
 // the best LANGUAGE model available given the configured API keys, using
 // this priority order:
 //
-//   1) Groq Llama 3.3 70B Versatile        — 30 RPM, 14k RPD (free)
-//      Excellent tool calling, fast, Arabic decent.
-//   2) Groq Llama 3.1 8B Instant           — 30 RPM, 14k RPD (free)
-//      Different rate-limit bucket from 70B → effective 60 RPM together.
+//   1) Groq gpt-oss-20b                    — 30 RPM, ~100k RPD (free)
+//      Supports BOTH tool calling AND json_schema structured outputs.
+//      Fast and Arabic-capable. Default primary because everything that
+//      calls generateObject (marketing studio, screening, etc.) needs
+//      native structured output support — Llama 3.x on Groq does NOT.
+//   2) Groq Llama 4 Scout 17B              — 30 RPM, 14k RPD (free)
+//      Different rate-limit bucket. Also supports json_schema. Good
+//      multilingual quality.
 //   3) Gemini 2.5 Flash Lite               — 60 RPM, 1.5k RPD (free)
-//      Falls back here when Groq keys aren't set.
+//      Falls back here when Groq keys aren't set or both Groq models
+//      are exhausted.
+//
+// Why not Llama 3.3 70B Versatile or Llama 3.1 8B Instant: Groq's
+// docs (https://console.groq.com/docs/structured-outputs#supported-models)
+// list them as supporting json_object only — NOT json_schema. The Vercel
+// AI SDK 6.x sends json_schema by default for generateObject, so those
+// models error with "This model does not support response format `json_schema`".
 //
 // Tenants can override the default order via env var:
-//   AI_AGENT_MODEL = "groq:llama-3.3-70b-versatile"
+//   AI_AGENT_MODEL = "groq:openai/gpt-oss-20b"
+//   AI_AGENT_MODEL = "groq:meta-llama/llama-4-scout-17b-16e-instruct"
 //   AI_AGENT_MODEL = "gemini:gemini-2.5-flash"
 //   AI_AGENT_MODEL = "gemini:gemini-2.5-flash-lite"
 //
@@ -60,7 +72,7 @@ function getGoogleProvider() {
 // ----------------------------------------------------------------------------
 // Priority:
 //   1) Honor AI_AGENT_MODEL env var if set ("groq:..." or "gemini:...")
-//   2) Otherwise prefer Groq Llama 3.3 70B (highest free RPD)
+//   2) Otherwise prefer Groq gpt-oss-20b (supports json_schema + 100k RPD)
 //   3) Fall back to Gemini Flash Lite
 // Throws if NO provider is configured — every tenant must have at least
 // one API key in env. The error message is bilingual so the surfaced
@@ -83,12 +95,14 @@ export function pickAgentModel(): AgentModelInfo {
     // fall through to defaults if the override is malformed
   }
 
-  // 2) Default: Groq Llama 3.3 70B — best free quota + tool calling
+  // 2) Default: Groq gpt-oss-20b — supports BOTH tool calling AND
+  // json_schema response format. Llama 3.x on Groq only supports
+  // json_object, which generateObject() doesn't use.
   if (groq) {
     return {
       provider: "groq",
-      modelName: "llama-3.3-70b-versatile",
-      model: groq("llama-3.3-70b-versatile"),
+      modelName: "openai/gpt-oss-20b",
+      model: groq("openai/gpt-oss-20b"),
     };
   }
 
@@ -119,15 +133,16 @@ export function pickFallbackAgentModel(
   const google = getGoogleProvider();
 
   if (primary.provider === "groq") {
-    // Try the other Groq model first (different rate-limit bucket),
-    // then fall through to Gemini.
-    if (groq && primary.modelName === "llama-3.3-70b-versatile") {
+    // Try the other json_schema-capable Groq model first (different
+    // rate-limit bucket), then fall through to Gemini.
+    if (groq && primary.modelName === "openai/gpt-oss-20b") {
       return {
         provider: "groq",
-        modelName: "llama-3.1-8b-instant",
-        model: groq("llama-3.1-8b-instant"),
+        modelName: "meta-llama/llama-4-scout-17b-16e-instruct",
+        model: groq("meta-llama/llama-4-scout-17b-16e-instruct"),
       };
     }
+    // If we're already on Llama 4 Scout (the secondary), go to Gemini.
     if (google) {
       return {
         provider: "gemini",
@@ -141,8 +156,8 @@ export function pickFallbackAgentModel(
     if (groq) {
       return {
         provider: "groq",
-        modelName: "llama-3.3-70b-versatile",
-        model: groq("llama-3.3-70b-versatile"),
+        modelName: "openai/gpt-oss-20b",
+        model: groq("openai/gpt-oss-20b"),
       };
     }
   }
@@ -203,7 +218,14 @@ export function isRetryableError(err: unknown): boolean {
     lower.includes("500") ||
     lower.includes("etimedout") ||
     lower.includes("econnreset") ||
-    lower.includes("aborted")
+    lower.includes("aborted") ||
+    // Treat "model capability mismatch" as retryable so the fallback
+    // chain can swap to a compatible model. Most commonly hit when an
+    // older Groq model is asked for json_schema (only json_object support).
+    lower.includes("does not support response format") ||
+    lower.includes("response_format") ||
+    lower.includes("does not support") ||
+    lower.includes("not supported")
   );
 }
 
@@ -315,7 +337,7 @@ export function getProviderStatus() {
     groq: !!process.env.GROQ_API_KEY,
     gemini: !!process.env.GEMINI_API_KEY,
     primary: process.env.GROQ_API_KEY
-      ? "groq:llama-3.3-70b-versatile"
+      ? "groq:openai/gpt-oss-20b"
       : process.env.GEMINI_API_KEY
         ? "gemini:gemini-2.5-flash-lite"
         : "none",

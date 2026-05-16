@@ -11,15 +11,22 @@
 //   - Celebrate "active" trials → they're his next paying customers
 //
 // Engagement is scored from data the tenant actually created:
-//   employees + attendance + customers + interactions + payroll periods
+//   employees + attendance + customers + interactions
+//   + payroll periods + marketing projects
+//
+// We also surface the timestamp of the most recent row in any of those
+// tables — that's the strongest "did this tenant come back?" signal,
+// independent of total volume.
 //
 // Tiers:
 //   🟢 active   — created real records (>= 10 across categories)
 //   🟡 warm     — tried a few things (1-9 records)
 //   🔴 cold     — signed up, never returned (0 records)
 //
-// Auth: gated on super_admins table. Uses RLS bypass so we see all
-// tenants. Mirrors the gate on /admin/page.tsx.
+// Auth: gated on super_admins table. Reads tenant data through RLS
+// bypass policies for super-admins (mig 008 + 014 + 021 + 038). If 038
+// hasn't been applied, every tenant looks "cold" — the page detects
+// that symptom and shows a "migration not applied" banner.
 
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -55,7 +62,7 @@ type EngagementCounts = {
   customers: number;
   interactions: number;
   payroll_periods: number;
-  ai_messages: number;
+  marketing_projects: number;
 };
 
 type EngagementTier = "active" | "warm" | "cold";
@@ -70,6 +77,9 @@ type TrialRow = {
   tier: EngagementTier;
   daysSinceSignup: number;
   daysUntilExpiry: number;
+  // ISO timestamp of the most recent row created across any tracked table.
+  // null when the tenant has done nothing since signup.
+  lastActivityAt: string | null;
 };
 
 function pickTier(total: number): EngagementTier {
@@ -160,6 +170,7 @@ export default async function TrialsAnalyticsPage() {
   const trialCompanyIds = subs.map((s) => s.company_id);
 
   const countsByCompany = new Map<string, EngagementCounts>();
+  const lastActivityByCompany = new Map<string, string | null>();
   for (const cid of trialCompanyIds) {
     countsByCompany.set(cid, {
       employees: 0,
@@ -167,13 +178,33 @@ export default async function TrialsAnalyticsPage() {
       customers: 0,
       interactions: 0,
       payroll_periods: 0,
-      ai_messages: 0,
+      marketing_projects: 0,
     });
+    lastActivityByCompany.set(cid, null);
   }
 
+  // For each tenant, fan-out row counts AND grab the most-recent created_at
+  // across all tracked tables in parallel. The count queries use head:true
+  // to avoid paying for row payloads; the "last activity" queries fetch
+  // exactly one row each (the newest).
+  //
+  // Note: this only works correctly when the super-admin has RLS SELECT
+  // bypass on every table below. Migration 038 added the four that were
+  // missing (employees / attendance / customers / interactions) plus the
+  // marketing_* tables. Without it, every tenant looks "cold" because the
+  // policies fall back to "see only your own company".
   if (trialCompanyIds.length > 0) {
     const fetches = trialCompanyIds.map(async (cid) => {
-      const [emp, att, cust, intr, pay] = await Promise.all([
+      const tablesForLastActivity = [
+        "employees",
+        "attendance",
+        "customers",
+        "interactions",
+        "payroll_periods",
+        "marketing_projects",
+      ] as const;
+
+      const countResults = await Promise.all([
         supabase
           .from("employees")
           .select("id", { count: "exact", head: true })
@@ -194,15 +225,60 @@ export default async function TrialsAnalyticsPage() {
           .from("payroll_periods")
           .select("id", { count: "exact", head: true })
           .eq("company_id", cid),
+        supabase
+          .from("marketing_projects")
+          .select("id", { count: "exact", head: true })
+          .eq("company_id", cid),
       ]);
+
+      const [emp, att, cust, intr, pay, mkt] = countResults;
       countsByCompany.set(cid, {
         employees: emp.count ?? 0,
         attendance: att.count ?? 0,
         customers: cust.count ?? 0,
         interactions: intr.count ?? 0,
         payroll_periods: pay.count ?? 0,
-        ai_messages: 0,
+        marketing_projects: mkt.count ?? 0,
       });
+
+      // Last activity: pick the newest created_at across every table that
+      // actually has a row for this tenant. We only query tables whose
+      // count > 0 to avoid wasted round-trips for cold tenants.
+      const counts = [
+        emp.count,
+        att.count,
+        cust.count,
+        intr.count,
+        pay.count,
+        mkt.count,
+      ];
+
+      const activityFetches = tablesForLastActivity
+        .map((table, i) =>
+          (counts[i] ?? 0) > 0
+            ? supabase
+                .from(table)
+                .select("created_at")
+                .eq("company_id", cid)
+                .order("created_at", { ascending: false })
+                .limit(1)
+                .maybeSingle<{ created_at: string }>()
+            : null,
+        )
+        .filter((p): p is NonNullable<typeof p> => p !== null);
+
+      if (activityFetches.length === 0) {
+        lastActivityByCompany.set(cid, null);
+        return;
+      }
+
+      const activityResults = await Promise.all(activityFetches);
+      let newest: string | null = null;
+      for (const r of activityResults) {
+        const ts = r.data?.created_at ?? null;
+        if (ts && (!newest || ts > newest)) newest = ts;
+      }
+      lastActivityByCompany.set(cid, newest);
     });
     await Promise.all(fetches);
   }
@@ -218,14 +294,15 @@ export default async function TrialsAnalyticsPage() {
       customers: 0,
       interactions: 0,
       payroll_periods: 0,
-      ai_messages: 0,
+      marketing_projects: 0,
     };
     const total =
       counts.employees +
       counts.attendance +
       counts.customers +
       counts.interactions +
-      counts.payroll_periods;
+      counts.payroll_periods +
+      counts.marketing_projects;
     const tier = pickTier(total);
     const ownerProfile = company.created_by
       ? profileById.get(company.created_by)
@@ -240,6 +317,7 @@ export default async function TrialsAnalyticsPage() {
       tier,
       daysSinceSignup: daysSince(company.created_at),
       daysUntilExpiry: daysFromToday(sub.ends_at),
+      lastActivityAt: lastActivityByCompany.get(sub.company_id) ?? null,
     });
   }
 
@@ -269,6 +347,14 @@ export default async function TrialsAnalyticsPage() {
     stats.total === 0
       ? 0
       : Math.round((stats.active / stats.total) * 100);
+
+  // Health-check: detect the "missing RLS bypass" symptom. If we have >=2
+  // trial tenants but every single one of them shows total=0 AND none has a
+  // last_activity timestamp, it's almost certain mig 038 hasn't run. Surface
+  // a one-shot diagnostic banner instead of silently presenting bad data.
+  const rlsLikelyBroken =
+    rows.length >= 2 &&
+    rows.every((r) => r.total === 0 && r.lastActivityAt === null);
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -366,6 +452,46 @@ export default async function TrialsAnalyticsPage() {
             </div>
           )}
 
+          {/* Diagnostic banner — Migration 038 not applied yet. The page
+              technically renders, but every tenant looks "cold" because
+              RLS hides their actual usage data from the super-admin. */}
+          {rlsLikelyBroken && (
+            <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-5 mb-6">
+              <div className="flex items-start gap-3">
+                <span className="text-3xl">⚠</span>
+                <div className="flex-1 min-w-0">
+                  <h2 className="font-black text-amber-900 mb-2 text-base font-cairo">
+                    الأرقام دي مش حقيقية — Migration 038 لسه ما اتطبّقتش
+                  </h2>
+                  <p className="text-sm text-amber-800 leading-relaxed mb-3 font-cairo">
+                    كل التجريبيين بيبانوا &quot;🔴 ما رجعوش&quot; لأن صلاحية الـ
+                    Super-Admin مش قادرة تشوف employees / attendance /
+                    customers / interactions بتاعتهم. لازم تطبّق Migration
+                    038 على Supabase الأول.
+                  </p>
+                  <div className="bg-white border border-amber-200 rounded-lg p-3 font-cairo">
+                    <div className="text-[10px] font-bold text-amber-700 mb-1">
+                      📋 خطوات التفعيل:
+                    </div>
+                    <ol className="text-sm text-slate-700 space-y-1 list-decimal pr-5">
+                      <li>افتح Supabase Dashboard → SQL Editor → New query</li>
+                      <li>
+                        انسخ والصق:{" "}
+                        <code
+                          className="block bg-slate-100 text-xs font-mono p-2 mt-1 rounded text-slate-800"
+                          dir="ltr"
+                        >
+                          db/migrations/038_super_admin_engagement_visibility.sql
+                        </code>
+                      </li>
+                      <li>اضغط Run وارجع هنا حدّث الصفحة</li>
+                    </ol>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Empty state */}
           {rows.length === 0 ? (
             <div className="bg-white rounded-2xl p-12 text-center border border-slate-100">
@@ -383,6 +509,7 @@ export default async function TrialsAnalyticsPage() {
                     <Th>صاحبها</Th>
                     <Th>المرحلة</Th>
                     <Th>تفاعل</Th>
+                    <Th>آخر نشاط</Th>
                     <Th>سجّل من</Th>
                     <Th>ينتهي بعد</Th>
                     <Th>تفاصيل</Th>
@@ -405,9 +532,37 @@ export default async function TrialsAnalyticsPage() {
 // ----------------------------------------------------------------------------
 // TrialRowItem
 // ----------------------------------------------------------------------------
+function formatLastActivity(iso: string | null): {
+  text: string;
+  cls: string;
+} {
+  if (!iso) return { text: "مفيش نشاط", cls: "text-rose-600 font-bold" };
+  const now = Date.now();
+  const then = new Date(iso).getTime();
+  const diffMs = now - then;
+  const hours = Math.floor(diffMs / (1000 * 60 * 60));
+  const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  if (hours < 1) return { text: "دلوقتي", cls: "text-emerald-700 font-bold" };
+  if (hours < 24) return { text: `من ${hours}س`, cls: "text-emerald-700 font-bold" };
+  if (days === 1) return { text: "إمبارح", cls: "text-emerald-600 font-bold" };
+  if (days <= 3) return { text: `من ${days} أيام`, cls: "text-emerald-600 font-bold" };
+  if (days <= 7) return { text: `من ${days} أيام`, cls: "text-amber-600 font-bold" };
+  if (days <= 14) return { text: `من ${days} يوم`, cls: "text-amber-700 font-bold" };
+  return { text: `من ${days} يوم`, cls: "text-rose-700 font-bold" };
+}
+
 function TrialRowItem({ row }: { row: TrialRow }) {
-  const { company, sub, counts, total, tier, daysSinceSignup, daysUntilExpiry } =
-    row;
+  const {
+    company,
+    sub,
+    counts,
+    total,
+    tier,
+    daysSinceSignup,
+    daysUntilExpiry,
+    lastActivityAt,
+  } = row;
+  const lastActivity = formatLastActivity(lastActivityAt);
 
   const tierBadge = {
     active: {
@@ -448,15 +603,29 @@ function TrialRowItem({ row }: { row: TrialRow }) {
             {total} سجل
           </div>
           <div className="text-[10px] text-slate-500 font-cairo flex flex-wrap gap-x-2">
-            {counts.employees > 0 && <span>👥{counts.employees}</span>}
-            {counts.attendance > 0 && <span>⏰{counts.attendance}</span>}
-            {counts.customers > 0 && <span>💼{counts.customers}</span>}
-            {counts.interactions > 0 && <span>💬{counts.interactions}</span>}
+            {counts.employees > 0 && (
+              <span title="موظفين">👥{counts.employees}</span>
+            )}
+            {counts.attendance > 0 && (
+              <span title="حضور">⏰{counts.attendance}</span>
+            )}
+            {counts.customers > 0 && (
+              <span title="عملاء">💼{counts.customers}</span>
+            )}
+            {counts.interactions > 0 && (
+              <span title="تفاعلات">💬{counts.interactions}</span>
+            )}
             {counts.payroll_periods > 0 && (
-              <span>💰{counts.payroll_periods}</span>
+              <span title="رواتب">💰{counts.payroll_periods}</span>
+            )}
+            {counts.marketing_projects > 0 && (
+              <span title="مشاريع تسويق">✦{counts.marketing_projects}</span>
             )}
           </div>
         </div>
+      </td>
+      <td className={`px-4 py-3 text-sm font-cairo ${lastActivity.cls}`}>
+        {lastActivity.text}
       </td>
       <td className="px-4 py-3 text-sm text-slate-600 font-cairo">
         {daysSinceSignup === 0
