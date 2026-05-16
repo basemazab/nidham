@@ -21,9 +21,17 @@ const squirrelOptions: ConstructorParameters<typeof MakerSquirrel>[0] = {
   description: "Nidham HR + CRM + AI Recruitment",
 };
 if (hasIcoIcon) {
+  // setupIcon -> the installer .exe icon (uses the local .ico file at
+  // build time, no network needed)
   squirrelOptions.setupIcon = "./assets/icon.ico";
-  squirrelOptions.iconUrl =
-    "https://raw.githubusercontent.com/basemazab/nidham/main/desktop/assets/icon.ico";
+
+  // NOTE: We intentionally do NOT set `iconUrl`. Squirrel's iconUrl is
+  // an HTTP URL Windows fetches AT INSTALL TIME to render the Control
+  // Panel / shortcut icon. If that URL 404s (e.g. repo is private),
+  // Squirrel skips the icon assignment and the desktop shortcut ends
+  // up blank. Leaving iconUrl unset makes Windows fall back to the
+  // icon embedded inside Nidham.exe itself (via packagerConfig.icon
+  // below) which is the right behaviour for a self-contained install.
 }
 
 const config: ForgeConfig = {
