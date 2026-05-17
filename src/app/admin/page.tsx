@@ -137,6 +137,12 @@ export default async function AdminPage() {
         </div>
         <div className="flex items-center gap-3">
           <Link
+            href="/admin/social"
+            className="text-sm text-rose-300 hover:text-white font-bold font-cairo px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 transition"
+          >
+            📣 Social Growth
+          </Link>
+          <Link
             href="/admin/trials"
             className="text-sm text-amber-300 hover:text-white font-bold font-cairo px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 transition"
           >
