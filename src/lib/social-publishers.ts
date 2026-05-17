@@ -290,16 +290,24 @@ async function publishToTelegram(args: {
       error: "Telegram account missing chat_id metadata (the channel ID).",
     };
   }
+  // Telegram's sendMessage caps text at 4096 chars. Truncate gracefully
+  // rather than letting the API reject the whole post.
+  const safeBody = args.body.length > 4096 ? args.body.slice(0, 4093) + "…" : args.body;
   try {
     const res = await fetch(
       `https://api.telegram.org/bot${args.accessToken}/sendMessage`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        // No parse_mode — send as plain text. We were previously passing
+        // parse_mode: "HTML" which makes Telegram strict about <, >, &
+        // characters in the body. AI-generated posts occasionally include
+        // a stray < or & that breaks publish without any visible HTML
+        // intent. Plain text is more forgiving and the posts don't need
+        // formatting anyway (line breaks render natively).
         body: JSON.stringify({
           chat_id: chatId,
-          text: args.body,
-          parse_mode: "HTML",
+          text: safeBody,
           disable_web_page_preview: false,
         }),
       },
