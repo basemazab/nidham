@@ -211,27 +211,34 @@ export default async function SocialHomePage({
       </section>
 
       {/* Quick links */}
-      <section className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+      <section className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <ActionCard
           href="/admin/social/composer"
           icon="✦"
           gradient="from-rose-500 to-pink-500"
           title="اكتب بوست جديد"
-          desc="AI يولّد بوستات للمنصات اللي اخترتها — انت بس تراجع وتنشر."
+          desc="AI يولّد بوستات + صور — انت تراجع وتنشر."
         />
         <ActionCard
           href="/admin/social/accounts"
           icon="🔌"
           gradient="from-cyan-500 to-blue-500"
           title="ربط حساب جديد"
-          desc="Facebook · Instagram · X · LinkedIn · Telegram + غيرهم."
+          desc="Facebook · Instagram · X · LinkedIn · Telegram."
         />
         <ActionCard
           href="/admin/social/inbox"
           icon="💬"
           gradient="from-violet-500 to-purple-500"
           title="رد على التعليقات"
-          desc="AI بيدرّج رد لكل تعليق — انت توافق أو تعدّل قبل النشر."
+          desc="AI بيدرّج رد لكل تعليق — انت توافق."
+        />
+        <ActionCard
+          href="/admin/social/branding"
+          icon="🎨"
+          gradient="from-amber-500 to-orange-500"
+          title="هوية بصرية للـ Page"
+          desc="ولّد صورة شخصية + غلاف احترافي للـ FB Page."
         />
       </section>
 

@@ -16,6 +16,11 @@ import {
   publishToSocialPlatform,
   replyToSocialComment,
 } from "@/lib/social-publishers";
+import {
+  generateAndStorePostImage,
+  generateBrandProfileImage,
+  generateBrandCoverImage,
+} from "@/lib/social-images";
 
 // ----------------------------------------------------------------------------
 // Super-admin gate. Every action in this file runs through it. If the
@@ -128,6 +133,142 @@ export async function saveSocialAccount(formData: FormData) {
   revalidatePath("/admin/social/accounts");
   revalidatePath("/admin/social");
   redirect("/admin/social/accounts?saved=1");
+}
+
+/**
+ * Exchange a short-lived Facebook token for a long-lived one (60 days).
+ *
+ * The token Graph API Explorer hands you is short-lived (1-2 hours).
+ * The actual long-lived flow is two steps:
+ *
+ *   1) Exchange short USER token → long USER token (60 days)
+ *      GET /oauth/access_token?grant_type=fb_exchange_token
+ *          &client_id=APP_ID
+ *          &client_secret=APP_SECRET
+ *          &fb_exchange_token=SHORT_TOKEN
+ *
+ *   2) Use long User token to GET /me/accounts — the Page tokens
+ *      returned at this step inherit "never expire" status as long
+ *      as the user keeps the app authorized and stays admin.
+ *
+ * Importantly: for a Page token, the exchange endpoint ALSO accepts
+ * the page token directly and just returns a longer-lived version of
+ * the same page token. We use that single-step path because:
+ *   - Operator pasted a Page token, not a User token.
+ *   - We don't have the User context to call /me/accounts cleanly.
+ *
+ * Required env vars: META_APP_ID, META_APP_SECRET (operator must add
+ * these once when they create the FB App).
+ */
+export async function refreshFacebookTokenToLongLived(formData: FormData) {
+  const { supabase } = await ensureSuperAdmin();
+  const accountId = String(formData.get("account_id") ?? "").trim();
+  if (!/^[0-9a-f-]{36}$/i.test(accountId)) {
+    redirect("/admin/social/accounts");
+  }
+
+  const appId = process.env.META_APP_ID;
+  const appSecret = process.env.META_APP_SECRET;
+  if (!appId || !appSecret) {
+    redirect(
+      "/admin/social/accounts?error=" +
+        encodeURIComponent(
+          "محتاج META_APP_ID + META_APP_SECRET في Vercel Env Variables. خد القيم من App Dashboard → Settings → Basic.",
+        ),
+    );
+  }
+
+  // Decrypt current token
+  const { data: tokenRows } = await supabase.rpc("decrypt_social_token", {
+    p_account_id: accountId,
+    p_encryption_key: getEncryptionKey(),
+  });
+  type Row = {
+    access_token: string;
+    platform: string;
+    external_id: string;
+    platform_metadata: Record<string, unknown>;
+  };
+  const row = (Array.isArray(tokenRows) ? tokenRows[0] : tokenRows) as
+    | Row
+    | null
+    | undefined;
+  if (!row?.access_token || row.platform !== "facebook") {
+    redirect(
+      "/admin/social/accounts?error=" +
+        encodeURIComponent(
+          "Token غير صالح أو الحساب مش Facebook. جدّد بـ Graph Explorer.",
+        ),
+    );
+  }
+
+  // Call FB to exchange
+  const params = new URLSearchParams({
+    grant_type: "fb_exchange_token",
+    client_id: appId,
+    client_secret: appSecret,
+    fb_exchange_token: row.access_token,
+  });
+  const res = await fetch(
+    `https://graph.facebook.com/v19.0/oauth/access_token?${params.toString()}`,
+  );
+  if (!res.ok) {
+    const err = (await res.text()).slice(0, 300);
+    redirect(
+      "/admin/social/accounts?error=" +
+        encodeURIComponent(`FB رفض التبديل: ${err}`),
+    );
+  }
+  const json = (await res.json()) as {
+    access_token?: string;
+    expires_in?: number;
+    token_type?: string;
+  };
+  if (!json.access_token) {
+    redirect(
+      "/admin/social/accounts?error=" +
+        encodeURIComponent("FB رد بدون token جديد"),
+    );
+  }
+
+  // Compute expiry. FB returns expires_in in seconds (typically 5184000
+  // = 60 days for the user-token exchange path). Page tokens that
+  // inherit "never expire" return 0 / no expires_in — store null in
+  // that case so the UI shows "never expires".
+  const expiresAt =
+    json.expires_in && json.expires_in > 0
+      ? new Date(Date.now() + json.expires_in * 1000).toISOString()
+      : null;
+
+  // Re-save via the same RPC — it handles re-encryption + upsert.
+  // We keep external_id + display_label intact by reading the existing
+  // row first (the RPC needs them as inputs).
+  const { data: account } = await supabase
+    .from("social_accounts")
+    .select("display_label, platform_metadata")
+    .eq("id", accountId)
+    .single<{
+      display_label: string;
+      platform_metadata: Record<string, unknown>;
+    }>();
+
+  await supabase.rpc("save_social_account", {
+    p_platform: "facebook",
+    p_external_id: row.external_id,
+    p_display_label: account?.display_label ?? "Facebook Page",
+    p_access_token: json.access_token,
+    p_refresh_token: "",
+    p_expires_at: expiresAt,
+    p_platform_metadata: account?.platform_metadata ?? {},
+    p_encryption_key: getEncryptionKey(),
+  });
+
+  revalidatePath("/admin/social/accounts");
+  redirect(
+    `/admin/social/accounts?saved=1&long_lived=${encodeURIComponent(
+      expiresAt ?? "permanent",
+    )}`,
+  );
 }
 
 export async function deleteSocialAccount(formData: FormData) {
@@ -296,6 +437,171 @@ export async function updateSocialPost(formData: FormData) {
   revalidatePath("/admin/social");
   revalidatePath(`/admin/social/composer?first=${id}`);
   redirect(`/admin/social/composer?first=${id}&saved=1`);
+}
+
+/**
+ * Generate an AI image for a post and attach it to social_posts.media_urls.
+ *
+ * We APPEND to media_urls rather than replacing so the operator can stack
+ * multiple variants (regenerate without losing the previous one). The
+ * publisher today picks media_urls[0], so the most-recently-generated
+ * image becomes the active one — that's why we unshift, not push.
+ */
+export async function generateImageForPost(formData: FormData) {
+  const { supabase } = await ensureSuperAdmin();
+  const postId = String(formData.get("post_id") ?? "").trim();
+  if (!/^[0-9a-f-]{36}$/i.test(postId)) {
+    redirect("/admin/social/composer");
+  }
+
+  // Pull the post so we can use its body + intent to brief the visual.
+  const { data: post } = await supabase
+    .from("social_posts")
+    .select("id, body, media_urls, ai_intent")
+    .eq("id", postId)
+    .single<{
+      id: string;
+      body: string;
+      media_urls: string[] | null;
+      ai_intent: string | null;
+    }>();
+
+  if (!post) {
+    redirect(
+      "/admin/social/composer?error=" +
+        encodeURIComponent("البوست مش موجود"),
+    );
+  }
+
+  try {
+    const { url } = await generateAndStorePostImage({
+      supabase,
+      postId: post.id,
+      postBody: post.body,
+      platform: "facebook", // default — image works across FB/IG/TG
+      goal: post.ai_intent ?? undefined,
+    });
+
+    // Prepend so the latest generation becomes the "active" image for
+    // the publisher. Keep the previous URLs as a history trail.
+    const existing = Array.isArray(post.media_urls) ? post.media_urls : [];
+    const next = [url, ...existing.filter((u) => u !== url)].slice(0, 5);
+
+    await supabase
+      .from("social_posts")
+      .update({ media_urls: next, updated_at: new Date().toISOString() })
+      .eq("id", post.id);
+  } catch (err) {
+    redirect(
+      `/admin/social/composer?first=${postId}&error=` +
+        encodeURIComponent(
+          err instanceof Error
+            ? `توليد الصورة فشل: ${err.message.slice(0, 200)}`
+            : "توليد الصورة فشل",
+        ),
+    );
+  }
+
+  revalidatePath("/admin/social");
+  revalidatePath("/admin/social/composer");
+  redirect(`/admin/social/composer?first=${postId}&img=1`);
+}
+
+/**
+ * Remove a specific image URL from a post's media_urls. Used by the "X"
+ * button next to each image preview in the composer.
+ */
+export async function removeImageFromPost(formData: FormData) {
+  const { supabase } = await ensureSuperAdmin();
+  const postId = String(formData.get("post_id") ?? "").trim();
+  const url = String(formData.get("url") ?? "").trim();
+  if (!/^[0-9a-f-]{36}$/i.test(postId) || !url) {
+    redirect("/admin/social/composer");
+  }
+
+  const { data: post } = await supabase
+    .from("social_posts")
+    .select("media_urls")
+    .eq("id", postId)
+    .single<{ media_urls: string[] | null }>();
+
+  if (post) {
+    const next = (post.media_urls ?? []).filter((u) => u !== url);
+    await supabase
+      .from("social_posts")
+      .update({ media_urls: next, updated_at: new Date().toISOString() })
+      .eq("id", postId);
+  }
+
+  revalidatePath("/admin/social/composer");
+  redirect(`/admin/social/composer?first=${postId}&img=removed`);
+}
+
+// ============================================================================
+// BRANDING — generate FB Page profile + cover images
+// ============================================================================
+
+/**
+ * Generate a fresh profile picture for the brand. The URL is stored in
+ * a tiny app_settings row so the branding page can render the latest
+ * across reloads without re-listing the bucket.
+ */
+export async function generateBrandProfile() {
+  const { supabase } = await ensureSuperAdmin();
+  try {
+    const url = await generateBrandProfileImage({ supabase });
+    await upsertAppSetting(supabase, "brand_profile_image_url", url);
+    revalidatePath("/admin/social/branding");
+    redirect("/admin/social/branding?profile=1");
+  } catch (err) {
+    redirect(
+      "/admin/social/branding?error=" +
+        encodeURIComponent(
+          err instanceof Error
+            ? `توليد الصورة الشخصية فشل: ${err.message.slice(0, 200)}`
+            : "توليد الصورة الشخصية فشل",
+        ),
+    );
+  }
+}
+
+export async function generateBrandCover() {
+  const { supabase } = await ensureSuperAdmin();
+  try {
+    const url = await generateBrandCoverImage({ supabase });
+    await upsertAppSetting(supabase, "brand_cover_image_url", url);
+    revalidatePath("/admin/social/branding");
+    redirect("/admin/social/branding?cover=1");
+  } catch (err) {
+    redirect(
+      "/admin/social/branding?error=" +
+        encodeURIComponent(
+          err instanceof Error
+            ? `توليد الغلاف فشل: ${err.message.slice(0, 200)}`
+            : "توليد الغلاف فشل",
+        ),
+    );
+  }
+}
+
+/**
+ * Tiny key-value helper backed by social_settings (mig 043). value is
+ * jsonb so we wrap strings in JSON.stringify — the read side does
+ * JSON.parse to recover the original.
+ */
+async function upsertAppSetting(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  key: string,
+  value: string,
+) {
+  await supabase.from("social_settings").upsert(
+    {
+      key,
+      value: JSON.stringify(value),
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "key" },
+  );
 }
 
 export async function archiveSocialPost(formData: FormData) {

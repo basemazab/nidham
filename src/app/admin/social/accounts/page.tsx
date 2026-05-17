@@ -8,6 +8,7 @@ import {
   saveSocialAccount,
   deleteSocialAccount,
   toggleSocialAccountActive,
+  refreshFacebookTokenToLongLived,
 } from "../actions";
 
 type SearchParams = Promise<{
@@ -15,6 +16,7 @@ type SearchParams = Promise<{
   deleted?: string;
   toggled?: string;
   error?: string;
+  long_lived?: string;
 }>;
 
 type AccountRow = {
@@ -25,6 +27,7 @@ type AccountRow = {
   is_active: boolean;
   last_used_at: string | null;
   last_error: string | null;
+  token_expires_at: string | null;
   created_at: string;
 };
 
@@ -92,7 +95,7 @@ export default async function SocialAccountsPage({
   const { data: accountsData } = await supabase
     .from("social_accounts")
     .select(
-      "id, platform, external_id, display_label, is_active, last_used_at, last_error, created_at",
+      "id, platform, external_id, display_label, is_active, last_used_at, last_error, token_expires_at, created_at",
     )
     .order("created_at", { ascending: false })
     .returns<AccountRow[]>();
@@ -106,6 +109,14 @@ export default async function SocialAccountsPage({
       {sp.saved && <Flash kind="ok">✅ تم الحفظ + التشفير</Flash>}
       {sp.deleted && <Flash kind="ok">🗑 تم الحذف</Flash>}
       {sp.toggled && <Flash kind="ok">✓ تم التحديث</Flash>}
+      {sp.long_lived && (
+        <Flash kind="ok">
+          🔐 تم تحويل الـ Token لـ long-lived.{" "}
+          {sp.long_lived === "permanent"
+            ? "Token دائم — مش هينتهي."
+            : `هينتهي في ${new Date(decodeURIComponent(sp.long_lived)).toLocaleString("ar-EG", { dateStyle: "medium" })}`}
+        </Flash>
+      )}
       {sp.error && <Flash kind="err">⚠ {decodeURIComponent(sp.error)}</Flash>}
 
       {!envReady && (
@@ -163,9 +174,22 @@ export default async function SocialAccountsPage({
                           ⚠ {a.last_error}
                         </div>
                       )}
+                      <TokenExpiryChip expiresAt={a.token_expires_at} />
                     </div>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap">
+                    {a.platform === "facebook" && (
+                      <form action={refreshFacebookTokenToLongLived}>
+                        <input type="hidden" name="account_id" value={a.id} />
+                        <button
+                          type="submit"
+                          title="حوّل الـ Token لـ long-lived (60 يوم أو دائم)"
+                          className="px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold font-cairo border border-indigo-200"
+                        >
+                          🔐 60 يوم
+                        </button>
+                      </form>
+                    )}
                     <form action={toggleSocialAccountActive}>
                       <input type="hidden" name="id" value={a.id} />
                       <input
@@ -369,6 +393,48 @@ function Label({ children }: { children: React.ReactNode }) {
 
 function Req() {
   return <span className="text-rose-500"> *</span>;
+}
+
+/**
+ * Visual indicator for token freshness. Three states:
+ *   - null/missing      → "غير محدد"      (most non-FB platforms; harmless)
+ *   - expires < 7 days  → red banner      (action needed soon)
+ *   - expires < 30 days → amber           (heads up)
+ *   - expires later     → green           (healthy)
+ * Page tokens that "never expire" come back with null expires_at after
+ * the long-lived exchange — we treat that same as "غير محدد" but with a
+ * positive label.
+ */
+function TokenExpiryChip({ expiresAt }: { expiresAt: string | null }) {
+  if (!expiresAt) {
+    return (
+      <div className="text-[10px] text-slate-400 font-cairo mt-1">
+        ⏱ صلاحية الـ Token: غير محددة (ممكن يكون دائم بعد long-lived)
+      </div>
+    );
+  }
+  const ms = new Date(expiresAt).getTime() - Date.now();
+  const days = Math.floor(ms / (24 * 60 * 60 * 1000));
+  const cls =
+    days < 0
+      ? "text-rose-600"
+      : days < 7
+        ? "text-rose-600"
+        : days < 30
+          ? "text-amber-700"
+          : "text-emerald-700";
+  const icon = days < 7 ? "🚨" : days < 30 ? "⚠" : "🟢";
+  const label =
+    days < 0
+      ? "انتهى — جدّده!"
+      : days < 7
+        ? `هينتهي خلال ${days} يوم — جدّده!`
+        : `هينتهي بعد ${days} يوم`;
+  return (
+    <div className={`text-[10px] font-cairo mt-1 font-bold ${cls}`}>
+      {icon} الـ Token {label}
+    </div>
+  );
 }
 
 function Flash({ kind, children }: { kind: "ok" | "err"; children: React.ReactNode }) {

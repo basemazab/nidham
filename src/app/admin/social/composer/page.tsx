@@ -9,6 +9,8 @@ import {
   updateSocialPost,
   publishSocialPost,
   archiveSocialPost,
+  generateImageForPost,
+  removeImageFromPost,
 } from "../actions";
 
 type SearchParams = Promise<{
@@ -16,6 +18,7 @@ type SearchParams = Promise<{
   saved?: string;
   first?: string;
   error?: string;
+  img?: string;
 }>;
 
 type PostRow = {
@@ -27,6 +30,7 @@ type PostRow = {
   source: string;
   ai_intent: string | null;
   tags: string[] | null;
+  media_urls: string[] | null;
   created_at: string;
 };
 
@@ -60,7 +64,7 @@ export default async function SocialComposer({
     supabase
       .from("social_posts")
       .select(
-        "id, title, body, status, scheduled_for, source, ai_intent, tags, created_at",
+        "id, title, body, status, scheduled_for, source, ai_intent, tags, media_urls, created_at",
       )
       .in("status", ["draft", "scheduled"])
       .order("created_at", { ascending: false })
@@ -96,6 +100,12 @@ export default async function SocialComposer({
         </Flash>
       )}
       {sp.saved && <Flash kind="ok">💾 تم حفظ التعديلات</Flash>}
+      {sp.img === "1" && (
+        <Flash kind="ok">🖼 تم توليد صورة جديدة للبوست</Flash>
+      )}
+      {sp.img === "removed" && (
+        <Flash kind="ok">🗑 تم حذف الصورة</Flash>
+      )}
       {sp.error && (
         <Flash kind="err">⚠ {decodeURIComponent(sp.error)}</Flash>
       )}
@@ -300,6 +310,9 @@ function PostEditor({
         </form>
       </div>
 
+      {/* Image preview + AI generator */}
+      <ImageBlock post={post} />
+
       {/* Edit form */}
       <form action={updateSocialPost} className="space-y-3 mb-3">
         <input type="hidden" name="id" value={post.id} />
@@ -360,6 +373,121 @@ function PostEditor({
               🚀 انشر دلوقتي
             </button>
           </form>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Image preview + AI image generator strip inside each post editor.
+ *
+ * UX intent:
+ *   - If the post has no image, show a single big "Generate" CTA so the
+ *     user understands images aren't required but heavily recommended.
+ *   - If the post HAS images, show the most-recent (which is also the
+ *     one the publisher will use) prominently + the older ones as small
+ *     thumbnails with delete buttons.
+ *   - Regenerate keeps re-trying without manual cleanup. We cap history
+ *     at 5 in the action layer.
+ */
+function ImageBlock({ post }: { post: PostRow }) {
+  const images = post.media_urls ?? [];
+  const active = images[0];
+  const history = images.slice(1);
+
+  return (
+    <div className="mb-3 p-3 rounded-xl bg-gradient-to-br from-slate-50 to-rose-50/30 border border-slate-200">
+      <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
+        <div className="text-xs font-bold text-slate-700 font-cairo">
+          🖼 صورة البوست
+          {images.length > 0 && (
+            <span className="text-[10px] text-slate-400 mr-2">
+              ({images.length}/5)
+            </span>
+          )}
+        </div>
+        <form action={generateImageForPost}>
+          <input type="hidden" name="post_id" value={post.id} />
+          <button
+            type="submit"
+            className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-rose-500 to-pink-500 text-white text-xs font-bold font-cairo shadow-sm hover:shadow-md transition"
+          >
+            {active ? "🔄 ولّد صورة جديدة" : "✨ ولّد صورة بالـ AI"}
+          </button>
+        </form>
+      </div>
+
+      {!active ? (
+        <p className="text-[11px] text-slate-500 font-cairo">
+          💡 البوستات بصور بتاخد engagement أكتر 5-10x. اضغط الزرار فوق
+          والـ AI هيصمم صورة تناسب نص البوست.
+          <br />
+          <span className="text-[10px] text-slate-400">
+            ⏱ 15-30 ثانية · مجاناً عبر Pollinations/FLUX
+          </span>
+        </p>
+      ) : (
+        <div className="space-y-2">
+          {/* Active image — the one the publisher will use */}
+          <div className="relative inline-block">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={active}
+              alt="صورة البوست"
+              className="max-w-full sm:max-w-md max-h-72 rounded-lg border-2 border-emerald-300 shadow"
+            />
+            <span className="absolute top-1 right-1 px-2 py-0.5 rounded-full bg-emerald-500 text-white text-[10px] font-bold font-cairo">
+              ✅ نشطة
+            </span>
+            <form
+              action={removeImageFromPost}
+              className="absolute top-1 left-1"
+            >
+              <input type="hidden" name="post_id" value={post.id} />
+              <input type="hidden" name="url" value={active} />
+              <button
+                type="submit"
+                title="حذف الصورة"
+                className="w-7 h-7 rounded-full bg-white/90 hover:bg-rose-100 text-rose-700 text-xs font-bold shadow"
+              >
+                ✕
+              </button>
+            </form>
+          </div>
+
+          {/* History thumbnails */}
+          {history.length > 0 && (
+            <div className="flex gap-2 flex-wrap pt-2 border-t border-slate-200">
+              <div className="text-[10px] text-slate-500 font-cairo w-full">
+                📚 إصدارات سابقة:
+              </div>
+              {history.map((url) => (
+                <div key={url} className="relative">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={url}
+                    alt="إصدار سابق"
+                    className="w-16 h-16 object-cover rounded border border-slate-200 opacity-70"
+                  />
+                  <form
+                    action={removeImageFromPost}
+                    className="absolute -top-1 -left-1"
+                  >
+                    <input type="hidden" name="post_id" value={post.id} />
+                    <input type="hidden" name="url" value={url} />
+                    <button
+                      type="submit"
+                      title="حذف"
+                      className="w-5 h-5 rounded-full bg-white text-rose-600 text-[10px] shadow"
+                    >
+                      ✕
+                    </button>
+                  </form>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
