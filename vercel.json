@@ -2,7 +2,6 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "crons": [
     {
-      "_comment": "Daily comment-sync at 9 AM Cairo time. Hobby plan limits cron to once-per-day. For more frequent ingestion (every 15 min) upgrade to Pro and change to '*/15 * * * *'. The manual '🔄 اسحب التعليقات' button in /admin/social/inbox stays available for ad-hoc pulls regardless of plan.",
       "path": "/api/cron/sync-social-comments",
       "schedule": "0 7 * * *"
     }
