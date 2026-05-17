@@ -115,36 +115,56 @@ export default async function MarketingHubPage({
             Leads Inbox) lives alongside the AI tool projects. Render
             them up top so they're always reachable, not buried inside
             a specific project. */}
-        <section className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
+        <section className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
           <Link
             href="/dashboard/marketing/landing-pages"
-            className="group bg-gradient-to-br from-cyan-50 to-blue-50 border-2 border-cyan-200 hover:border-cyan-400 rounded-2xl p-5 transition hover:shadow-lg"
+            className="group bg-gradient-to-br from-cyan-50 to-blue-50 border-2 border-cyan-200 hover:border-cyan-400 rounded-2xl p-4 transition hover:shadow-lg"
           >
-            <div className="flex items-center gap-3 mb-1">
-              <span className="text-3xl">🏠</span>
-              <h3 className="text-base font-black font-cairo text-slate-800 group-hover:text-cyan-700">
-                صفحات الهبوط
-              </h3>
-            </div>
-            <p className="text-xs text-slate-600 font-cairo">
-              ابني landing page بدقايق وحطها في إعلاناتك. كل lead يدخل CRM
-              تلقائياً مع مصدره (UTM + Referrer).
+            <div className="text-2xl mb-1">🏠</div>
+            <h3 className="text-sm font-black font-cairo text-slate-800 group-hover:text-cyan-700 mb-1">
+              صفحات الهبوط
+            </h3>
+            <p className="text-[11px] text-slate-600 font-cairo leading-snug">
+              Landing pages + lead capture + UTM tracking
             </p>
           </Link>
 
           <Link
             href="/dashboard/marketing/leads"
-            className="group bg-gradient-to-br from-violet-50 to-purple-50 border-2 border-violet-200 hover:border-violet-400 rounded-2xl p-5 transition hover:shadow-lg"
+            className="group bg-gradient-to-br from-violet-50 to-purple-50 border-2 border-violet-200 hover:border-violet-400 rounded-2xl p-4 transition hover:shadow-lg"
           >
-            <div className="flex items-center gap-3 mb-1">
-              <span className="text-3xl">📥</span>
-              <h3 className="text-base font-black font-cairo text-slate-800 group-hover:text-violet-700">
-                Leads Inbox
-              </h3>
-            </div>
-            <p className="text-xs text-slate-600 font-cairo">
-              صندوق العملاء المحتملين. مين جديد، مين اتواصلت معاه، مين
-              ضايع لو محدش رد عليه خلال 24 ساعة.
+            <div className="text-2xl mb-1">📥</div>
+            <h3 className="text-sm font-black font-cairo text-slate-800 group-hover:text-violet-700 mb-1">
+              Leads Inbox
+            </h3>
+            <p className="text-[11px] text-slate-600 font-cairo leading-snug">
+              صندوق العملاء + Pipeline + متابعة
+            </p>
+          </Link>
+
+          <Link
+            href="/dashboard/marketing/analytics"
+            className="group bg-gradient-to-br from-emerald-50 to-teal-50 border-2 border-emerald-200 hover:border-emerald-400 rounded-2xl p-4 transition hover:shadow-lg"
+          >
+            <div className="text-2xl mb-1">📊</div>
+            <h3 className="text-sm font-black font-cairo text-slate-800 group-hover:text-emerald-700 mb-1">
+              Analytics
+            </h3>
+            <p className="text-[11px] text-slate-600 font-cairo leading-snug">
+              Funnel + sources + ROI per campaign
+            </p>
+          </Link>
+
+          <Link
+            href="/dashboard/marketing/integrations"
+            className="group bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 hover:border-blue-400 rounded-2xl p-4 transition hover:shadow-lg"
+          >
+            <div className="text-2xl mb-1">🔌</div>
+            <h3 className="text-sm font-black font-cairo text-slate-800 group-hover:text-blue-700 mb-1">
+              Integrations
+            </h3>
+            <p className="text-[11px] text-slate-600 font-cairo leading-snug">
+              Meta Lead Ads webhook (auto-import)
             </p>
           </Link>
         </section>

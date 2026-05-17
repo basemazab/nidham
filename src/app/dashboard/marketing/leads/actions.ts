@@ -119,6 +119,51 @@ export async function updateLeadStatus(formData: FormData) {
 }
 
 // ----------------------------------------------------------------------------
+// moveLeadOnPipeline — lightweight status change for the Kanban board.
+// Unlike updateLeadStatus this returns JSON instead of redirecting (the
+// caller is a client component handling drag-drop, not a form post).
+// ----------------------------------------------------------------------------
+export async function moveLeadOnPipeline(
+  customerId: string,
+  newStatus: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { profile, supabase } = await gate();
+
+  if (!/^[0-9a-f-]{36}$/i.test(customerId)) {
+    return { ok: false, error: "ID مش صحيح" };
+  }
+  if (!ALLOWED_STATUSES.has(newStatus)) {
+    return { ok: false, error: "حالة مش معروفة" };
+  }
+
+  const update: Record<string, unknown> = {
+    status: newStatus,
+    updated_at: new Date().toISOString(),
+  };
+  // Stamp converted_at / lost_at when transitioning into terminal states
+  // so dashboards downstream don't have to special-case status changes.
+  if (newStatus === "won") {
+    update.converted_at = new Date().toISOString();
+    update.lost_at = null;
+  } else if (newStatus === "lost") {
+    update.lost_at = new Date().toISOString();
+    update.converted_at = null;
+  }
+
+  const { error } = await supabase
+    .from("customers")
+    .update(update)
+    .eq("id", customerId)
+    .eq("company_id", profile.company_id);
+
+  if (error) return { ok: false, error: arabicizeDbError(error.message) };
+
+  revalidatePath("/dashboard/marketing/leads/pipeline");
+  revalidatePath("/dashboard/marketing/leads");
+  return { ok: true };
+}
+
+// ----------------------------------------------------------------------------
 // assignLead — set customers.assigned_to (an employee). Setting to empty
 // string clears the assignment.
 // ----------------------------------------------------------------------------

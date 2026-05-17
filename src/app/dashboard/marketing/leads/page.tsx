@@ -213,13 +213,29 @@ export default async function LeadsInbox({
               {leads.length} lead في الـ view الحالي · يلا نشتغل عليهم
             </p>
           </div>
-          <Link
-            href="/dashboard/marketing/landing-pages"
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-cyan-100 hover:bg-cyan-200 text-cyan-800 font-bold text-sm font-cairo transition"
-          >
-            <span>🏠</span>
-            <span>Landing Pages</span>
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href="/dashboard/marketing/leads/pipeline"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-violet-100 hover:bg-violet-200 text-violet-800 font-bold text-sm font-cairo transition"
+            >
+              <span>🎯</span>
+              <span>Pipeline View</span>
+            </Link>
+            <Link
+              href="/dashboard/marketing/analytics"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-bold text-sm font-cairo transition"
+            >
+              <span>📊</span>
+              <span>Analytics</span>
+            </Link>
+            <Link
+              href="/dashboard/marketing/landing-pages"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-cyan-100 hover:bg-cyan-200 text-cyan-800 font-bold text-sm font-cairo transition"
+            >
+              <span>🏠</span>
+              <span>Landing Pages</span>
+            </Link>
+          </div>
         </header>
 
         {/* Migration missing banner */}
