@@ -11,6 +11,11 @@ import {
   refreshFacebookTokenToLongLived,
 } from "../actions";
 
+// Bump Vercel's 10s default — refreshFacebookTokenToLongLived hits
+// graph.facebook.com which can be slow on a cold connection, and
+// saveSocialAccount runs the encryption RPC which adds ~500ms.
+export const maxDuration = 60;
+
 type SearchParams = Promise<{
   saved?: string;
   deleted?: string;

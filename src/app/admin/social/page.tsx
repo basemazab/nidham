@@ -8,6 +8,12 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 
+// Vercel Hobby defaults serverless functions to 10s. publishSocialPost
+// (dispatched from PostCard's parent) iterates per account_id and hits
+// Graph API once per target — 5 targets at ~800ms each plus token
+// decryption easily exceeds 10s. Bump to the Hobby ceiling (60s).
+export const maxDuration = 60;
+
 type SearchParams = Promise<{
   archived?: string;
   published?: string;

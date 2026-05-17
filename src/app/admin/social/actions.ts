@@ -203,28 +203,49 @@ export async function refreshFacebookTokenToLongLived(formData: FormData) {
     );
   }
 
-  // Call FB to exchange
+  // Call FB to exchange. Wrap in try/catch because fetch() can throw
+  // (DNS / TCP / TLS errors) BEFORE we get an HTTP response — without
+  // this guard Vercel surfaces a generic 500 instead of a friendly
+  // redirect-with-error to the operator. Keep redirect() calls OUTSIDE
+  // the try block (NEXT_REDIRECT-bubble rule).
   const params = new URLSearchParams({
     grant_type: "fb_exchange_token",
     client_id: appId,
     client_secret: appSecret,
     fb_exchange_token: row.access_token,
   });
-  const res = await fetch(
-    `https://graph.facebook.com/v19.0/oauth/access_token?${params.toString()}`,
-  );
-  if (!res.ok) {
-    const err = (await res.text()).slice(0, 300);
-    redirect(
-      "/admin/social/accounts?error=" +
-        encodeURIComponent(`FB رفض التبديل: ${err}`),
-    );
-  }
-  const json = (await res.json()) as {
+  let json: {
     access_token?: string;
     expires_in?: number;
     token_type?: string;
   };
+  let fbHttpError: string | null = null;
+  try {
+    const res = await fetch(
+      `https://graph.facebook.com/v19.0/oauth/access_token?${params.toString()}`,
+    );
+    if (!res.ok) {
+      fbHttpError = (await res.text()).slice(0, 300);
+      json = {};
+    } else {
+      json = (await res.json()) as typeof json;
+    }
+  } catch (err) {
+    redirect(
+      "/admin/social/accounts?error=" +
+        encodeURIComponent(
+          err instanceof Error
+            ? `FB request failed: ${err.message.slice(0, 200)}`
+            : "FB request failed",
+        ),
+    );
+  }
+  if (fbHttpError) {
+    redirect(
+      "/admin/social/accounts?error=" +
+        encodeURIComponent(`FB رفض التبديل: ${fbHttpError}`),
+    );
+  }
   if (!json.access_token) {
     redirect(
       "/admin/social/accounts?error=" +
@@ -1084,8 +1105,14 @@ export async function syncSocialCommentsNow() {
 
   revalidatePath("/admin/social/inbox");
   revalidatePath("/admin/social");
-  const summary = `scanned=${result.targets_scanned}&seen=${result.comments_seen}&new=${result.new_comments}&errors=${result.errors.length}`;
-  redirect(`/admin/social/inbox?synced=1&${summary}`);
+  const summary = new URLSearchParams({
+    synced: "1",
+    scanned: String(result.targets_scanned),
+    seen: String(result.comments_seen),
+    new: String(result.new_comments),
+    errors: String(result.errors.length),
+  });
+  redirect(`/admin/social/inbox?${summary.toString()}`);
 }
 
 export async function markCommentReviewed(formData: FormData) {
