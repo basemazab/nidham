@@ -21,6 +21,7 @@ import {
   generateBrandProfileImage,
   generateBrandCoverImage,
 } from "@/lib/social-images";
+import { syncFacebookCommentsForAllTargets } from "@/lib/social-sync";
 
 // ----------------------------------------------------------------------------
 // Super-admin gate. Every action in this file runs through it. If the
@@ -940,6 +941,38 @@ export async function approveAndPublishReply(formData: FormData) {
       ? "/admin/social/inbox?published=1"
       : "/admin/social/inbox?error=" + encodeURIComponent(result.error),
   );
+}
+
+/**
+ * Manual trigger for the comment sync worker. Bound to the "🔄 Sync now"
+ * button on /admin/social/inbox so the operator can pull fresh comments
+ * on demand without waiting for the cron tick (every 15 min).
+ *
+ * Returns redirect with a summary in querystring so the inbox page can
+ * surface "أنت لقطّت X تعليق جديد" without an extra round-trip.
+ */
+export async function syncSocialCommentsNow() {
+  const { supabase } = await ensureSuperAdmin();
+  try {
+    const result = await syncFacebookCommentsForAllTargets({
+      supabase,
+      encryptionKey: getEncryptionKey(),
+      maxTargets: 50,
+    });
+    revalidatePath("/admin/social/inbox");
+    revalidatePath("/admin/social");
+    const summary = `scanned=${result.targets_scanned}&seen=${result.comments_seen}&new=${result.new_comments}&errors=${result.errors.length}`;
+    redirect(`/admin/social/inbox?synced=1&${summary}`);
+  } catch (err) {
+    redirect(
+      "/admin/social/inbox?error=" +
+        encodeURIComponent(
+          err instanceof Error
+            ? `Sync failed: ${err.message.slice(0, 200)}`
+            : "Sync failed",
+        ),
+    );
+  }
 }
 
 export async function markCommentReviewed(formData: FormData) {

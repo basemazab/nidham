@@ -28,7 +28,6 @@ type LandingPage = {
   form_fields: string[];
   form_submit_label: string;
   form_success_msg: string;
-  company_name: string;
 };
 
 const SESSION_KEY = "nidham_lp_sid";
@@ -294,7 +293,7 @@ export function LandingPageClient({ page }: { page: LandingPage }) {
             </button>
 
             <p className="text-[10px] text-slate-400 font-cairo text-center mt-2">
-              بيانات بتبقى سرية وما تتشاركش مع طرف ثالث · {page.company_name}
+              بياناتك سرية وما تتشاركش مع طرف ثالث · Nidham
             </p>
           </form>
         </>

@@ -16,6 +16,7 @@ import {
   draftReplyForComment,
   approveAndPublishReply,
   markCommentReviewed,
+  syncSocialCommentsNow,
 } from "../actions";
 
 type SearchParams = Promise<{
@@ -23,6 +24,11 @@ type SearchParams = Promise<{
   published?: string;
   marked?: string;
   error?: string;
+  synced?: string;
+  scanned?: string;
+  seen?: string;
+  new?: string;
+  errors?: string;
 }>;
 
 type CommentRow = {
@@ -106,6 +112,15 @@ export default async function SocialInbox({
       {sp.drafted && <Flash kind="ok">✨ تم درافت رد AI — راجعه تحت</Flash>}
       {sp.published && <Flash kind="ok">✅ تم نشر الرد على المنصة</Flash>}
       {sp.marked && <Flash kind="ok">✓ تم التحديث</Flash>}
+      {sp.synced && (
+        <Flash kind="ok">
+          🔄 تم الـ Sync · فحصنا {sp.scanned ?? 0} بوست منشور · شفنا{" "}
+          {sp.seen ?? 0} تعليق · جديد {sp.new ?? 0}
+          {Number(sp.errors ?? 0) > 0
+            ? ` · ⚠ ${sp.errors} خطأ`
+            : ""}
+        </Flash>
+      )}
       {sp.error && <Flash kind="err">⚠ {decodeURIComponent(sp.error)}</Flash>}
 
       {tableMissing && (
@@ -116,23 +131,42 @@ export default async function SocialInbox({
         </div>
       )}
 
-      <header className="mb-6">
-        <h1 className="text-2xl font-black font-cairo text-slate-800 mb-1">
-          💬 صندوق التعليقات
-        </h1>
-        <p className="text-sm text-slate-500 font-cairo">
-          {comments.length} تعليق · AI بيدرّج الردود · انت توافق أو تعدّل
-        </p>
+      <header className="mb-6 flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-black font-cairo text-slate-800 mb-1">
+            💬 صندوق التعليقات
+          </h1>
+          <p className="text-sm text-slate-500 font-cairo">
+            {comments.length} تعليق · AI بيدرّج الردود · انت توافق أو تعدّل
+          </p>
+        </div>
+        <form action={syncSocialCommentsNow}>
+          <button
+            type="submit"
+            className="px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 text-white text-sm font-black font-cairo shadow hover:shadow-lg transition"
+            title="اسحب التعليقات الجديدة من Facebook دلوقتي"
+          >
+            🔄 اسحب التعليقات
+          </button>
+        </form>
       </header>
+
+      <div className="mb-5 p-3 bg-cyan-50 border border-cyan-200 rounded-xl text-xs text-cyan-800 font-cairo">
+        ⚡ <strong>الـ Sync:</strong> الزرار فوق بيجلب التعليقات الجديدة من
+        كل بوست منشور على Facebook. لو ضايف <code dir="ltr">vercel.json</code>
+        فيه cron schedule على <code dir="ltr">/api/cron/sync-social-comments</code>{" "}
+        كل 15 دقيقة، هيشتغل تلقائي.
+      </div>
 
       {comments.length === 0 ? (
         <div className="bg-white border border-slate-200 rounded-2xl p-10 text-center">
           <div className="text-5xl mb-3">📭</div>
           <p className="text-sm text-slate-500 font-cairo mb-2">
-            مفيش تعليقات لسه. التعليقات بتيجي تلقائياً من البوستات المنشورة.
+            مفيش تعليقات لسه. اضغط <strong>"🔄 اسحب التعليقات"</strong> فوق
+            علشان نجلبها من Facebook.
           </p>
           <p className="text-xs text-slate-400 font-cairo">
-            💡 ملاحظة: sync التعليقات حالياً يدوي — هنضيف cron قريباً.
+            💡 لو مفيش حد كومنت على بوستاتك لسه، الـ sync هيرجع 0 تعليق.
           </p>
         </div>
       ) : (

@@ -42,7 +42,6 @@ type LandingPageRow = {
 
 async function loadPage(slug: string): Promise<{
   page: LandingPageRow;
-  companyName: string;
 } | null> {
   const supabase = await createClient();
   const { data: page } = await supabase
@@ -56,19 +55,14 @@ async function loadPage(slug: string): Promise<{
 
   if (!page) return null;
 
-  // Pull company name in a second query — companies has a separate
-  // public read policy (mig 014) gated on "has at least one public+open
-  // job", which won't apply here. We try anyway and fall back to a
-  // generic label if blocked.
-  let companyName = "الشركة";
-  const { data: company } = await supabase
-    .from("companies")
-    .select("name")
-    .eq("id", page.company_id)
-    .maybeSingle<{ name: string }>();
-  if (company?.name) companyName = company.name;
-
-  return { page, companyName };
+  // Note: we deliberately DON'T expose the owning company's name on the
+  // public landing page. Visitors who hit /p/<slug> from an ad shouldn't
+  // see the tenant's legal entity (e.g. "المصرية الالمانية") — they came
+  // for the offer, not for our internal multi-tenancy plumbing. Branding
+  // is fixed to "Nidham" so every landing page reads like a Nidham
+  // product page, which is what Basem wants while he uses the SaaS as
+  // his own marketing surface.
+  return { page };
 }
 
 // Per-page SEO metadata
@@ -80,11 +74,14 @@ export async function generateMetadata({
   if (!loaded) {
     return { title: "صفحة غير موجودة" };
   }
-  const { page, companyName } = loaded;
+  const { page } = loaded;
   const description =
     page.sub_headline ?? page.body?.slice(0, 160) ?? page.headline;
   return {
-    title: `${page.headline} · ${companyName}`,
+    // Title is just the offer headline. We intentionally drop the owning
+    // tenant name from the page title so SERPs / OG previews lead with
+    // the offer, not the legal entity.
+    title: page.headline,
     description,
     openGraph: {
       title: page.headline,
@@ -99,7 +96,7 @@ export default async function PublicLandingPage({ params }: PageProps) {
   const { slug } = await params;
   const loaded = await loadPage(slug);
   if (!loaded) notFound();
-  const { page, companyName } = loaded;
+  const { page } = loaded;
 
   const accent = page.accent_color || "#0891B2";
 
@@ -108,14 +105,15 @@ export default async function PublicLandingPage({ params }: PageProps) {
       dir="rtl"
       className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-50"
     >
-      {/* Top bar — minimal brand line */}
+      {/* Top bar — Nidham branding only. The owning company's name is
+          deliberately NOT shown to public visitors. */}
       <header className="border-b border-slate-200 bg-white/80 backdrop-blur-sm">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="text-sm font-bold font-cairo text-slate-700">
-            {companyName}
+          <div className="text-sm font-black font-cairo text-slate-800">
+            Nidham
           </div>
           <div className="text-[10px] text-slate-400 font-cairo">
-            صفحة آمنة · Nidham
+            صفحة آمنة 🔒
           </div>
         </div>
       </header>
@@ -186,15 +184,15 @@ export default async function PublicLandingPage({ params }: PageProps) {
               form_fields: page.form_fields ?? [],
               form_submit_label: page.form_submit_label,
               form_success_msg: page.form_success_msg,
-              company_name: companyName,
             }}
           />
         </div>
       </div>
 
-      {/* Footer */}
+      {/* Footer — Nidham-branded only. The tenant's company name is
+          intentionally omitted (see loadPage rationale). */}
       <footer className="border-t border-slate-200 mt-12 py-6 text-center text-xs text-slate-400 font-cairo">
-        © {new Date().getFullYear()} {companyName} · صفحة منشورة عبر Nidham
+        © {new Date().getFullYear()} Nidham · صفحة آمنة محمية
       </footer>
     </main>
   );
