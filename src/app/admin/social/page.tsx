@@ -35,6 +35,19 @@ type PostRow = {
   created_at: string;
 };
 
+type TargetRow = {
+  id: string;
+  post_id: string;
+  status: string;
+  error_message: string | null;
+  external_post_id: string | null;
+  external_url: string | null;
+  social_accounts: {
+    platform: string;
+    display_label: string;
+  } | null;
+};
+
 type CommentRow = {
   id: string;
   body: string;
@@ -95,6 +108,28 @@ export default async function SocialHomePage({
   const accounts = accountsRes.data ?? [];
   const posts = postsRes.data ?? [];
   const pendingComments = commentsRes.data ?? [];
+
+  // Fetch per-platform publish results for the visible posts so we can
+  // surface error messages inline (otherwise the user has no way to see
+  // WHY a post failed — Supabase only returns aggregate post.status).
+  const postIds = posts.map((p) => p.id);
+  let targetsByPost: Record<string, TargetRow[]> = {};
+  if (postIds.length > 0) {
+    const { data: targets } = await supabase
+      .from("social_post_targets")
+      .select(
+        "id, post_id, status, error_message, external_post_id, external_url, social_accounts(platform, display_label)",
+      )
+      .in("post_id", postIds)
+      .returns<TargetRow[]>();
+    targetsByPost = (targets ?? []).reduce<Record<string, TargetRow[]>>(
+      (acc, t) => {
+        (acc[t.post_id] ??= []).push(t);
+        return acc;
+      },
+      {},
+    );
+  }
 
   const tableMissing =
     !!postsRes.error &&
@@ -221,7 +256,11 @@ export default async function SocialHomePage({
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {posts.slice(0, 9).map((p) => (
-              <PostCard key={p.id} post={p} />
+              <PostCard
+                key={p.id}
+                post={p}
+                targets={targetsByPost[p.id] ?? []}
+              />
             ))}
           </div>
         )}
@@ -310,7 +349,13 @@ function ActionCard({
   );
 }
 
-function PostCard({ post }: { post: PostRow }) {
+function PostCard({
+  post,
+  targets,
+}: {
+  post: PostRow;
+  targets: TargetRow[];
+}) {
   const statusLabel: Record<string, { cls: string; text: string }> = {
     draft: { cls: "bg-slate-100 text-slate-700", text: "مسودة" },
     scheduled: { cls: "bg-amber-100 text-amber-800", text: "مجدول" },
@@ -325,7 +370,7 @@ function PostCard({ post }: { post: PostRow }) {
   return (
     <Link
       href={`/admin/social/composer?first=${post.id}`}
-      className="bg-white border border-slate-200 hover:border-rose-300 rounded-2xl p-4 transition hover:shadow"
+      className="bg-white border border-slate-200 hover:border-rose-300 rounded-2xl p-4 transition hover:shadow block"
     >
       <div className="flex items-start justify-between mb-2 gap-2">
         <span
@@ -351,6 +396,57 @@ function PostCard({ post }: { post: PostRow }) {
           timeStyle: "short",
         })}
       </div>
+
+      {/* Per-platform publish results — the most important debug info. */}
+      {targets.length > 0 && (
+        <div className="mt-3 pt-2 border-t border-slate-100 space-y-1">
+          {targets.map((t) => {
+            const platform = t.social_accounts?.platform ?? "?";
+            const icon = PLATFORM_ICON[platform] ?? "🔌";
+            const ok = t.status === "published";
+            const failed = t.status === "failed";
+            const pending =
+              t.status === "queued" || t.status === "publishing";
+            return (
+              <div
+                key={t.id}
+                className={`text-[10px] font-cairo p-1.5 rounded ${
+                  failed
+                    ? "bg-rose-50"
+                    : ok
+                      ? "bg-emerald-50"
+                      : "bg-slate-50"
+                }`}
+              >
+                <div className="flex items-center gap-1">
+                  <span>{icon}</span>
+                  <span className="flex-1 truncate text-slate-700">
+                    {t.social_accounts?.display_label ?? platform}
+                  </span>
+                  <span>
+                    {ok ? "✅" : failed ? "❌" : pending ? "⏳" : "·"}
+                  </span>
+                </div>
+                {failed && t.error_message && (
+                  <div
+                    className="text-rose-700 mt-1 text-[10px] leading-tight break-words"
+                    dir="ltr"
+                  >
+                    ⚠ {t.error_message}
+                  </div>
+                )}
+                {ok && t.external_url && (
+                  <div className="mt-0.5">
+                    <span className="text-emerald-700 underline" dir="ltr">
+                      {t.external_url.slice(0, 50)}…
+                    </span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </Link>
   );
 }
