@@ -52,6 +52,7 @@ export default async function Home({
       <CoreModulesSection />
       <BridgeAnalyticsSection />
       <AISection />
+      <MarketingStudioSection />
       <MobileSection />
       <SecuritySection />
       <DeploymentOptionsSection />
@@ -100,14 +101,15 @@ function HeroSection() {
           نظام واحد بدل خمس أنظمة منفصلة.
           <br />
           <span className="text-brand-cyan-dark">
-            HR + CRM + ذكاء اصطناعي
+            HR + CRM + استوديو تسويق
           </span>{" "}
-          — كله بالعربي.
+          — كله بالعربي + AI.
         </h2>
         <p className="text-lg md:text-xl text-slate-600 mb-10 leading-relaxed max-w-3xl mx-auto font-cairo">
           من الحضور بالـ GPS لحد قسائم الرواتب، ومن الـ CRM لحد فحص الـ
-          CVs بالـ AI. متوافق مع قانون العمل المصري 12/2003 وقانون التأمينات
-          148/2019.
+          CVs بالـ AI. كمان <strong className="text-amber-700">استوديو تسويق ذكي</strong>{" "}
+          بيصمم حملاتك، landing pages، ويجيب leads — متوافق مع قانون العمل
+          المصري 12/2003 وقانون التأمينات 148/2019.
         </p>
 
         {/* CTAs */}
@@ -143,12 +145,13 @@ function ProofStrip() {
     { stat: "21", label: "يوم إجازة سنوية محسوبين تلقائيًا" },
     { stat: "14%", label: "تأمينات اجتماعية، مخصومة لحد سقف المرتب" },
     { stat: "100م", label: "geofence حول مكتبك للحضور" },
-    { stat: "AI", label: "بيقرا CVs ويقيّم بالعربي" },
+    { stat: "6", label: "أدوات AI تسويق بتحل محل وكالة كاملة" },
+    { stat: "AI", label: "بيقرا CVs، يصمم حملات، ويجيب leads" },
   ];
 
   return (
     <section className="border-y border-slate-200 bg-white px-6 py-8">
-      <div className="max-w-5xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-6">
+      <div className="max-w-6xl mx-auto grid grid-cols-2 md:grid-cols-5 gap-6">
         {items.map((i) => (
           <div key={i.label} className="text-center">
             <div className="text-3xl font-black font-display bg-gradient-to-r from-brand-cyan-dark to-brand-navy bg-clip-text text-transparent mb-1">
@@ -221,6 +224,16 @@ function CoreModulesSection() {
       title: "مساعد ذكي",
       desc: "اسأله بالعربي عن قانون العمل أو عن بيانات شركتك. Gemini 2.5 + قانون 12/2003.",
       points: ["قانون عمل وتأمينات", "حسابات الضرائب", "ملخصات الشركة"],
+    },
+    {
+      icon: "✦",
+      title: "استوديو التسويق (Enterprise)",
+      desc: "وكالة تسويق كاملة جواه نظامك: 6 أدوات AI + landing pages + Leads pipeline + Meta integration.",
+      points: [
+        "AI يصمم حملات + ad copy + SEO",
+        "Landing pages + Lead capture",
+        "Pipeline Kanban + Analytics",
+      ],
     },
   ];
 
@@ -295,15 +308,16 @@ function BridgeAnalyticsSection() {
               </span>
             </h2>
             <p className="text-lg text-slate-300 mb-6 leading-relaxed font-cairo">
-              معظم الأنظمة بتقولك "محمد ملتزم 95%" — وخلاص. نِظام بيوصّل
-              بيانات الحضور بـ بيانات الـ CRM ويقولك:
+              معظم الأنظمة بتقولك &quot;محمد ملتزم 95%&quot; — وخلاص. نِظام
+              بيوصّل بيانات الحضور بـ بيانات الـ CRM ويقولك:
             </p>
             <div className="space-y-3 mb-6">
               <Quote text="محمد حضور 95% بس عمل 3 تفاعلات إيجابية بس الشهر ده. ملتزم — مش منتج." />
               <Quote text="أحمد حضور 75%، عمل 22 تفاعل، 8 صفقات Active. منتج — حتى لو متأخر يومين." />
             </div>
             <p className="text-sm text-slate-400 font-cairo">
-              ده الفرق بين موظف "بيتجوّز شغل" وموظف "بيدفع لشركتك تنمو".
+              ده الفرق بين موظف &quot;بيتجوّز شغل&quot; وموظف &quot;بيدفع
+              لشركتك تنمو&quot;.
             </p>
           </div>
 
@@ -411,7 +425,7 @@ function AISection() {
         <SectionHeader
           eyebrow="✦ ذكاء اصطناعي"
           title="الـ AI مدمج في نظامك — مش add-on"
-          subtitle="نِظام بيستخدم Gemini 2.5 Flash في 4 مواضع، كل واحد بيوفّر لك ساعات أسبوعيًا."
+          subtitle="نِظام بيستخدم Groq + Gemini مع multi-provider fallback، بحيث ما تقفش في وش حد قط. ١٠+ مواضع AI، كل واحد بيوفّر لك ساعات أسبوعيًا."
         />
 
         <div className="grid md:grid-cols-2 gap-5">
@@ -439,14 +453,27 @@ function AISection() {
             desc="بناءً على الـ JD والمرشح، الـ AI بيولّد أسئلة technical + behavioral مفصّلة، كل واحدة بسبب فني واضح."
             cta="ضمن فحص الـ CV"
           />
+          <AICard
+            icon="✦"
+            title="٦ أدوات تسويق AI (Enterprise)"
+            desc="محلل منتج + باني personas + كاتب إعلانات + ماستر SEO + معالج حملات + Page Doctor — وكالة Big4 جواه نظامك."
+            cta="شوف القسم اللي تحت ↓"
+          />
+          <AICard
+            icon="🏠"
+            title="Landing Pages + Lead Capture (Enterprise)"
+            desc="صفحات هبوط بتجمع leads تلقائياً مع UTM tracking كامل. Pipeline Kanban بـ drag-and-drop يخلّيك تتابع كل lead لحد ما يبقى عميل."
+            cta="ضمن استوديو التسويق"
+          />
         </div>
 
         <div className="mt-10 p-5 bg-amber-50 border border-amber-200 rounded-2xl flex items-start gap-4 max-w-4xl mx-auto">
           <div className="text-2xl">🔒</div>
           <div className="text-sm text-slate-700 font-cairo leading-relaxed">
-            <b>الخصوصية:</b> بياناتك بتروح Gemini للمعالجة بس — مش
-            بتُستخدم training data، مفيش رفع تلقائي لأي طرف ثالث،
-            وكل طلب AI rate-limited على مستخدمك عشان أمان رصيدك.
+            <b>الخصوصية + Resilience:</b> بياناتك بتروح Groq أو Gemini
+            للمعالجة بس — مش بتُستخدم training data، مفيش رفع تلقائي لأي
+            طرف ثالث. والـ multi-provider fallback معناه إن لو حد منهم وقع،
+            النظام تلقائياً يستخدم التاني — مفيش downtime.
           </div>
         </div>
       </div>
@@ -478,6 +505,296 @@ function AICard({
       </p>
       <div className="text-xs text-amber-700 font-bold font-cairo">{cta}</div>
     </div>
+  );
+}
+
+// =================================================================
+// Marketing Studio — the Enterprise-tier flagship
+// =================================================================
+
+function MarketingStudioSection() {
+  return (
+    <section className="px-6 py-20 bg-gradient-to-br from-slate-900 via-amber-950 to-slate-900 text-white relative overflow-hidden">
+      {/* Background glow */}
+      <div
+        aria-hidden
+        className="absolute inset-0 opacity-30"
+        style={{
+          backgroundImage:
+            "radial-gradient(circle at 20% 30%, rgba(245,158,11,0.4), transparent 50%), radial-gradient(circle at 80% 70%, rgba(244,63,94,0.3), transparent 50%)",
+        }}
+      />
+
+      <div className="max-w-6xl mx-auto relative">
+        <div className="text-center mb-12">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gradient-to-r from-amber-500/20 to-rose-500/20 border border-amber-400/40 text-amber-300 text-xs font-bold mb-4 font-cairo">
+            👑 Enterprise Exclusive · جديد ٢٠٢٦
+          </div>
+          <h2 className="text-3xl md:text-5xl font-black font-cairo mb-4 leading-tight">
+            استوديو التسويق الذكي
+            <br />
+            <span className="bg-gradient-to-r from-amber-300 via-orange-400 to-rose-400 bg-clip-text text-transparent">
+              وكالة Big4 جواه نظامك
+            </span>
+          </h2>
+          <p className="text-lg text-slate-300 max-w-3xl mx-auto leading-relaxed font-cairo">
+            بدل ما تدفع <strong className="text-amber-300">10,000-50,000 ج/شهر</strong>{" "}
+            لوكالة تسويق، AI بيصمم لك حملاتك، يكتب إعلاناتك، يبني landing
+            pages، ويجيب لك leads — وكله بالعربي المصري.
+          </p>
+        </div>
+
+        {/* ----- 6 AI Tools ----- */}
+        <div className="mb-12">
+          <h3 className="text-center text-xs tracking-[0.3em] text-amber-400 font-bold mb-6 font-cairo">
+            ✦ ٦ أدوات AI متكاملة
+          </h3>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <ToolCard
+              icon="🔬"
+              title="محلل المنتج"
+              desc="USP + Positioning + قنوات التسويق المناسبة"
+            />
+            <ToolCard
+              icon="🎯"
+              title="باني الجمهور"
+              desc="2-4 buyer personas مع targeting كامل لـ Meta/Google"
+            />
+            <ToolCard
+              icon="✍"
+              title="كاتب الإعلانات"
+              desc="3-8 ad variants لـ Meta / Google / TikTok جاهزة للنشر"
+            />
+            <ToolCard
+              icon="🔍"
+              title="ماستر SEO"
+              desc="10-25 keyword + content strategy + quick wins"
+            />
+            <ToolCard
+              icon="🚀"
+              title="معالج الحملات"
+              desc="استراتيجية كاملة: ميزانية + مراحل + توقعات CPA"
+            />
+            <ToolCard
+              icon="🩺"
+              title="Page Doctor"
+              desc="تشخيص مشاكل صفحتك قبل الإعلان + خطة إصلاح مرقمة"
+            />
+          </div>
+        </div>
+
+        {/* ----- Operational Flow ----- */}
+        <div className="mb-12">
+          <h3 className="text-center text-xs tracking-[0.3em] text-amber-400 font-bold mb-6 font-cairo">
+            ⚡ Pipeline التشغيلي — من الـ AI لحد العميل
+          </h3>
+
+          <div className="grid md:grid-cols-4 gap-3 mb-4">
+            <FlowCard
+              num="١"
+              icon="🏠"
+              title="Landing Pages"
+              desc="ابني صفحة هبوط في دقايق. WhatsApp + tracking + lead form قابل للتخصيص."
+              accent="cyan"
+            />
+            <FlowCard
+              num="٢"
+              icon="📥"
+              title="Leads Inbox"
+              desc="كل lead بيدخل CRM تلقائياً مع مصدره الكامل (UTM + landing page)."
+              accent="violet"
+            />
+            <FlowCard
+              num="٣"
+              icon="🎯"
+              title="Pipeline Kanban"
+              desc="اسحب الـ leads بين 6 مراحل (جديد → عميل) بـ drag-and-drop."
+              accent="rose"
+            />
+            <FlowCard
+              num="٤"
+              icon="📊"
+              title="Analytics"
+              desc="Funnel كامل + ROI لكل حملة + leaderboard للصفحات."
+              accent="emerald"
+            />
+          </div>
+        </div>
+
+        {/* ----- Integrations row ----- */}
+        <div className="bg-gradient-to-br from-slate-800/60 to-slate-900/60 backdrop-blur rounded-2xl border border-amber-400/20 p-6 mb-10">
+          <div className="flex items-start gap-4 flex-wrap">
+            <div className="text-4xl shrink-0">🔌</div>
+            <div className="flex-1 min-w-[250px]">
+              <h3 className="text-lg font-black font-cairo mb-1 text-white">
+                Meta Lead Ads Integration
+              </h3>
+              <p className="text-sm text-slate-300 font-cairo leading-relaxed">
+                اربط Facebook/Instagram → الـ leads من إعلاناتك الممولة
+                بيدخلوا CRM <strong className="text-amber-300">تلقائياً في ثوانٍ</strong>{" "}
+                — بدون تنزيل CSV يدوي.
+              </p>
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              <Pill text="🔒 HMAC verification" />
+              <Pill text="🔐 Encrypted tokens" />
+              <Pill text="📥 Auto-dedup" />
+            </div>
+          </div>
+        </div>
+
+        {/* ----- Differentiator quote ----- */}
+        <div className="grid md:grid-cols-3 gap-4 mb-10">
+          <Stat
+            big="٥ د"
+            label="بدل ٥ أيام مع وكالة تسويق"
+          />
+          <Stat
+            big="٠ ج"
+            label="بدل ١٠ آلاف ج/شهر لوكالة"
+          />
+          <Stat
+            big="١٠٠٪"
+            label="بالعربي المصري — مش ترجمة من إنجليزي"
+          />
+        </div>
+
+        {/* ----- AI providers used ----- */}
+        <div className="text-center mb-8">
+          <p className="text-xs text-slate-400 font-cairo mb-3">
+            مدعوم بـ multi-provider AI fallback
+          </p>
+          <div className="flex flex-wrap justify-center gap-2 text-[10px]">
+            <ProviderBadge text="Groq · gpt-oss-120b" />
+            <ProviderBadge text="Groq · gpt-oss-20b" />
+            <ProviderBadge text="Groq · Llama 4 Scout" />
+            <ProviderBadge text="Google · Gemini 2.5 Flash Lite" />
+          </div>
+          <p className="text-[10px] text-slate-500 font-cairo mt-3">
+            لو وصلنا حد الـ quota في أي provider، النظام يـ fallback تلقائياً
+          </p>
+        </div>
+
+        {/* ----- CTA ----- */}
+        <div className="text-center">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-200 text-[10px] font-bold mb-4 font-cairo">
+            👑 متاح للنسخة Enterprise فقط
+          </div>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <a
+              href="https://wa.me/201553641615?text=أهلاً، عايز أعرف تفاصيل استوديو التسويق Enterprise"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-8 py-4 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 text-white font-black text-lg shadow-2xl hover:shadow-amber-500/50 hover:scale-105 transition-all font-cairo"
+            >
+              ✦ احجز جلسة تعريفية
+            </a>
+            <Link
+              href="/signup"
+              className="px-8 py-4 rounded-xl border-2 border-amber-400/40 text-amber-200 font-bold text-lg hover:bg-amber-500/10 transition-all font-cairo"
+            >
+              ابدأ تجربة 14 يوم
+            </Link>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// Tool card — for the 6-tool grid
+function ToolCard({
+  icon,
+  title,
+  desc,
+}: {
+  icon: string;
+  title: string;
+  desc: string;
+}) {
+  return (
+    <div className="group bg-gradient-to-br from-slate-800/60 to-slate-900/60 backdrop-blur border border-amber-400/20 hover:border-amber-400/60 rounded-2xl p-4 transition hover:scale-105">
+      <div className="text-2xl mb-2">{icon}</div>
+      <h4 className="text-sm font-black font-cairo text-white mb-1 group-hover:text-amber-300 transition">
+        {title}
+      </h4>
+      <p className="text-[11px] text-slate-400 font-cairo leading-snug">
+        {desc}
+      </p>
+    </div>
+  );
+}
+
+// Flow card — for the 4-stage operational pipeline
+function FlowCard({
+  num,
+  icon,
+  title,
+  desc,
+  accent,
+}: {
+  num: string;
+  icon: string;
+  title: string;
+  desc: string;
+  accent: "cyan" | "violet" | "rose" | "emerald";
+}) {
+  const accentRing: Record<typeof accent, string> = {
+    cyan: "ring-cyan-400/50 from-cyan-500/20 to-cyan-500/5",
+    violet: "ring-violet-400/50 from-violet-500/20 to-violet-500/5",
+    rose: "ring-rose-400/50 from-rose-500/20 to-rose-500/5",
+    emerald: "ring-emerald-400/50 from-emerald-500/20 to-emerald-500/5",
+  };
+  const numRing: Record<typeof accent, string> = {
+    cyan: "bg-cyan-500/30 border-cyan-300 text-cyan-100",
+    violet: "bg-violet-500/30 border-violet-300 text-violet-100",
+    rose: "bg-rose-500/30 border-rose-300 text-rose-100",
+    emerald: "bg-emerald-500/30 border-emerald-300 text-emerald-100",
+  };
+  return (
+    <div
+      className={`relative bg-gradient-to-br backdrop-blur rounded-2xl p-5 ring-1 ${accentRing[accent]}`}
+    >
+      <div
+        className={`absolute -top-3 right-4 w-8 h-8 rounded-full border-2 font-display font-black flex items-center justify-center text-sm ${numRing[accent]}`}
+      >
+        {num}
+      </div>
+      <div className="text-3xl mb-2 mt-2">{icon}</div>
+      <h4 className="text-base font-black font-cairo text-white mb-1">
+        {title}
+      </h4>
+      <p className="text-xs text-slate-300 font-cairo leading-relaxed">
+        {desc}
+      </p>
+    </div>
+  );
+}
+
+function Pill({ text }: { text: string }) {
+  return (
+    <span className="inline-block px-3 py-1 rounded-full text-[10px] font-bold font-cairo bg-amber-500/15 border border-amber-400/30 text-amber-200">
+      {text}
+    </span>
+  );
+}
+
+function Stat({ big, label }: { big: string; label: string }) {
+  return (
+    <div className="text-center bg-gradient-to-br from-amber-500/10 to-rose-500/10 border border-amber-400/20 rounded-2xl p-4">
+      <div className="text-4xl font-black font-display bg-gradient-to-r from-amber-300 to-rose-300 bg-clip-text text-transparent mb-1">
+        {big}
+      </div>
+      <div className="text-xs text-slate-300 font-cairo">{label}</div>
+    </div>
+  );
+}
+
+function ProviderBadge({ text }: { text: string }) {
+  return (
+    <span className="inline-block px-2.5 py-1 rounded-full font-mono bg-slate-800/70 border border-slate-700 text-slate-300">
+      {text}
+    </span>
   );
 }
 
@@ -746,23 +1063,36 @@ function HowItWorksSection() {
     {
       n: "٤",
       title: "اعمل أول payroll",
-      desc: "اضغط زرار. النظام بيحسب التأمينات والضرائب والسلف وكل حاجة. وقّع وابعت.",
+      desc: "اضغط زرار. النظام بيحسب التأمينات والضرائب والسلف. وقّع وابعت.",
+    },
+    {
+      n: "٥",
+      title: "أطلق أول حملة تسويق",
+      desc: "(Enterprise) خلّي الـ AI يصمم حملة + landing page + يجيب الـ leads أوتوماتيك في الـ CRM.",
     },
   ];
   return (
     <section className="px-6 py-20 bg-gradient-to-b from-cyan-50/30 to-white">
-      <div className="max-w-5xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         <SectionHeader
           eyebrow="بداية سهلة"
-          title="من التسجيل لأول راتب — في يوم واحد"
+          title="من التسجيل لأول راتب + أول حملة — في يوم واحد"
         />
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {steps.map((s) => (
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+          {steps.map((s, i) => (
             <div
               key={s.n}
-              className="relative bg-white border border-slate-200 rounded-2xl p-6 hover:shadow-lg transition"
+              className={`relative bg-white border rounded-2xl p-6 hover:shadow-lg transition ${
+                i === 4 ? "border-amber-300" : "border-slate-200"
+              }`}
             >
-              <div className="absolute -top-4 right-6 w-10 h-10 rounded-full bg-gradient-to-br from-brand-cyan to-brand-cyan-dark text-white font-black text-lg flex items-center justify-center shadow-lg font-display">
+              <div
+                className={`absolute -top-4 right-6 w-10 h-10 rounded-full text-white font-black text-lg flex items-center justify-center shadow-lg font-display ${
+                  i === 4
+                    ? "bg-gradient-to-br from-amber-500 to-rose-500"
+                    : "bg-gradient-to-br from-brand-cyan to-brand-cyan-dark"
+                }`}
+              >
                 {s.n}
               </div>
               <h3 className="font-black text-slate-800 mt-3 mb-2 font-cairo">
@@ -861,6 +1191,16 @@ function Footer() {
                 className="hover:text-white transition"
               >
                 نسخة Enterprise (On-Premise)
+              </a>
+            </li>
+            <li>
+              <a
+                href="https://wa.me/201553641615?text=أهلاً، عايز أعرف تفاصيل استوديو التسويق Enterprise"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-amber-300 transition"
+              >
+                ✦ استوديو التسويق
               </a>
             </li>
             <li>
