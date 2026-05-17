@@ -16,6 +16,14 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { generateBrandProfile, generateBrandCover } from "../actions";
 
+// Vercel Hobby plan defaults serverless functions to 10s. Image
+// generation through Gemini takes 8-30s for the cover (16:9 is heavier
+// than 1:1), plus storage upload, so we bump to 60s — the Hobby plan's
+// hard ceiling. This applies to both the GET render and the POST
+// dispatched server actions on this route (generateBrandProfile /
+// generateBrandCover).
+export const maxDuration = 60;
+
 type SearchParams = Promise<{
   profile?: string;
   cover?: string;

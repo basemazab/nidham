@@ -13,6 +13,14 @@ import {
   removeImageFromPost,
 } from "../actions";
 
+// Extends Vercel's 10s default to the Hobby-plan ceiling (60s) so:
+//   - generateAndDraftPosts can call the LLM (Groq 120B can take 15-25s
+//     for the multi-variant schema).
+//   - generateImageForPost can run the visual-brief LLM + Gemini image
+//     model + Supabase upload sequentially without timing out.
+//   - publishSocialPost can hit multiple platform APIs sequentially.
+export const maxDuration = 60;
+
 type SearchParams = Promise<{
   generated?: string;
   saved?: string;

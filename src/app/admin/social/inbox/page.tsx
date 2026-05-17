@@ -19,6 +19,11 @@ import {
   syncSocialCommentsNow,
 } from "../actions";
 
+// Bump function timeout past Vercel's 10s default — comment sync
+// walks every published target and makes one Graph API call per
+// target, which adds up quickly even with a small handful of posts.
+export const maxDuration = 60;
+
 type SearchParams = Promise<{
   drafted?: string;
   published?: string;

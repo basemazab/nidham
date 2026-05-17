@@ -26,6 +26,12 @@ import { syncFacebookCommentsForAllTargets } from "@/lib/social-sync";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// Extends Vercel's default 10s function timeout. Comment sync scans
+// every published target sequentially (one Graph API call each) and
+// 100 targets at ~500ms each would blow the default. 60s is the
+// Hobby-plan ceiling.
+export const maxDuration = 60;
+
 // Vercel Cron sets this header on every cron invocation. Locally / from
 // curl we accept x-cron-secret too as a developer-friendly alternative.
 function isAuthorized(req: Request): boolean {

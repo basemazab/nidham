@@ -40,11 +40,11 @@ const STORAGE_BUCKET = "social-media";
 // So we only reach for it if Gemini isn't configured / failed.
 const POLLINATIONS_BASE = "https://image.pollinations.ai/prompt/";
 
-// Gemini image-generation endpoint. The 2.5-flash-image model is the
-// current free-tier image generator (free as of Oct 2025; subject to
-// Google's quota changes). It accepts a text prompt and returns
-// base64-encoded PNG data inline with the response.
-const GEMINI_IMAGE_MODEL = "gemini-2.5-flash-image";
+// Gemini image-generation endpoint. The 2.5-flash-image-preview model
+// is the current free-tier image generator (free as of Q1 2026; subject
+// to Google's quota changes). The `-preview` suffix matters — without
+// it the endpoint returns 404 in the free tier.
+const GEMINI_IMAGE_MODEL = "gemini-2.5-flash-image-preview";
 const GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta";
 
 
@@ -209,14 +209,19 @@ async function generateImageBytesViaGemini(args: {
   const body = {
     contents: [{ parts: [{ text: promptText }] }],
     generationConfig: {
-      responseModalities: ["IMAGE"],
+      // Both TEXT and IMAGE — even though we only want the image,
+      // omitting TEXT causes "responseModalities must include TEXT"
+      // errors from some model variants.
+      responseModalities: ["IMAGE", "TEXT"],
       // Skipping temperature etc — the image model has its own defaults
       // and overriding them with text-model values tends to error out.
     },
   };
 
+  // 50s timeout — leaves ~10s of headroom under Vercel's 60s hard cap
+  // for the upload + DB write + redirect that follow.
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 60_000);
+  const timer = setTimeout(() => controller.abort(), 50_000);
   try {
     const res = await fetch(url, {
       method: "POST",
