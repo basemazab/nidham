@@ -11,17 +11,21 @@
 // the best LANGUAGE model available given the configured API keys, using
 // this priority order:
 //
-//   1) Groq gpt-oss-20b                    — 30 RPM, ~100k RPD (free)
-//      Supports BOTH tool calling AND json_schema structured outputs.
-//      Fast and Arabic-capable. Default primary because everything that
-//      calls generateObject (marketing studio, screening, etc.) needs
-//      native structured output support — Llama 3.x on Groq does NOT.
-//   2) Groq Llama 4 Scout 17B              — 30 RPM, 14k RPD (free)
-//      Different rate-limit bucket. Also supports json_schema. Good
-//      multilingual quality.
-//   3) Gemini 2.5 Flash Lite               — 60 RPM, 1.5k RPD (free)
-//      Falls back here when Groq keys aren't set or both Groq models
-//      are exhausted.
+//   1) Groq gpt-oss-120b                   — 30 RPM, ~30k RPD (free)
+//      Supports json_schema AND tool calling. The 120B size matters for
+//      complex Marketing Studio schemas (SEO returns 10-25 keyword
+//      objects with enums; gpt-oss-20b reliably fails to produce valid
+//      JSON for those). Slightly slower than 20B but bullet-proof on
+//      structured output, which is what users hit first.
+//   2) Groq gpt-oss-20b                    — 30 RPM, ~100k RPD (free)
+//      Fast secondary for simpler schemas + chat. Different rate-limit
+//      bucket from 120B so an exhausted primary gracefully degrades.
+//   3) Groq Llama 4 Scout 17B              — 30 RPM, 14k RPD (free)
+//      Third option in the Groq family if both gpt-oss variants are
+//      hammered. Also supports json_schema.
+//   4) Gemini 2.5 Flash Lite               — 60 RPM, 1.5k RPD (free)
+//      Final fallback when all Groq is exhausted, or the only provider
+//      when GROQ_API_KEY isn't set.
 //
 // Why not Llama 3.3 70B Versatile or Llama 3.1 8B Instant: Groq's
 // docs (https://console.groq.com/docs/structured-outputs#supported-models)
@@ -30,6 +34,7 @@
 // models error with "This model does not support response format `json_schema`".
 //
 // Tenants can override the default order via env var:
+//   AI_AGENT_MODEL = "groq:openai/gpt-oss-120b"
 //   AI_AGENT_MODEL = "groq:openai/gpt-oss-20b"
 //   AI_AGENT_MODEL = "groq:meta-llama/llama-4-scout-17b-16e-instruct"
 //   AI_AGENT_MODEL = "gemini:gemini-2.5-flash"
@@ -72,7 +77,7 @@ function getGoogleProvider() {
 // ----------------------------------------------------------------------------
 // Priority:
 //   1) Honor AI_AGENT_MODEL env var if set ("groq:..." or "gemini:...")
-//   2) Otherwise prefer Groq gpt-oss-20b (supports json_schema + 100k RPD)
+//   2) Otherwise prefer Groq gpt-oss-120b (best at structured output)
 //   3) Fall back to Gemini Flash Lite
 // Throws if NO provider is configured — every tenant must have at least
 // one API key in env. The error message is bilingual so the surfaced
@@ -95,14 +100,18 @@ export function pickAgentModel(): AgentModelInfo {
     // fall through to defaults if the override is malformed
   }
 
-  // 2) Default: Groq gpt-oss-20b — supports BOTH tool calling AND
-  // json_schema response format. Llama 3.x on Groq only supports
-  // json_object, which generateObject() doesn't use.
+  // 2) Default: Groq gpt-oss-120b — bullet-proof for complex schemas.
+  // The 20B variant intermittently returns "Failed to generate JSON"
+  // for the SEO / Personas / Ad-copy schemas which have 10-25 items
+  // each with nested enums. 120B handles them reliably; same json_schema
+  // + tool-calling support, same 30 RPM, just lower RPD (30k vs 100k).
+  // RPD isn't the bottleneck for a Marketing Studio that runs a few
+  // dozen requests per active tenant per day.
   if (groq) {
     return {
       provider: "groq",
-      modelName: "openai/gpt-oss-20b",
-      model: groq("openai/gpt-oss-20b"),
+      modelName: "openai/gpt-oss-120b",
+      model: groq("openai/gpt-oss-120b"),
     };
   }
 
@@ -133,8 +142,14 @@ export function pickFallbackAgentModel(
   const google = getGoogleProvider();
 
   if (primary.provider === "groq") {
-    // Try the other json_schema-capable Groq model first (different
-    // rate-limit bucket), then fall through to Gemini.
+    // Chain: 120B (primary) -> 20B -> llama-4-scout -> Gemini
+    if (groq && primary.modelName === "openai/gpt-oss-120b") {
+      return {
+        provider: "groq",
+        modelName: "openai/gpt-oss-20b",
+        model: groq("openai/gpt-oss-20b"),
+      };
+    }
     if (groq && primary.modelName === "openai/gpt-oss-20b") {
       return {
         provider: "groq",
@@ -142,7 +157,7 @@ export function pickFallbackAgentModel(
         model: groq("meta-llama/llama-4-scout-17b-16e-instruct"),
       };
     }
-    // If we're already on Llama 4 Scout (the secondary), go to Gemini.
+    // If we're already on Llama 4 Scout, fall through to Gemini.
     if (google) {
       return {
         provider: "gemini",
@@ -156,8 +171,8 @@ export function pickFallbackAgentModel(
     if (groq) {
       return {
         provider: "groq",
-        modelName: "openai/gpt-oss-20b",
-        model: groq("openai/gpt-oss-20b"),
+        modelName: "openai/gpt-oss-120b",
+        model: groq("openai/gpt-oss-120b"),
       };
     }
   }
@@ -225,7 +240,22 @@ export function isRetryableError(err: unknown): boolean {
     lower.includes("does not support response format") ||
     lower.includes("response_format") ||
     lower.includes("does not support") ||
-    lower.includes("not supported")
+    lower.includes("not supported") ||
+    // Treat schema-validation failures as retryable so a smaller model
+    // that produced syntactically-bad JSON falls through to a bigger
+    // one. Groq surfaces this as "Failed to generate JSON. Please
+    // adjust your prompt. See 'failed_generation'". Happens most on
+    // complex schemas (SEO with 10-25 keyword objects).
+    lower.includes("failed to generate json") ||
+    lower.includes("failed_generation") ||
+    lower.includes("adjust your prompt") ||
+    // Vercel AI SDK wraps schema-validation issues as AI_NoObject /
+    // AI_TypeValidation / no-object-generated errors. Same fallback
+    // logic applies — let a bigger / different-family model try.
+    lower.includes("no-object-generated") ||
+    lower.includes("no object generated") ||
+    lower.includes("ai_noobject") ||
+    lower.includes("typevalidation")
   );
 }
 
@@ -244,12 +274,12 @@ export async function callWithFallback<T>(
   const tried: string[] = [];
   let lastError: unknown = null;
 
-  // Build the chain dynamically — primary, then primary-fallback, then
-  // primary-fallback-fallback. Three tiers covers the realistic case:
-  //   Groq 70B -> Groq 8B -> Gemini Flash Lite
-  // (or Gemini -> Groq 70B if Gemini was primary)
+  // Build the chain dynamically — primary, then each fallback in turn.
+  // Four tiers cover the realistic Groq case:
+  //   gpt-oss-120b -> gpt-oss-20b -> llama-4-scout -> Gemini Flash Lite
+  // (or Gemini -> gpt-oss-120b if Gemini was primary)
   let cursor: AgentModelInfo | null = pickAgentModel();
-  for (let i = 0; i < 3 && cursor; i++) {
+  for (let i = 0; i < 4 && cursor; i++) {
     const label = `${cursor.provider}:${cursor.modelName}`;
     tried.push(label);
     try {
@@ -337,7 +367,7 @@ export function getProviderStatus() {
     groq: !!process.env.GROQ_API_KEY,
     gemini: !!process.env.GEMINI_API_KEY,
     primary: process.env.GROQ_API_KEY
-      ? "groq:openai/gpt-oss-20b"
+      ? "groq:openai/gpt-oss-120b"
       : process.env.GEMINI_API_KEY
         ? "gemini:gemini-2.5-flash-lite"
         : "none",
