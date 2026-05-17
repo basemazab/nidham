@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { DashboardSidebar } from "@/components/dashboard-sidebar";
+import { getMyFeatureOverrides } from "@/lib/subscriptions-server";
 import type { Plan } from "@/lib/subscriptions";
 
 type Profile = {
@@ -65,9 +66,11 @@ export default async function DashboardLayout({
         .eq("company_id", callerCompanyId)
         .maybeSingle<SubscriptionLite>()
     : { data: null };
+  // eslint-disable-next-line react-hooks/purity
+  const nowMs = Date.now();
   const daysLeft = subscription
     ? Math.round(
-        (new Date(subscription.ends_at + "T23:59:59").getTime() - Date.now()) /
+        (new Date(subscription.ends_at + "T23:59:59").getTime() - nowMs) /
           (1000 * 60 * 60 * 24),
       )
     : undefined;
@@ -83,6 +86,13 @@ export default async function DashboardLayout({
   const companyName = profile?.companies?.name ?? "—";
   const isSuperAdmin = !!superAdminRes.data;
 
+  // Per-tenant feature overrides (mig 041). When the super-admin has
+  // disabled a module for this tenant (e.g. they bought "Marketing-only"
+  // and don't need HR), the override map carries enabled=false and the
+  // sidebar hides those nav items entirely. Tenants with no overrides
+  // see the standard tier-based defaults.
+  const featureOverrides = await getMyFeatureOverrides();
+
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-slate-50">
       <DashboardSidebar
@@ -93,6 +103,7 @@ export default async function DashboardLayout({
         role={profile?.role}
         plan={subscription?.plan ?? null}
         daysLeft={daysLeft}
+        featureOverrides={featureOverrides}
       />
       <div className="flex-1 min-w-0">{children}</div>
     </div>

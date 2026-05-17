@@ -17,6 +17,14 @@ type Props = {
   role?: Role;
   plan?: Plan | null;
   daysLeft?: number;
+  /**
+   * Per-tenant feature flag overrides (mig 041). When a feature is
+   * explicitly disabled in this map, the corresponding nav item is
+   * HIDDEN entirely (vs. the old behavior of showing it with a 🔒).
+   * Lets super-admin sculpt the dashboard for "Marketing-only" or
+   * "HR-only" customers.
+   */
+  featureOverrides?: Partial<Record<Feature, boolean>>;
 };
 
 type NavItem = {
@@ -27,32 +35,50 @@ type NavItem = {
   // Roles that may see + click this item. Defaults to HR (admin + manager).
   // Settings + team management are admin-only.
   visibleTo?: Role[];
-  // Optional subscription feature gate. If set, the item is shown with
-  // a 🔒 indicator for callers whose plan doesn't include it; the link
-  // still navigates -- the destination page renders <UpgradeRequired />.
+  // Subscription feature gate. ALL business items have one now so the
+  // super-admin can hide modules per-tenant via Migration-041 overrides.
+  // Items with feature=undefined are always visible (dashboard home,
+  // forms hub, etc.). The render below decides between "lock icon"
+  // (tier-locked) and "hide entirely" (explicit override=false).
   feature?: Feature;
 };
 
 const NAV_ITEMS: readonly NavItem[] = [
+  // Always-visible essentials
   { href: "/dashboard", label: "الرئيسية", icon: "🏠", section: "main" },
-  { href: "/dashboard/employees", label: "الموظفين", icon: "👥", section: "main" },
-  { href: "/dashboard/attendance", label: "الحضور", icon: "⏰", section: "main" },
-  { href: "/dashboard/shifts", label: "الورديات", icon: "🕒", section: "main" },
-  { href: "/dashboard/payroll", label: "الرواتب", icon: "💰", section: "main" },
-  { href: "/dashboard/requests", label: "طلبات الموظفين", icon: "📨", section: "main" },
-  { href: "/dashboard/jobs", label: "التوظيف ✦", icon: "🎯", section: "main" },
-  { href: "/dashboard/customers", label: "العملاء", icon: "💼", section: "main" },
-  { href: "/dashboard/interactions", label: "التفاعلات", icon: "💬", section: "main" },
-  { href: "/dashboard/contracts", label: "العقود", icon: "📋", section: "main" },
+
+  // Core HR (gated on individual features so super-admin can sell
+  // an "HR-only" or "Marketing-only" package)
+  { href: "/dashboard/employees", label: "الموظفين", icon: "👥", section: "main", feature: "employees" },
+  { href: "/dashboard/attendance", label: "الحضور", icon: "⏰", section: "main", feature: "attendance" },
+  { href: "/dashboard/shifts", label: "الورديات", icon: "🕒", section: "main", feature: "shifts_rotations" },
+  { href: "/dashboard/payroll", label: "الرواتب", icon: "💰", section: "main", feature: "payroll" },
+  { href: "/dashboard/requests", label: "طلبات الموظفين", icon: "📨", section: "main", feature: "requests" },
+  { href: "/dashboard/jobs", label: "التوظيف ✦", icon: "🎯", section: "main", feature: "recruitment" },
+
+  // CRM
+  { href: "/dashboard/customers", label: "العملاء", icon: "💼", section: "main", feature: "crm" },
+  { href: "/dashboard/interactions", label: "التفاعلات", icon: "💬", section: "main", feature: "crm" },
+  { href: "/dashboard/contracts", label: "العقود", icon: "📋", section: "main", feature: "crm" },
+
+  // Forms hub + compliance — always visible (no feature gate, useful to all tiers)
   { href: "/dashboard/forms", label: "النماذج 📋", icon: "📄", section: "main" },
   { href: "/dashboard/compliance", label: "دليل الامتثال ⚖", icon: "🏛", section: "main" },
+
+  // Admin-only
   { href: "/dashboard/team", label: "فريق الشركة", icon: "🤝", section: "main", visibleTo: ["admin"] },
+
+  // AI section
   { href: "/dashboard/ai", label: "المساعد الذكي ✦", icon: "🤖", section: "ai", feature: "ai_assistant" },
   { href: "/dashboard/marketing", label: "Marketing Studio 👑", icon: "✦", section: "ai", feature: "marketing_studio" },
   { href: "/dashboard/retention", label: "احتفاظ بالموظفين 🎯", icon: "🎯", section: "ai", feature: "retention_insights" },
-  { href: "/dashboard/reports/attendance", label: "تقرير الحضور", icon: "📊", section: "reports" },
+
+  // Reports
+  { href: "/dashboard/reports/attendance", label: "تقرير الحضور", icon: "📊", section: "reports", feature: "attendance" },
   { href: "/dashboard/reports/bridge", label: "Bridge ✦", icon: "✦", section: "reports", feature: "bridge_analytics" },
   { href: "/dashboard/audit-log", label: "سجل النشاط", icon: "📋", section: "reports", visibleTo: ["admin"], feature: "audit_log" },
+
+  // Settings
   { href: "/dashboard/settings/office-location", label: "موقع المكتب 📍", icon: "⚙", section: "settings", visibleTo: ["admin"] },
   { href: "/dashboard/settings/leave-rollover", label: "ترحيل الإجازات", icon: "🗓", section: "settings", visibleTo: ["admin"] },
 ];
@@ -65,12 +91,17 @@ export function DashboardSidebar({
   role,
   plan,
   daysLeft,
+  featureOverrides,
 }: Props) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  // Close mobile drawer whenever the route changes
+  // Close mobile drawer whenever the route changes. The setState is
+  // intentional here — we're syncing UI to an external state (the URL),
+  // which is a legitimate effect use case. The lint rule is overzealous
+  // for this pattern, so we suppress it on the offending line.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMobileOpen(false);
   }, [pathname]);
 
@@ -79,8 +110,24 @@ export function DashboardSidebar({
     return pathname === href || pathname?.startsWith(href + "/");
   };
 
-  const canSee = (item: NavItem) =>
-    !item.visibleTo || (role !== undefined && item.visibleTo.includes(role));
+  const canSee = (item: NavItem) => {
+    // Role gate
+    if (item.visibleTo && (role === undefined || !item.visibleTo.includes(role))) {
+      return false;
+    }
+    // Per-tenant override gate — if super-admin explicitly DISABLED the
+    // feature for this tenant, hide the nav item entirely so the customer
+    // never sees the module they didn't pay for. Override=true (or no
+    // override at all) falls through to the rank-based render.
+    if (
+      item.feature &&
+      featureOverrides &&
+      featureOverrides[item.feature] === false
+    ) {
+      return false;
+    }
+    return true;
+  };
 
   const mainItems = NAV_ITEMS.filter((i) => i.section === "main" && canSee(i));
   const aiItems = NAV_ITEMS.filter((i) => i.section === "ai" && canSee(i));
@@ -132,10 +179,10 @@ export function DashboardSidebar({
               </button>
             </div>
             <nav className="flex-1 overflow-y-auto p-3">
-              <NavSection label="الموديولات" items={mainItems} isActive={isActive} plan={plan} />
-              <NavSection label="✦ ذكاء" items={aiItems} isActive={isActive} plan={plan} />
-              <NavSection label="التقارير" items={reportItems} isActive={isActive} plan={plan} />
-              <NavSection label="الإعدادات" items={settingsItems} isActive={isActive} plan={plan} />
+              <NavSection label="الموديولات" items={mainItems} isActive={isActive} plan={plan} featureOverrides={featureOverrides} />
+              <NavSection label="✦ ذكاء" items={aiItems} isActive={isActive} plan={plan} featureOverrides={featureOverrides} />
+              <NavSection label="التقارير" items={reportItems} isActive={isActive} plan={plan} featureOverrides={featureOverrides} />
+              <NavSection label="الإعدادات" items={settingsItems} isActive={isActive} plan={plan} featureOverrides={featureOverrides} />
             </nav>
             <UserFooter
               userName={userName}
@@ -156,10 +203,10 @@ export function DashboardSidebar({
           <Logo />
         </div>
         <nav className="flex-1 overflow-y-auto p-3">
-          <NavSection label="الموديولات" items={mainItems} isActive={isActive} />
-          <NavSection label="✦ ذكاء" items={aiItems} isActive={isActive} />
-          <NavSection label="التقارير" items={reportItems} isActive={isActive} />
-          <NavSection label="الإعدادات" items={settingsItems} isActive={isActive} />
+          <NavSection label="الموديولات" items={mainItems} isActive={isActive} plan={plan} featureOverrides={featureOverrides} />
+          <NavSection label="✦ ذكاء" items={aiItems} isActive={isActive} plan={plan} featureOverrides={featureOverrides} />
+          <NavSection label="التقارير" items={reportItems} isActive={isActive} plan={plan} featureOverrides={featureOverrides} />
+          <NavSection label="الإعدادات" items={settingsItems} isActive={isActive} plan={plan} featureOverrides={featureOverrides} />
         </nav>
         <UserFooter
           userName={userName}
@@ -187,11 +234,13 @@ function NavSection({
   items,
   isActive,
   plan,
+  featureOverrides,
 }: {
   label: string;
   items: NavItem[];
   isActive: (href: string) => boolean;
   plan?: Plan | null;
+  featureOverrides?: Partial<Record<Feature, boolean>>;
 }) {
   if (items.length === 0) return null;
   return (
@@ -203,11 +252,12 @@ function NavSection({
         {items.map((item) => {
           const active = isActive(item.href);
           const isReport = item.section === "reports";
-          // A feature-gated item shows a lock if the current plan
-          // doesn't unlock it -- the link still navigates so the
-          // destination page can render <UpgradeRequired />.
+          // Tier-locking only — explicit override=false items are already
+          // filtered out by canSee() above; override=true items pass
+          // through here as "unlocked" via hasFeature's overrides arg.
           const locked =
-            !!item.feature && !hasFeature(plan, item.feature);
+            !!item.feature &&
+            !hasFeature(plan, item.feature, featureOverrides);
           return (
             <Link
               key={item.href}

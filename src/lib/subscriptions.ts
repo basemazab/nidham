@@ -97,13 +97,233 @@ const FEATURE_RANK: Record<Feature, number> = {
 // ----------------------------------------------------------------------------
 
 /**
+ * Per-tenant feature override map. Set by super-admin in /admin to force
+ * features ON or OFF regardless of the tier-based default.
+ *   - undefined / missing → fall back to tier check
+ *   - true                → forced ON
+ *   - false               → forced OFF
+ */
+export type FeatureOverrides = Partial<Record<Feature, boolean>>;
+
+/**
  * Does the given plan unlock the feature? Synchronous, used in JSX
  * to decide whether to render a button or a lock icon.
+ *
+ * The optional `overrides` argument lets super-admin overrides take
+ * precedence over the tier-based default. Pass undefined or {} to
+ * skip the override layer.
  */
-export function hasFeature(plan: Plan | null | undefined, feature: Feature): boolean {
+export function hasFeature(
+  plan: Plan | null | undefined,
+  feature: Feature,
+  overrides?: FeatureOverrides,
+): boolean {
+  // Override takes priority — explicit true/false, in that order.
+  if (overrides && Object.prototype.hasOwnProperty.call(overrides, feature)) {
+    return overrides[feature] === true;
+  }
   if (!plan) return false;
   return PLAN_RANK[plan] >= FEATURE_RANK[feature];
 }
+
+/**
+ * Catalogue of feature keys grouped by category — drives the super-admin
+ * UI so it can show toggles per feature without hard-coding the list
+ * twice.
+ */
+export const FEATURE_CATALOGUE: {
+  category: string;
+  icon: string;
+  features: { key: Feature; label: string; description: string }[];
+}[] = [
+  {
+    category: "HR الأساسية",
+    icon: "👥",
+    features: [
+      {
+        key: "employees",
+        label: "إدارة الموظفين",
+        description: "بيانات + رفع Excel + استيراد PDF",
+      },
+      {
+        key: "attendance",
+        label: "الحضور والانصراف",
+        description: "GPS / يدوي / بصمة",
+      },
+      {
+        key: "payroll",
+        label: "الرواتب",
+        description: "تأمينات + ضرائب + قسائم",
+      },
+      {
+        key: "requests",
+        label: "طلبات الموظفين",
+        description: "إجازات + سلف + استئذانات",
+      },
+    ],
+  },
+  {
+    category: "HR المتقدمة",
+    icon: "⚙",
+    features: [
+      { key: "weekly_payroll", label: "رواتب أسبوعية", description: "" },
+      { key: "shifts_rotations", label: "ورديات + روتيشن", description: "" },
+      { key: "tardiness_tracking", label: "تتبع التأخير", description: "" },
+      { key: "bulk_attendance", label: "رفع حضور جماعي", description: "" },
+      { key: "mobile_app", label: "تطبيق الموبايل", description: "للموظفين" },
+      { key: "retention_insights", label: "Retention Insights", description: "تنبيهات الاستقالة" },
+    ],
+  },
+  {
+    category: "CRM + التوظيف",
+    icon: "💼",
+    features: [
+      { key: "crm", label: "CRM (العملاء)", description: "Pipeline + Interactions" },
+      { key: "recruitment", label: "التوظيف", description: "Jobs + Candidates" },
+    ],
+  },
+  {
+    category: "AI",
+    icon: "🤖",
+    features: [
+      {
+        key: "ai_assistant",
+        label: "مساعد AI",
+        description: "اسأل بالعربي عن أي حاجة",
+      },
+      {
+        key: "ai_cv_screening",
+        label: "فحص CVs بالـ AI",
+        description: "Score + أسئلة مقابلة",
+      },
+    ],
+  },
+  {
+    category: "استوديو التسويق",
+    icon: "✦",
+    features: [
+      {
+        key: "marketing_studio",
+        label: "استوديو التسويق الكامل",
+        description: "6 أدوات AI + Landing Pages + Leads + Analytics + Meta",
+      },
+    ],
+  },
+  {
+    category: "Enterprise",
+    icon: "👑",
+    features: [
+      {
+        key: "bridge_analytics",
+        label: "Bridge Analytics",
+        description: "ربط الـ HR بالـ CRM",
+      },
+      { key: "audit_log", label: "Audit Log", description: "سجل كل التعديلات" },
+      { key: "custom_branding", label: "Branding مخصص", description: "" },
+      { key: "premium_support", label: "Premium Support", description: "" },
+    ],
+  },
+];
+
+/**
+ * Preset packages that the super-admin can apply with one click to
+ * configure a tenant's feature set quickly. Each preset is a full
+ * map: features NOT listed default to enabled=false (so the preset
+ * fully describes the visible feature surface).
+ */
+export const FEATURE_PRESETS: {
+  key: string;
+  label: string;
+  icon: string;
+  description: string;
+  enabledFeatures: Feature[];
+}[] = [
+  {
+    key: "marketing_only",
+    label: "Marketing فقط",
+    icon: "✦",
+    description: "العميل اشترى استوديو التسويق بس — مفيش HR ولا CRM ولا توظيف",
+    enabledFeatures: ["marketing_studio"],
+  },
+  {
+    key: "hr_only",
+    label: "HR فقط",
+    icon: "👥",
+    description: "العميل اشترى موديولات HR بس — مفيش CRM ولا تسويق ولا توظيف",
+    enabledFeatures: [
+      "employees",
+      "attendance",
+      "payroll",
+      "requests",
+      "weekly_payroll",
+      "shifts_rotations",
+      "tardiness_tracking",
+      "bulk_attendance",
+      "mobile_app",
+      "retention_insights",
+      "ai_assistant",
+    ],
+  },
+  {
+    key: "hr_plus_crm",
+    label: "HR + CRM (بدون تسويق)",
+    icon: "💼",
+    description: "العميل عايز HR كامل + CRM، لكن مش عايز استوديو التسويق",
+    enabledFeatures: [
+      "employees",
+      "attendance",
+      "payroll",
+      "requests",
+      "weekly_payroll",
+      "shifts_rotations",
+      "tardiness_tracking",
+      "bulk_attendance",
+      "mobile_app",
+      "retention_insights",
+      "crm",
+      "recruitment",
+      "ai_assistant",
+      "ai_cv_screening",
+      "bridge_analytics",
+      "audit_log",
+    ],
+  },
+  {
+    key: "everything",
+    label: "كل حاجة (Full Enterprise)",
+    icon: "👑",
+    description: "كل الموديولات شغّالة — الباقة الكاملة",
+    enabledFeatures: [
+      "employees",
+      "attendance",
+      "payroll",
+      "requests",
+      "weekly_payroll",
+      "shifts_rotations",
+      "tardiness_tracking",
+      "bulk_attendance",
+      "mobile_app",
+      "retention_insights",
+      "crm",
+      "recruitment",
+      "ai_assistant",
+      "ai_cv_screening",
+      "marketing_studio",
+      "bridge_analytics",
+      "audit_log",
+      "custom_branding",
+      "premium_support",
+    ],
+  },
+];
+
+/**
+ * All known feature keys as a flat array — useful for the super-admin
+ * UI to render every toggle.
+ */
+export const ALL_FEATURES: Feature[] = FEATURE_CATALOGUE.flatMap((cat) =>
+  cat.features.map((f) => f.key),
+);
 
 /**
  * Human-readable Arabic label for each plan, used in badges +
