@@ -7,6 +7,7 @@
 
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { recoverStuckPublishingPosts } from "./actions";
 
 // Vercel Hobby defaults serverless functions to 10s. publishSocialPost
 // (dispatched from PostCard's parent) iterates per account_id and hits
@@ -18,6 +19,7 @@ type SearchParams = Promise<{
   archived?: string;
   published?: string;
   error?: string;
+  recovered?: string;
 }>;
 
 type AccountRow = {
@@ -152,6 +154,15 @@ export default async function SocialHomePage({
     failedPosts: posts.filter(
       (p) => p.status === "failed" || p.status === "partially_failed",
     ).length,
+    // Stuck count drives the recovery banner. We treat any publishing
+    // row touched more than 5 minutes ago as stuck — a healthy publish
+    // pass finishes way before that even for 5-platform fan-outs.
+    stuckPosts: posts.filter((p) => {
+      if (p.status !== "publishing") return false;
+      const age =
+        Date.now() - new Date(p.created_at).getTime();
+      return age > 5 * 60_000;
+    }).length,
     pendingComments: pendingComments.length,
     criticalComments: pendingComments.filter(
       (c) => c.urgency === "critical" || c.urgency === "high",
@@ -163,6 +174,12 @@ export default async function SocialHomePage({
       {sp.archived && <Flash kind="ok">✓ تم الأرشفة</Flash>}
       {sp.published && (
         <Flash kind="ok">✅ تم النشر · شوف التفاصيل في كارت البوست</Flash>
+      )}
+      {sp.recovered !== undefined && (
+        <Flash kind="ok">
+          🔧 تم استعادة {sp.recovered} بوست كانوا عالقين في حالة &quot;بينشر&quot;
+          (رجّعتهم لـ مسودة)
+        </Flash>
       )}
       {sp.error && <Flash kind="err">⚠ {decodeURIComponent(sp.error)}</Flash>}
 
@@ -187,6 +204,25 @@ export default async function SocialHomePage({
           حساباتك · بيرد على التعليقات (بموافقتك).
         </p>
       </header>
+
+      {/* Stuck-post recovery — only renders when there's something to recover */}
+      {stats.stuckPosts > 0 && (
+        <div className="mb-5 p-4 rounded-2xl bg-amber-50 border-2 border-amber-300 flex items-center justify-between gap-3 flex-wrap font-cairo">
+          <div className="text-sm text-amber-900">
+            ⚠ في <strong>{stats.stuckPosts}</strong> بوست عالق في حالة
+            &quot;بينشر…&quot; لأكتر من 5 دقايق (غالباً اتعطل في النص بسبب
+            تايملاوت أو deploy). تقدر ترجّعهم لـ مسودة وتنشرهم تاني.
+          </div>
+          <form action={recoverStuckPublishingPosts}>
+            <button
+              type="submit"
+              className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-black font-cairo shadow"
+            >
+              🔧 رجّع الـ {stats.stuckPosts} بوست لـ مسودة
+            </button>
+          </form>
+        </div>
+      )}
 
       {/* KPI strip */}
       <section className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">

@@ -87,6 +87,23 @@ export default async function BrandingPage({
     "brand_cover_image_url",
   );
 
+  // Pull the connected Facebook Page id so the "open my page" link is
+  // accurate for whichever tenant is logged in (no more hardcoded
+  // 61589810406479). If there's no FB account yet, the link section
+  // gets a graceful fallback to the Pages search.
+  const { data: fbAccount } = await supabase
+    .from("social_accounts")
+    .select("external_id, display_label")
+    .eq("platform", "facebook")
+    .eq("is_active", true)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle<{ external_id: string; display_label: string }>();
+
+  const fbPageUrl = fbAccount?.external_id
+    ? `https://www.facebook.com/${fbAccount.external_id}`
+    : "https://www.facebook.com/pages/";
+
   return (
     <div className="max-w-5xl mx-auto px-6 py-8">
       {sp.profile && sp.uploaded && (
@@ -173,12 +190,12 @@ export default async function BrandingPage({
                 <li>
                   ادخل صفحتك على Facebook (
                   <a
-                    href="https://www.facebook.com/profile.php?id=61589810406479"
+                    href={fbPageUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-indigo-700 underline"
                   >
-                    Nidham Egypt
+                    {fbAccount?.display_label ?? "افتح Facebook Page"}
                   </a>
                   )
                 </li>

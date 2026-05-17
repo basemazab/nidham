@@ -109,6 +109,21 @@ export default async function SocialAccountsPage({
 
   const envReady = !!process.env.META_ENCRYPTION_KEY;
 
+  // Compute which accounts are expiring soon so we can show a banner
+  // at the top — operators routinely miss the per-row chip and don't
+  // notice until publishes start failing. We treat <7 days as
+  // "critical", <30 days as "warning". Null expiries (long-lived /
+  // permanent / unspecified) are healthy.
+  const expiringAccounts = accounts
+    .filter((a) => a.is_active && a.token_expires_at)
+    .map((a) => {
+      const ms = new Date(a.token_expires_at as string).getTime() - Date.now();
+      const days = Math.floor(ms / 86_400_000);
+      return { account: a, days };
+    })
+    .filter((x) => x.days < 30)
+    .sort((a, b) => a.days - b.days);
+
   return (
     <div className="max-w-5xl mx-auto px-6 py-8">
       {sp.saved && <Flash kind="ok">✅ تم الحفظ + التشفير</Flash>}
@@ -134,6 +149,39 @@ export default async function SocialAccountsPage({
             Environment Variables، ضيف <code dir="ltr">META_ENCRYPTION_KEY</code>{" "}
             بـ string عشوائي 32+ char، Redeploy.
           </p>
+        </div>
+      )}
+
+      {/* Token-expiry warning — only renders if at least one account
+          is < 30 days from expiry. Critical (<7 days) gets a red
+          banner; warning (<30 days) gets an amber one. */}
+      {expiringAccounts.length > 0 && (
+        <div
+          className={`mb-5 p-4 rounded-2xl border-2 font-cairo ${
+            expiringAccounts[0].days < 7
+              ? "bg-rose-50 border-rose-300 text-rose-900"
+              : "bg-amber-50 border-amber-300 text-amber-900"
+          }`}
+        >
+          <h3 className="font-black mb-2">
+            {expiringAccounts[0].days < 7 ? "🚨" : "⚠"} في{" "}
+            {expiringAccounts.length} حساب tokens قربت تنتهي
+          </h3>
+          <ul className="text-sm space-y-1 list-disc pr-5">
+            {expiringAccounts.map((x) => (
+              <li key={x.account.id}>
+                <strong>{x.account.display_label}</strong> —{" "}
+                {x.days < 0
+                  ? `انتهى من ${-x.days} يوم!`
+                  : `هينتهي خلال ${x.days} يوم`}
+                {x.account.platform === "facebook" && (
+                  <span>
+                    {" "}· اضغط <strong>🔐 60 يوم</strong> جنبه عشان تجدّده
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 

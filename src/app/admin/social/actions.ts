@@ -731,6 +731,47 @@ async function upsertAppSetting(
   );
 }
 
+/**
+ * Reset social_posts rows stuck in `publishing` state for more than 5
+ * minutes back to `draft`. This unblocks the operator when a deploy
+ * (or function timeout) interrupts publishSocialPost mid-loop — those
+ * posts would otherwise sit indefinitely with no way to retry from the
+ * UI (the publish form only shows for `draft` status).
+ *
+ * Conservative cutoff: 5 minutes. A real publish run touches every
+ * target sequentially so even a slow 5-platform run finishes well
+ * inside that window.
+ */
+export async function recoverStuckPublishingPosts() {
+  const { supabase } = await ensureSuperAdmin();
+  const fiveMinutesAgo = new Date(Date.now() - 5 * 60_000).toISOString();
+
+  const { data: stuck, error: selErr } = await supabase
+    .from("social_posts")
+    .select("id")
+    .eq("status", "publishing")
+    .lt("updated_at", fiveMinutesAgo)
+    .returns<{ id: string }[]>();
+  if (selErr) {
+    redirect(
+      "/admin/social?error=" +
+        encodeURIComponent(`Failed to scan stuck posts: ${selErr.message}`),
+    );
+  }
+  const count = stuck?.length ?? 0;
+
+  if (count > 0) {
+    await supabase
+      .from("social_posts")
+      .update({ status: "draft", updated_at: new Date().toISOString() })
+      .eq("status", "publishing")
+      .lt("updated_at", fiveMinutesAgo);
+  }
+
+  revalidatePath("/admin/social");
+  redirect(`/admin/social?recovered=${count}`);
+}
+
 export async function archiveSocialPost(formData: FormData) {
   const { supabase } = await ensureSuperAdmin();
   const id = String(formData.get("id") ?? "").trim();
@@ -1112,6 +1153,14 @@ export async function syncSocialCommentsNow() {
     new: String(result.new_comments),
     errors: String(result.errors.length),
   });
+  // Expose the first error message so the operator can act on it.
+  // Previously the UI just said "3 errors" with no hint of what went
+  // wrong (token expired? permission missing? FB outage?), so the
+  // operator was blind. We surface ONE representative message — the
+  // rest will be the same root cause 99% of the time.
+  if (result.errors.length > 0) {
+    summary.set("first_error", result.errors[0].error.slice(0, 200));
+  }
   redirect(`/admin/social/inbox?${summary.toString()}`);
 }
 

@@ -34,6 +34,7 @@ type SearchParams = Promise<{
   seen?: string;
   new?: string;
   errors?: string;
+  first_error?: string;
 }>;
 
 type CommentRow = {
@@ -118,13 +119,43 @@ export default async function SocialInbox({
       {sp.published && <Flash kind="ok">✅ تم نشر الرد على المنصة</Flash>}
       {sp.marked && <Flash kind="ok">✓ تم التحديث</Flash>}
       {sp.synced && (
-        <Flash kind="ok">
-          🔄 تم الـ Sync · فحصنا {sp.scanned ?? 0} بوست منشور · شفنا{" "}
-          {sp.seen ?? 0} تعليق · جديد {sp.new ?? 0}
-          {Number(sp.errors ?? 0) > 0
-            ? ` · ⚠ ${sp.errors} خطأ`
-            : ""}
-        </Flash>
+        <>
+          <Flash kind="ok">
+            🔄 تم الـ Sync · فحصنا {sp.scanned ?? 0} بوست منشور · شفنا{" "}
+            {sp.seen ?? 0} تعليق · جديد {sp.new ?? 0}
+            {Number(sp.errors ?? 0) > 0
+              ? ` · ⚠ ${sp.errors} خطأ`
+              : ""}
+          </Flash>
+          {sp.first_error && (
+            <div className="mb-4 p-3 rounded-xl border border-amber-300 bg-amber-50 text-amber-900 font-cairo text-xs">
+              <div className="font-bold mb-1">
+                ⚠ سبب الفشل (أول error من Facebook):
+              </div>
+              <code className="block bg-white/60 p-2 rounded text-[11px] break-all" dir="ltr">
+                {decodeURIComponent(sp.first_error)}
+              </code>
+              {/Session has expired|access token/i.test(
+                decodeURIComponent(sp.first_error),
+              ) && (
+                <div className="mt-2 text-[11px] leading-snug">
+                  💡 الـ Token انتهت صلاحيته — جدّده من Graph API Explorer
+                  وحدّثه في صفحة الحسابات، أو اضغط زرار{" "}
+                  <strong>🔐 60 يوم</strong> لو ضفت META_APP_ID/SECRET.
+                </div>
+              )}
+              {/pages_read_user_content|permission/i.test(
+                decodeURIComponent(sp.first_error),
+              ) && (
+                <div className="mt-2 text-[11px] leading-snug">
+                  💡 محتاج تضيف permission{" "}
+                  <code dir="ltr">pages_read_user_content</code> للـ Token
+                  من App Dashboard → Use Cases → Customize → Permissions.
+                </div>
+              )}
+            </div>
+          )}
+        </>
       )}
       {sp.error && <Flash kind="err">⚠ {decodeURIComponent(sp.error)}</Flash>}
 
