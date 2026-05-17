@@ -39,7 +39,7 @@ type TargetRow = {
   id: string;
   post_id: string;
   status: string;
-  error_message: string | null;
+  last_error: string | null;
   external_post_id: string | null;
   external_url: string | null;
   social_accounts: {
@@ -118,7 +118,7 @@ export default async function SocialHomePage({
     const { data: targets } = await supabase
       .from("social_post_targets")
       .select(
-        "id, post_id, status, error_message, external_post_id, external_url, social_accounts(platform, display_label)",
+        "id, post_id, status, last_error, external_post_id, external_url, social_accounts(platform, display_label)",
       )
       .in("post_id", postIds)
       .returns<TargetRow[]>();
@@ -427,12 +427,12 @@ function PostCard({
                     {ok ? "✅" : failed ? "❌" : pending ? "⏳" : "·"}
                   </span>
                 </div>
-                {failed && t.error_message && (
+                {failed && t.last_error && (
                   <div
                     className="text-rose-700 mt-1 text-[10px] leading-tight break-words"
                     dir="ltr"
                   >
-                    ⚠ {t.error_message}
+                    ⚠ {t.last_error}
                   </div>
                 )}
                 {ok && t.external_url && (
