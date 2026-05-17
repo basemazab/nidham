@@ -593,6 +593,104 @@ export async function generateBrandCover() {
 }
 
 /**
+ * Upload a brand image (profile picture or cover) from the operator's
+ * computer. Stored in the same Supabase bucket as AI-generated images,
+ * keyed by which slot (`profile` / `cover`) it belongs to.
+ *
+ * Why this exists alongside the AI generators:
+ *   - Free AI image gen quality is mediocre. Operators with a real
+ *     designer-made logo / cover get a much better Page look by
+ *     uploading their own asset rather than relying on FLUX Schnell
+ *     or Gemini Flash Image.
+ *   - The downstream consumer (Facebook upload) doesn't care whether
+ *     the URL was AI-generated or hand-curated — same code path.
+ */
+export async function uploadBrandImage(formData: FormData) {
+  const { supabase } = await ensureSuperAdmin();
+  const slot = String(formData.get("slot") ?? "").trim();
+  const file = formData.get("file");
+
+  if (slot !== "profile" && slot !== "cover") {
+    redirect(
+      "/admin/social/branding?error=" +
+        encodeURIComponent("slot لازم يكون profile أو cover"),
+    );
+  }
+  if (!file || !(file instanceof File) || file.size === 0) {
+    redirect(
+      "/admin/social/branding?error=" +
+        encodeURIComponent("اختار ملف صورة الأول"),
+    );
+  }
+
+  // Validate type — must match the bucket's allowed_mime_types (mig 045)
+  const allowed = ["image/png", "image/jpeg", "image/webp", "image/gif"];
+  if (!allowed.includes(file.type)) {
+    redirect(
+      "/admin/social/branding?error=" +
+        encodeURIComponent(
+          `نوع الصورة مش مدعوم (${file.type}). استخدم PNG / JPEG / WebP / GIF`,
+        ),
+    );
+  }
+  // Validate size (10 MB bucket cap from mig 045)
+  if (file.size > 10 * 1024 * 1024) {
+    redirect(
+      "/admin/social/branding?error=" +
+        encodeURIComponent(
+          `حجم الصورة كبير (${(file.size / 1024 / 1024).toFixed(1)} MB). الحد الأقصى 10 MB`,
+        ),
+    );
+  }
+
+  try {
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const ext =
+      file.type === "image/jpeg"
+        ? "jpg"
+        : file.type === "image/webp"
+          ? "webp"
+          : file.type === "image/gif"
+            ? "gif"
+            : "png";
+    const path = `branding/${slot}/${Date.now()}-upload.${ext}`;
+
+    const { error: upErr } = await supabase.storage
+      .from("social-media")
+      .upload(path, bytes, {
+        contentType: file.type,
+        upsert: false,
+        cacheControl: "31536000",
+      });
+    if (upErr) throw new Error(`Storage upload failed: ${upErr.message}`);
+
+    const { data: pub } = supabase.storage
+      .from("social-media")
+      .getPublicUrl(path);
+
+    await upsertAppSetting(
+      supabase,
+      slot === "profile" ? "brand_profile_image_url" : "brand_cover_image_url",
+      pub.publicUrl,
+    );
+  } catch (err) {
+    redirect(
+      "/admin/social/branding?error=" +
+        encodeURIComponent(
+          err instanceof Error
+            ? `الرفع فشل: ${err.message.slice(0, 200)}`
+            : "الرفع فشل",
+        ),
+    );
+  }
+
+  revalidatePath("/admin/social/branding");
+  redirect(
+    `/admin/social/branding?${slot === "profile" ? "profile" : "cover"}=1&uploaded=1`,
+  );
+}
+
+/**
  * Tiny key-value helper backed by social_settings (mig 043). value is
  * jsonb so we wrap strings in JSON.stringify — the read side does
  * JSON.parse to recover the original.

@@ -50,3 +50,5 @@ playwright-report/
 
 # claude code local dev config (preview server)
 .claude/
+
+.vercel

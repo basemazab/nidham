@@ -14,7 +14,12 @@
 
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { generateBrandProfile, generateBrandCover } from "../actions";
+import {
+  generateBrandProfile,
+  generateBrandCover,
+  uploadBrandImage,
+} from "../actions";
+import { UploadButton } from "./upload-button";
 
 // Vercel Hobby plan defaults serverless functions to 10s. Image
 // generation through Gemini takes 8-30s for the cover (16:9 is heavier
@@ -27,6 +32,7 @@ export const maxDuration = 60;
 type SearchParams = Promise<{
   profile?: string;
   cover?: string;
+  uploaded?: string;
   error?: string;
 }>;
 
@@ -83,8 +89,18 @@ export default async function BrandingPage({
 
   return (
     <div className="max-w-5xl mx-auto px-6 py-8">
-      {sp.profile && <Flash kind="ok">✅ تم توليد صورة شخصية جديدة</Flash>}
-      {sp.cover && <Flash kind="ok">✅ تم توليد غلاف جديد</Flash>}
+      {sp.profile && sp.uploaded && (
+        <Flash kind="ok">✅ تم رفع الصورة الشخصية بنجاح</Flash>
+      )}
+      {sp.cover && sp.uploaded && (
+        <Flash kind="ok">✅ تم رفع الغلاف بنجاح</Flash>
+      )}
+      {sp.profile && !sp.uploaded && (
+        <Flash kind="ok">✅ تم توليد صورة شخصية جديدة</Flash>
+      )}
+      {sp.cover && !sp.uploaded && (
+        <Flash kind="ok">✅ تم توليد غلاف جديد</Flash>
+      )}
       {sp.error && (
         <Flash kind="err">⚠ {decodeURIComponent(sp.error)}</Flash>
       )}
@@ -94,11 +110,19 @@ export default async function BrandingPage({
           🎨 هوية بصرية للـ Facebook Page
         </h1>
         <p className="text-sm text-slate-500 font-cairo">
-          الـ AI بيصمملك صورة شخصية + غلاف على هوية Nidham. تحمّلهم وترفعهم
-          على صفحتك في Facebook بنفسك (Facebook بيمنع رفع الصور تلقائي
-          من API بدون App Review).
+          عندك خياران: ولّد صورة بالـ AI أو ارفع صورتك الجاهزة (لو معاك من
+          مصمم أو Canva). الاتنين بيتخزّنوا في نفس المكان وبتقدر تنزّلهم
+          ترفعهم يدوياً على Facebook.
         </p>
       </header>
+
+      {/* Quality note — set expectations honestly */}
+      <div className="mb-5 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 font-cairo">
+        💡 <strong>ملحوظة عن جودة الـ AI:</strong> النماذج المجانية
+        (Gemini Flash Image + FLUX Schnell) جودتها متوسطة — مناسبة
+        للبوستات اليومية بس مش لـ branding احترافي. **للهوية البصرية يفضّل ترفع
+        صورة جاهزة من مصمم أو من Canva.**
+      </div>
 
       {/* PROFILE PICTURE */}
       <section className="mb-8 p-5 bg-white border-2 border-indigo-200 rounded-2xl">
@@ -111,14 +135,21 @@ export default async function BrandingPage({
               1080×1080 مربعة · مناسبة لـ FB + IG + LinkedIn
             </p>
           </div>
-          <form action={generateBrandProfile}>
-            <button
-              type="submit"
-              className="px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-500 to-blue-500 text-white text-sm font-black font-cairo shadow hover:shadow-lg transition"
-            >
-              {profileUrl ? "🔄 ولّد بديل" : "✨ ولّد بالـ AI"}
-            </button>
-          </form>
+          <div className="flex items-center gap-2 flex-wrap">
+            <UploadButton
+              action={uploadBrandImage}
+              slot="profile"
+              label="📤 ارفع صورتك"
+            />
+            <form action={generateBrandProfile}>
+              <button
+                type="submit"
+                className="px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-500 to-blue-500 text-white text-sm font-black font-cairo shadow hover:shadow-lg transition"
+              >
+                {profileUrl ? "🔄 ولّد بديل بالـ AI" : "✨ ولّد بالـ AI"}
+              </button>
+            </form>
+          </div>
         </div>
 
         {profileUrl ? (
@@ -192,14 +223,21 @@ export default async function BrandingPage({
               1280×720 (16:9) · مناسبة لـ FB cover + LinkedIn banner
             </p>
           </div>
-          <form action={generateBrandCover}>
-            <button
-              type="submit"
-              className="px-4 py-2 rounded-lg bg-gradient-to-r from-purple-500 to-fuchsia-500 text-white text-sm font-black font-cairo shadow hover:shadow-lg transition"
-            >
-              {coverUrl ? "🔄 ولّد بديل" : "✨ ولّد بالـ AI"}
-            </button>
-          </form>
+          <div className="flex items-center gap-2 flex-wrap">
+            <UploadButton
+              action={uploadBrandImage}
+              slot="cover"
+              label="📤 ارفع غلافك"
+            />
+            <form action={generateBrandCover}>
+              <button
+                type="submit"
+                className="px-4 py-2 rounded-lg bg-gradient-to-r from-purple-500 to-fuchsia-500 text-white text-sm font-black font-cairo shadow hover:shadow-lg transition"
+              >
+                {coverUrl ? "🔄 ولّد بديل بالـ AI" : "✨ ولّد بالـ AI"}
+              </button>
+            </form>
+          </div>
         </div>
 
         {coverUrl ? (

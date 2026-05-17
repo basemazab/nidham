@@ -86,25 +86,53 @@ const visualBriefSchema = z.object({
 export type VisualBrief = z.infer<typeof visualBriefSchema>;
 
 
-const VISUAL_BRIEF_SYSTEM = `You are an art director who briefs an AI image model
-(FLUX) for social media posts. The post is in Egyptian Arabic; YOU output
-English visual descriptions only.
+const VISUAL_BRIEF_SYSTEM = `You are a senior art director briefing an AI
+image model (FLUX / Imagen) for a B2B SaaS company's social media. The
+underlying post is in Egyptian Arabic; YOU output English visual
+descriptions only.
 
-CRITICAL RULES:
-1. NO text in the image — the image model can't render Arabic text properly.
-   Describe the scene only, not the message.
-2. Concrete nouns + adjectives + lighting + composition. Avoid abstract
-   marketing words ("innovation", "synergy" → garbage images).
-3. The brand is Nidham — a modern Egyptian HR/CRM SaaS. Visual identity:
-   clean, professional, slightly warm. Egyptian setting subtle (no pyramids,
-   no clichés). Office workers, laptops, dashboards.
-4. Pick the style that matches the POST'S ENERGY:
-   - pain point / problem        → photorealistic stressed worker
-   - feature / solution          → isometric_3d clean dashboard
-   - case study / numbers        → infographic with charts
-   - hype / launch               → cinematic photorealistic
-   - tip / how-to                → minimal_flat illustration
-5. Aspect ratio: 1:1 unless the post is specifically a banner (16:9).`;
+# PROMPT QUALITY RULES (these drive the final image quality)
+
+1. **No text in image** — Arabic text from FLUX/Imagen renders as
+   gibberish. Describe the SCENE, not the marketing message.
+
+2. **Concrete > abstract.** Bad: "innovation, synergy, productivity".
+   Good: "young woman in cream sweater at standing desk, two monitors
+   show colorful charts, one hand holds coffee".
+
+3. **Lock in style explicitly.** Every brief must include:
+   - Lighting (e.g. "soft natural daylight from large window")
+   - Lens / framing (e.g. "shot on 50mm, shallow depth of field, eye-level")
+   - Color palette (e.g. "warm cream + deep indigo accents")
+   - Composition cue (e.g. "rule of thirds, subject right of center")
+   - Quality anchors ("editorial photography, high detail, sharp focus")
+
+4. **Brand: Nidham** — modern Egyptian HR / CRM SaaS. Visual identity:
+   - Clean, professional, warm (not cold corporate).
+   - Egyptian subtly — Cairo office workers, modern fashion, no
+     pyramid/camel clichés EVER.
+   - Color accents: deep indigo (#4338ca) and warm cream (#fef7e0).
+   - People in scenes are 22-45, business-casual, look like real
+     Cairo professionals (not stock-photo models).
+
+5. **Style matches post energy:**
+   - pain point / problem        → photorealistic stressed worker, dim
+                                    overhead light, cluttered desk
+   - feature / solution          → isometric 3d dashboard, clean white
+                                    background, vibrant accent colors
+   - case study / numbers        → infographic style, charts/numbers
+                                    composition, modern flat design
+   - hype / feature launch       → cinematic photo, dramatic lighting,
+                                    confident subject
+   - tip / how-to                → minimal flat illustration, two-tone,
+                                    icon-driven
+
+6. **Aspect ratio: 1:1 default.** 16:9 only for explicit banner posts.
+
+7. **End every prompt with quality boosters:**
+   "8k resolution, professional photography, award-winning composition,
+   shot on Hasselblad, ultra-realistic detail, no text, no logos"
+   (or the illustration equivalent for non-photo styles)`;
 
 
 export async function buildVisualBrief(args: {
@@ -428,21 +456,43 @@ export async function generateAndStorePostImage(args: {
     goal: args.goal,
   });
 
-  // Append style cue to keep Pollinations on-brand without re-rolling
-  // the brief each time. These are well-known FLUX modifiers.
+  // Append heavy style + quality anchors to push the image model into
+  // its strongest mode. These follow the proven "boost the prompt with
+  // technical photography / illustration vocab" pattern that takes
+  // FLUX / Imagen output from mediocre to professional. Re-rolled per
+  // style_hint so a photorealistic scene gets camera vocab, an
+  // illustration gets vector vocab, etc.
   const styleSuffix: Record<VisualBrief["style_hint"], string> = {
     photorealistic:
-      ", professional photography, soft natural lighting, shallow depth of field, high detail",
+      ", professional editorial photography, shot on Hasselblad H6D 100c, " +
+      "85mm prime lens, golden hour natural lighting, shallow depth of field f/2.8, " +
+      "high dynamic range, ultra-detailed skin texture, magazine cover quality, " +
+      "8k resolution, sharp focus, no text, no logos",
     illustration:
-      ", modern vector illustration style, clean lines, vibrant flat colors",
+      ", modern minimalist vector illustration, clean geometric shapes, " +
+      "bold flat colors with subtle gradients, harmonious palette, " +
+      "behance trending, dribbble featured, smooth bezier curves, " +
+      "ultra crisp lines, no text, no typography",
     isometric_3d:
-      ", isometric 3d render, soft shadows, pastel palette, blender style",
+      ", premium isometric 3D render in Blender, soft global illumination, " +
+      "subtle ambient occlusion, pastel material palette, octane render quality, " +
+      "subsurface scattering, professional product visualization, " +
+      "trending on artstation, 4k resolution, no text",
     minimal_flat:
-      ", minimal flat design, two-tone accent palette, generous white space",
+      ", swiss minimalist flat design, generous negative space, " +
+      "two-tone palette (deep indigo + warm cream), grid composition, " +
+      "modernist typography placeholder areas, magazine layout aesthetic, " +
+      "vector crisp, no actual text",
     infographic:
-      ", clean modern infographic style, data visualization, blue and teal accent colors",
+      ", premium business infographic, clean data visualization style, " +
+      "modern flat design, deep indigo and warm cream accents, " +
+      "geometric charts and bars (no text), Behance featured quality, " +
+      "high contrast, professional, 4k resolution",
     office_scene:
-      ", modern office workspace, natural light, candid composition",
+      ", candid editorial photography of a modern Cairo office, " +
+      "soft window light, natural skin tones, shot on 50mm prime, " +
+      "documentary style, warm professional atmosphere, " +
+      "sharp focus on subject, blurred background, 8k, no text, no logos",
   };
 
   const finalPrompt = `${brief.prompt}${styleSuffix[brief.style_hint]}`;
