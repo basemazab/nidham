@@ -1,0 +1,44 @@
+# ============================================================================
+# .vercelignore — files NOT to upload during `vercel --prod`
+# ============================================================================
+#
+# Vercel CLI uploads the entire working directory (minus .gitignore) by
+# default. We exclude folders that aren't needed for the Next.js build —
+# Electron desktop binaries, mobile RN artifacts, the enterprise/
+# package's own node_modules, build caches, etc. Skipping these keeps the
+# upload payload under Vercel's 100 MB hard cap and shaves minutes off
+# each deploy.
+#
+# Note: this file is OR'd with .gitignore — anything matched here is
+# additionally excluded on top of git-ignored items.
+
+# Build outputs (also covered by .gitignore but stated explicitly)
+.next/
+out/
+build/
+dist/
+
+# Companion packages — Vercel only builds the Next.js root
+desktop/
+mobile/
+enterprise/
+
+# Local test artifacts
+test-results/
+playwright-report/
+coverage/
+scripts/storageState.json
+scripts/screenshots/
+
+# TypeScript incremental cache (large, regenerated)
+*.tsbuildinfo
+
+# Docs/dev-only files
+docs/
+
+# Editor + OS
+.claude/
+.DS_Store
+*.swp
+*.swo
+Thumbs.db
