@@ -280,14 +280,23 @@ async function publishToLinkedIn(args: {
 // ----------------------------------------------------------------------------
 async function publishToTelegram(args: {
   accessToken: string; // this is actually the bot token (1234:ABC...)
+  externalId: string;  // channel @username or numeric ID — same thing
   platformMetadata: PlatformMetadata;
   body: string;
 }): Promise<PublishResult> {
-  const chatId = getMeta<string>(args.platformMetadata, "chat_id");
+  // For Telegram channels, the platform-level "external_id" and the
+  // "chat_id" metadata field are conceptually identical (both = the
+  // channel's @username or numeric ID). The Accounts form has both
+  // because some platforms genuinely need separate values, but for
+  // Telegram users routinely fill only one of them. Accept either:
+  // metadata.chat_id wins (operator-intent override), then externalId.
+  const chatId =
+    getMeta<string>(args.platformMetadata, "chat_id") || args.externalId;
   if (!chatId) {
     return {
       ok: false,
-      error: "Telegram account missing chat_id metadata (the channel ID).",
+      error:
+        "Telegram channel ID missing. Set Platform ID OR Metadata.chat_id on the account.",
     };
   }
   // Telegram's sendMessage caps text at 4096 chars. Truncate gracefully
@@ -371,7 +380,12 @@ export async function publishToSocialPlatform(args: {
     case "linkedin":
       return publishToLinkedIn({ accessToken, body, platformMetadata });
     case "telegram":
-      return publishToTelegram({ accessToken, platformMetadata, body });
+      return publishToTelegram({
+        accessToken,
+        externalId,
+        platformMetadata,
+        body,
+      });
     case "tiktok":
       return notYetImplemented("TikTok");
     case "youtube":
