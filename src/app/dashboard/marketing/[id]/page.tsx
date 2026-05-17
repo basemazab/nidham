@@ -257,6 +257,41 @@ export default async function MarketingProjectPage({
             color="violet"
           />
         </div>
+
+        {/* Lead operations — bridges the AI output to actual leads */}
+        <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 mt-8 font-cairo">
+          العمليات (Lead capture + متابعة)
+        </h2>
+        <div className="grid sm:grid-cols-2 gap-4">
+          <Link
+            href="/dashboard/marketing/landing-pages"
+            className="group bg-gradient-to-br from-cyan-50 to-blue-50 border-2 border-cyan-200 hover:border-cyan-400 rounded-2xl p-5 transition hover:shadow-lg"
+          >
+            <div className="flex items-center gap-3 mb-1">
+              <span className="text-2xl">🏠</span>
+              <h3 className="text-base font-black font-cairo text-slate-800 group-hover:text-cyan-700">
+                صفحات الهبوط
+              </h3>
+            </div>
+            <p className="text-xs text-slate-600 font-cairo">
+              ابني صفحة هبوط من الـ ad copy اللي عملته، وحطها في إعلانك.
+            </p>
+          </Link>
+          <Link
+            href="/dashboard/marketing/leads"
+            className="group bg-gradient-to-br from-violet-50 to-purple-50 border-2 border-violet-200 hover:border-violet-400 rounded-2xl p-5 transition hover:shadow-lg"
+          >
+            <div className="flex items-center gap-3 mb-1">
+              <span className="text-2xl">📥</span>
+              <h3 className="text-base font-black font-cairo text-slate-800 group-hover:text-violet-700">
+                Leads Inbox
+              </h3>
+            </div>
+            <p className="text-xs text-slate-600 font-cairo">
+              كل lead من الحملة دي بييجي هنا مع مصدره الكامل.
+            </p>
+          </Link>
+        </div>
       </div>
     </main>
   );

@@ -111,6 +111,44 @@ export default async function MarketingHubPage({
 
         <AiErrorBanner message={errorMsg} />
 
+        {/* Quick-access cards — the operational layer (Landing Pages +
+            Leads Inbox) lives alongside the AI tool projects. Render
+            them up top so they're always reachable, not buried inside
+            a specific project. */}
+        <section className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
+          <Link
+            href="/dashboard/marketing/landing-pages"
+            className="group bg-gradient-to-br from-cyan-50 to-blue-50 border-2 border-cyan-200 hover:border-cyan-400 rounded-2xl p-5 transition hover:shadow-lg"
+          >
+            <div className="flex items-center gap-3 mb-1">
+              <span className="text-3xl">🏠</span>
+              <h3 className="text-base font-black font-cairo text-slate-800 group-hover:text-cyan-700">
+                صفحات الهبوط
+              </h3>
+            </div>
+            <p className="text-xs text-slate-600 font-cairo">
+              ابني landing page بدقايق وحطها في إعلاناتك. كل lead يدخل CRM
+              تلقائياً مع مصدره (UTM + Referrer).
+            </p>
+          </Link>
+
+          <Link
+            href="/dashboard/marketing/leads"
+            className="group bg-gradient-to-br from-violet-50 to-purple-50 border-2 border-violet-200 hover:border-violet-400 rounded-2xl p-5 transition hover:shadow-lg"
+          >
+            <div className="flex items-center gap-3 mb-1">
+              <span className="text-3xl">📥</span>
+              <h3 className="text-base font-black font-cairo text-slate-800 group-hover:text-violet-700">
+                Leads Inbox
+              </h3>
+            </div>
+            <p className="text-xs text-slate-600 font-cairo">
+              صندوق العملاء المحتملين. مين جديد، مين اتواصلت معاه، مين
+              ضايع لو محدش رد عليه خلال 24 ساعة.
+            </p>
+          </Link>
+        </section>
+
         {/* Migration not applied warning — the most likely reason for
             "table not found" errors. Tells the operator exactly which
             SQL file to apply where, with a one-click copy path. */}

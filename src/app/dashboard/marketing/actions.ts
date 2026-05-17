@@ -88,7 +88,6 @@ export async function createMarketingProject(formData: FormData) {
     // Log full error to server console — visible in Vercel logs so an
     // admin can debug if the user reports the surfaced Arabic message
     // is still unclear.
-    // eslint-disable-next-line no-console
     console.error("[marketing/createProject] insert failed:", {
       code: error?.code,
       message: error?.message,
@@ -177,7 +176,6 @@ export async function updateMarketingProject(formData: FormData) {
     .eq("company_id", profile.company_id);
 
   if (error) {
-    // eslint-disable-next-line no-console
     console.error("[marketing/updateProject] update failed:", {
       code: error.code,
       message: error.message,
