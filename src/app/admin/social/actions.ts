@@ -549,11 +549,15 @@ export async function removeImageFromPost(formData: FormData) {
  */
 export async function generateBrandProfile() {
   const { supabase } = await ensureSuperAdmin();
+
+  // CAREFUL: redirect() throws a NEXT_REDIRECT internal error. If the
+  // success redirect lives inside the try{} it gets caught by the
+  // catch and re-thrown as a generic "Sync failed: NEXT_REDIRECT".
+  // Keep all redirect() calls OUTSIDE the try/catch so they bubble up
+  // to Next.js' framework handler instead.
   try {
     const url = await generateBrandProfileImage({ supabase });
     await upsertAppSetting(supabase, "brand_profile_image_url", url);
-    revalidatePath("/admin/social/branding");
-    redirect("/admin/social/branding?profile=1");
   } catch (err) {
     redirect(
       "/admin/social/branding?error=" +
@@ -564,15 +568,16 @@ export async function generateBrandProfile() {
         ),
     );
   }
+  revalidatePath("/admin/social/branding");
+  redirect("/admin/social/branding?profile=1");
 }
 
 export async function generateBrandCover() {
   const { supabase } = await ensureSuperAdmin();
+  // Same NEXT_REDIRECT consideration as generateBrandProfile above.
   try {
     const url = await generateBrandCoverImage({ supabase });
     await upsertAppSetting(supabase, "brand_cover_image_url", url);
-    revalidatePath("/admin/social/branding");
-    redirect("/admin/social/branding?cover=1");
   } catch (err) {
     redirect(
       "/admin/social/branding?error=" +
@@ -583,6 +588,8 @@ export async function generateBrandCover() {
         ),
     );
   }
+  revalidatePath("/admin/social/branding");
+  redirect("/admin/social/branding?cover=1");
 }
 
 /**
@@ -953,16 +960,19 @@ export async function approveAndPublishReply(formData: FormData) {
  */
 export async function syncSocialCommentsNow() {
   const { supabase } = await ensureSuperAdmin();
+
+  // CAREFUL: redirect() throws NEXT_REDIRECT internally. Catching it
+  // turns the success path into a fake "Sync failed: NEXT_REDIRECT"
+  // error. Always declare the result outside try{}, do the work
+  // inside, and redirect AFTER the try/catch so the throw bubbles up
+  // to the framework cleanly.
+  let result;
   try {
-    const result = await syncFacebookCommentsForAllTargets({
+    result = await syncFacebookCommentsForAllTargets({
       supabase,
       encryptionKey: getEncryptionKey(),
       maxTargets: 50,
     });
-    revalidatePath("/admin/social/inbox");
-    revalidatePath("/admin/social");
-    const summary = `scanned=${result.targets_scanned}&seen=${result.comments_seen}&new=${result.new_comments}&errors=${result.errors.length}`;
-    redirect(`/admin/social/inbox?synced=1&${summary}`);
   } catch (err) {
     redirect(
       "/admin/social/inbox?error=" +
@@ -973,6 +983,11 @@ export async function syncSocialCommentsNow() {
         ),
     );
   }
+
+  revalidatePath("/admin/social/inbox");
+  revalidatePath("/admin/social");
+  const summary = `scanned=${result.targets_scanned}&seen=${result.comments_seen}&new=${result.new_comments}&errors=${result.errors.length}`;
+  redirect(`/admin/social/inbox?synced=1&${summary}`);
 }
 
 export async function markCommentReviewed(formData: FormData) {
