@@ -68,9 +68,15 @@ const NAV_ITEMS: readonly NavItem[] = [
   // Admin-only
   { href: "/dashboard/team", label: "فريق الشركة", icon: "🤝", section: "main", visibleTo: ["admin"] },
 
-  // AI section
+  // AI + Marketing section
   { href: "/dashboard/ai", label: "المساعد الذكي ✦", icon: "🤖", section: "ai", feature: "ai_assistant" },
   { href: "/dashboard/marketing", label: "Marketing Studio 👑", icon: "✦", section: "ai", feature: "marketing_studio" },
+  // Leads inbox surfaces the day-to-day workflow on its own row so users
+  // don't have to dive into Marketing Hub every time they want to check
+  // who came in via the funnel.
+  { href: "/dashboard/marketing/leads", label: "Leads Inbox 📥", icon: "📥", section: "ai", feature: "marketing_studio" },
+  { href: "/dashboard/marketing/landing-pages", label: "صفحات الهبوط", icon: "🏠", section: "ai", feature: "marketing_studio" },
+  { href: "/dashboard/marketing/analytics", label: "تحليل التسويق", icon: "📊", section: "ai", feature: "marketing_studio" },
   { href: "/dashboard/retention", label: "احتفاظ بالموظفين 🎯", icon: "🎯", section: "ai", feature: "retention_insights" },
 
   // Reports

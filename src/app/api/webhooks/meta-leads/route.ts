@@ -238,15 +238,12 @@ async function processLeadgen(args: {
     | undefined;
 
   if (lookupErr || !lookup) {
-    await logImport(supabase, {
-      leadgenId,
-      pageId,
-      adId,
-      formId,
-      adsetId,
-      outcome: "token_missing",
-      error: `no integration for page ${pageId}: ${lookupErr?.message ?? "not found"}`,
-    });
+    // Orphan webhook — no tenant claimed this page. Can't write to a
+    // tenant-scoped table without a company_id, so we just log to
+    // console (visible in Vercel logs).
+    console.warn(
+      `[meta-leads] orphan webhook · page=${pageId} leadgen=${leadgenId} err=${lookupErr?.message ?? "not found"}`,
+    );
     return "token_missing";
   }
 
@@ -257,35 +254,31 @@ async function processLeadgen(args: {
     const res = await fetch(graphUrl, { cache: "no-store" });
     if (!res.ok) {
       const errText = await res.text();
-      await logImport(supabase, {
+      await recordFailure(supabase, {
+        integrationId: lookup.integration_id,
+        companyId: lookup.company_id,
         leadgenId,
         pageId,
         adId,
         formId,
-        adsetId,
-        integrationId: lookup.integration_id,
-        companyId: lookup.company_id,
         outcome: "fetch_failed",
         error: `graph ${res.status}: ${errText.slice(0, 300)}`,
       });
-      await bumpCounters(supabase, lookup.integration_id, false, `graph ${res.status}`);
       return "fetch_failed";
     }
     lead = (await res.json()) as GraphLeadResponse;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    await logImport(supabase, {
+    await recordFailure(supabase, {
+      integrationId: lookup.integration_id,
+      companyId: lookup.company_id,
       leadgenId,
       pageId,
       adId,
       formId,
-      adsetId,
-      integrationId: lookup.integration_id,
-      companyId: lookup.company_id,
       outcome: "fetch_failed",
       error: `fetch threw: ${msg.slice(0, 300)}`,
     });
-    await bumpCounters(supabase, lookup.integration_id, false, msg);
     return "fetch_failed";
   }
 
@@ -310,190 +303,115 @@ async function processLeadgen(args: {
     fields.get("comments");
 
   if (!name || (!phone && !email && !whatsapp)) {
-    await logImport(supabase, {
+    await recordFailure(supabase, {
+      integrationId: lookup.integration_id,
+      companyId: lookup.company_id,
       leadgenId,
       pageId,
       adId,
       formId,
-      adsetId,
-      integrationId: lookup.integration_id,
-      companyId: lookup.company_id,
       outcome: "parse_failed",
       error: `missing name/contact: ${JSON.stringify(Array.from(fields.keys()))}`,
       rawPayload: lead as unknown as Record<string, unknown>,
     });
-    await bumpCounters(supabase, lookup.integration_id, false, "missing required fields");
     return "parse_failed";
   }
 
-  // 4) Dedup against existing customer by phone OR email in same tenant
-  const dedupPhone = phone?.trim() || null;
-  const dedupEmail = email?.trim().toLowerCase() || null;
-
-  let customerId: string | null = null;
-  if (dedupPhone || dedupEmail) {
-    const ors: string[] = [];
-    if (dedupPhone) ors.push(`phone.eq.${dedupPhone}`);
-    if (dedupEmail) ors.push(`email.eq.${dedupEmail}`);
-    const { data: existing } = await supabase
-      .from("customers")
-      .select("id")
-      .eq("company_id", lookup.company_id)
-      .or(ors.join(","))
-      .limit(1)
-      .maybeSingle<{ id: string }>();
-    if (existing) customerId = existing.id;
-  }
-
-  if (customerId) {
-    // Existing customer: refresh fields, don't reset status
-    await supabase
-      .from("customers")
-      .update({
-        full_name: name,
-        phone: dedupPhone ?? undefined,
-        email: dedupEmail ?? undefined,
-        whatsapp: whatsapp ?? undefined,
-        notes: message
-          ? `[Meta Lead Ad · ${new Date().toLocaleString("ar-EG")}]\n${message}`
-          : undefined,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", customerId)
-      .eq("company_id", lookup.company_id);
-
-    await logImport(supabase, {
-      leadgenId,
-      pageId,
-      adId: lead.ad_id ?? adId,
-      formId: lead.form_id ?? formId,
-      campaignId: lead.campaign_id,
-      adsetId,
-      integrationId: lookup.integration_id,
-      companyId: lookup.company_id,
-      customerId,
-      outcome: "duplicate",
-      rawPayload: lead as unknown as Record<string, unknown>,
-    });
-    await bumpCounters(supabase, lookup.integration_id, true, null);
-    return "duplicate";
-  }
-
-  // New customer
-  const { data: inserted, error: insertErr } = await supabase
-    .from("customers")
-    .insert({
-      company_id: lookup.company_id,
-      full_name: name,
-      phone: dedupPhone,
-      email: dedupEmail,
-      whatsapp,
-      status: "lead",
-      source: "meta_lead_ads",
-      first_utm_source: "meta_lead_ads",
-      first_utm_medium: "paid_social",
-      first_utm_campaign: lead.campaign_id ?? null,
-      first_utm_content: lead.ad_id ?? adId ?? null,
-      landing_page_id: lookup.default_landing_page_id,
-      first_seen_at: lead.created_time
+  // 4) Hand the lead to the ingest RPC. SECURITY DEFINER, so it
+  // bypasses the customers + meta_lead_imports RLS that would otherwise
+  // block an anon-role write. The RPC does dedup + insert/update +
+  // audit log + counter bump atomically.
+  const { data: ingestResult, error: ingestErr } = await supabase.rpc(
+    "ingest_meta_lead_v1",
+    {
+      p_integration_id: lookup.integration_id,
+      p_company_id: lookup.company_id,
+      p_landing_page_id: lookup.default_landing_page_id,
+      p_leadgen_id: leadgenId,
+      p_page_id: pageId,
+      p_ad_id: lead.ad_id ?? adId ?? null,
+      p_form_id: lead.form_id ?? formId ?? null,
+      p_campaign_id: lead.campaign_id ?? null,
+      p_adset_id: adsetId ?? null,
+      p_full_name: name,
+      p_phone: phone ?? "",
+      p_email: email ?? "",
+      p_whatsapp: whatsapp ?? "",
+      p_city: city ?? "",
+      p_message: message ?? "",
+      p_created_time: lead.created_time
         ? new Date(lead.created_time).toISOString()
-        : new Date().toISOString(),
-      notes: [
-        message,
-        city ? `📍 ${city}` : null,
-        `📥 من Meta Lead Form · ad_id=${lead.ad_id ?? adId ?? "—"}`,
-      ]
-        .filter(Boolean)
-        .join("\n\n"),
-    })
-    .select("id")
-    .single<{ id: string }>();
+        : null,
+      p_raw_payload: lead as unknown as Record<string, unknown>,
+    },
+  );
 
-  if (insertErr || !inserted) {
-    await logImport(supabase, {
+  if (ingestErr) {
+    await recordFailure(supabase, {
+      integrationId: lookup.integration_id,
+      companyId: lookup.company_id,
       leadgenId,
       pageId,
       adId: lead.ad_id ?? adId,
       formId: lead.form_id ?? formId,
-      campaignId: lead.campaign_id,
-      adsetId,
-      integrationId: lookup.integration_id,
-      companyId: lookup.company_id,
-      outcome: "parse_failed",
-      error: insertErr?.message ?? "insert returned no row",
+      outcome: "insert_failed",
+      error: ingestErr.message,
       rawPayload: lead as unknown as Record<string, unknown>,
     });
-    await bumpCounters(supabase, lookup.integration_id, false, insertErr?.message ?? null);
     return "insert_failed";
   }
 
-  await logImport(supabase, {
-    leadgenId,
-    pageId,
-    adId: lead.ad_id ?? adId,
-    formId: lead.form_id ?? formId,
-    campaignId: lead.campaign_id,
-    adsetId,
-    integrationId: lookup.integration_id,
-    companyId: lookup.company_id,
-    customerId: inserted.id,
-    outcome: "success",
-    rawPayload: lead as unknown as Record<string, unknown>,
-  });
-  await bumpCounters(supabase, lookup.integration_id, true, null);
-  return "success";
+  type IngestRow = { customer_id: string; outcome: string };
+  const row = (
+    Array.isArray(ingestResult) ? ingestResult[0] : ingestResult
+  ) as IngestRow | null | undefined;
+  return row?.outcome ?? "success";
 }
 
-async function logImport(
+// ----------------------------------------------------------------------------
+// recordFailure — wraps the record_meta_lead_failure RPC. SECURITY DEFINER
+// on the SQL side so writes succeed under anon role (which is what the
+// webhook runs as — Meta isn't logged in to our app).
+// ----------------------------------------------------------------------------
+async function recordFailure(
   supabase: SupabaseClientLike,
   args: {
     leadgenId: string;
     pageId: string;
     adId?: string;
     formId?: string;
-    campaignId?: string;
-    adsetId?: string;
     integrationId?: string;
     companyId?: string;
-    customerId?: string;
     outcome: string;
     error?: string;
     rawPayload?: Record<string, unknown>;
   },
 ): Promise<void> {
   if (!args.companyId) {
-    // No tenant known — log to console only (we can't write to a
-    // tenant-scoped table without company_id).
+    // No tenant known — log to console only.
     console.warn(
       `[meta-leads] orphan webhook · page=${args.pageId} leadgen=${args.leadgenId} outcome=${args.outcome} err=${args.error}`,
     );
     return;
   }
-  await supabase.from("meta_lead_imports").insert({
-    meta_integration_id: args.integrationId,
-    company_id: args.companyId,
-    leadgen_id: args.leadgenId,
-    page_id: args.pageId,
-    ad_id: args.adId,
-    form_id: args.formId,
-    campaign_id: args.campaignId,
-    adset_id: args.adsetId,
-    customer_id: args.customerId,
-    outcome: args.outcome,
-    error_message: args.error,
-    raw_payload: args.rawPayload,
+  const { error } = await supabase.rpc("record_meta_lead_failure", {
+    p_integration_id: args.integrationId ?? null,
+    p_company_id: args.companyId,
+    p_leadgen_id: args.leadgenId,
+    p_page_id: args.pageId,
+    p_ad_id: args.adId ?? null,
+    p_form_id: args.formId ?? null,
+    p_outcome: args.outcome,
+    p_error_message: args.error ?? null,
+    p_raw_payload: (args.rawPayload ?? {}) as Record<string, unknown>,
   });
+  if (error) {
+    console.warn(
+      `[meta-leads] failure-log RPC failed: ${error.message} (original outcome=${args.outcome})`,
+    );
+  }
 }
 
-async function bumpCounters(
-  supabase: SupabaseClientLike,
-  integrationId: string,
-  imported: boolean,
-  errorMessage: string | null,
-): Promise<void> {
-  await supabase.rpc("_meta_integration_bump_counters", {
-    p_integration_id: integrationId,
-    p_imported: imported,
-    p_error_message: errorMessage,
-  });
-}
+// Counter bumps now happen inside ingest_meta_lead_v1 and
+// record_meta_lead_failure RPCs (mig 042). The standalone bumpCounters
+// helper was removed when those RPCs took over the inserts.

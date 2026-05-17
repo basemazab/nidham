@@ -13,6 +13,7 @@
 //      received, webhooks count, leads imported, last error.
 
 import Link from "next/link";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { canUseFeature } from "@/lib/subscriptions-server";
@@ -106,11 +107,31 @@ export default async function IntegrationsPage({
     );
 
   // Construct the public webhook URL the tenant needs to paste into
-  // Facebook App settings. Prefer the request's origin when available;
-  // fall back to a Vercel default.
-  const webhookUrl =
-    (process.env.NEXT_PUBLIC_APP_URL ?? "https://nidham-seven.vercel.app") +
-    "/api/webhooks/meta-leads";
+  // Facebook App settings. Use the actual request host so the URL
+  // reflects whatever domain the user is currently on (works for
+  // preview deployments, custom domains, and the production URL alike).
+  const h = await headers();
+  const proto = h.get("x-forwarded-proto") ?? "https";
+  const host =
+    h.get("x-forwarded-host") ??
+    h.get("host") ??
+    process.env.NEXT_PUBLIC_APP_URL?.replace(/^https?:\/\//, "") ??
+    "nidham-seven.vercel.app";
+  const webhookUrl = `${proto}://${host}/api/webhooks/meta-leads`;
+
+  // Check env-var readiness server-side so we can warn upfront instead
+  // of after the user fills the entire form. We can only see these
+  // three from server components — they're not exposed to the client.
+  const envReady = {
+    encryption: !!process.env.META_ENCRYPTION_KEY,
+    appSecret: !!process.env.META_APP_SECRET,
+    verifyToken: !!process.env.META_WEBHOOK_VERIFY_TOKEN,
+  };
+  const missingEnvVars = [
+    !envReady.encryption && "META_ENCRYPTION_KEY",
+    !envReady.appSecret && "META_APP_SECRET",
+    !envReady.verifyToken && "META_WEBHOOK_VERIFY_TOKEN",
+  ].filter(Boolean) as string[];
 
   return (
     <main className="flex-1 px-4 md:px-6 py-6 bg-gradient-to-b from-slate-50 via-white min-h-screen">
@@ -158,6 +179,42 @@ export default async function IntegrationsPage({
               <code dir="ltr">
                 db/migrations/040_meta_lead_ads_integrations.sql
               </code>
+            </p>
+          </div>
+        )}
+
+        {missingEnvVars.length > 0 && (
+          <div className="mb-5 bg-rose-50 border-2 border-rose-300 rounded-2xl p-5 font-cairo">
+            <h3 className="font-black text-rose-900 mb-2 text-base">
+              ⚠ السيرفر مش جاهز للـ Meta Integration
+            </h3>
+            <p className="text-sm text-rose-800 leading-relaxed mb-3">
+              في{" "}
+              <strong className="text-rose-900">
+                {missingEnvVars.length} env var
+              </strong>{" "}
+              لازم يتعيّن في Vercel قبل ما الـ integration يشتغل:
+            </p>
+            <ul className="space-y-1.5 mb-3">
+              {missingEnvVars.map((v) => (
+                <li
+                  key={v}
+                  className="flex items-center gap-2 text-xs font-mono bg-white border border-rose-200 rounded p-2"
+                  dir="ltr"
+                >
+                  <span className="text-rose-600">❌</span>
+                  <span className="font-bold">{v}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="text-xs text-rose-700">
+              💡 روح Vercel → Settings → Environment Variables، ضيفهم،
+              وبعدين اعمل Redeploy. لـ <code>META_ENCRYPTION_KEY</code>{" "}
+              استخدم string عشوائي 32+ حرف (مثلاً من PowerShell:{" "}
+              <code className="bg-rose-100 px-1 rounded text-[10px]">
+                [System.Convert]::ToBase64String([byte[]](1..32 | %&#123;Get-Random -Maximum 256&#125;))
+              </code>
+              ).
             </p>
           </div>
         )}
