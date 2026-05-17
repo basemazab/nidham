@@ -157,19 +157,39 @@ export async function generateImageBytes(args: {
   aspect_ratio?: "1:1" | "4:5" | "16:9";
   seed?: number;
 }): Promise<{ bytes: Uint8Array; contentType: string }> {
+  let geminiError: string | null = null;
+
   if (process.env.GEMINI_API_KEY) {
     try {
       return await generateImageBytesViaGemini(args);
     } catch (err) {
+      geminiError =
+        err instanceof Error ? err.message.slice(0, 200) : String(err);
       // eslint-disable-next-line no-console
       console.warn(
-        "[social-images] Gemini image gen failed, falling back to Pollinations:",
-        err instanceof Error ? err.message.slice(0, 200) : String(err),
+        "[social-images] Gemini failed, trying Pollinations:",
+        geminiError,
       );
       // fall through
     }
   }
-  return generateImageBytesViaPollinations(args);
+
+  try {
+    return await generateImageBytesViaPollinations(args);
+  } catch (err) {
+    const pollErr =
+      err instanceof Error ? err.message.slice(0, 200) : String(err);
+    // Compound message — if both providers failed the caller needs to
+    // know about both. The bare "This operation was aborted" we used
+    // to surface gave no clue WHICH provider the user could try
+    // working around (e.g. add a different API key).
+    if (geminiError) {
+      throw new Error(
+        `Both providers failed. Gemini: ${geminiError}. Pollinations: ${pollErr}`,
+      );
+    }
+    throw new Error(`Pollinations: ${pollErr}`);
+  }
 }
 
 
@@ -218,10 +238,12 @@ async function generateImageBytesViaGemini(args: {
     },
   };
 
-  // 50s timeout — leaves ~10s of headroom under Vercel's 60s hard cap
-  // for the upload + DB write + redirect that follow.
+  // 25s timeout — gives the fallback (Pollinations, another 25s) room
+  // to run inside Vercel's 60s function cap. If Gemini hasn't returned
+  // in 25s it's probably stuck; better to fail fast and try the other
+  // provider than wait the full 50s and starve the fallback.
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 50_000);
+  const timer = setTimeout(() => controller.abort(), 25_000);
   try {
     const res = await fetch(url, {
       method: "POST",
@@ -312,8 +334,11 @@ async function generateImageBytesViaPollinations(args: {
       seed: String(seed),
     }).toString();
 
+  // 25s — matches the Gemini timeout above. If both providers fail
+  // we want to surface the error well before Vercel's 60s cap so the
+  // user sees a real error message and not a generic 504.
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 60_000);
+  const timer = setTimeout(() => controller.abort(), 25_000);
   try {
     const res = await fetch(url, { signal: controller.signal });
     if (!res.ok) {
