@@ -102,34 +102,21 @@ export default async function SocialComposer({
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-8">
-      {sp.generated && (
-        <Flash kind="ok">
-          ✨ تم توليد {sp.generated} variant — مرّحبة بمراجعتك وتعديلك تحت
-        </Flash>
-      )}
-      {sp.saved && <Flash kind="ok">💾 تم حفظ التعديلات</Flash>}
-      {sp.img === "1" && (
-        <Flash kind="ok">🖼 تم توليد صورة جديدة للبوست</Flash>
-      )}
-      {sp.img === "removed" && (
-        <Flash kind="ok">🗑 تم حذف الصورة</Flash>
-      )}
-      {sp.error && (
-        <Flash kind="err">⚠ {decodeURIComponent(sp.error)}</Flash>
-      )}
+      {/* Transient action toasts now handled by <UrlToasts> in root
+          layout. */}
 
       <header className="mb-6">
-        <h1 className="text-2xl font-black font-cairo text-slate-800 mb-1">
+        <h1 className="text-2xl font-black font-cairo text-slate-800 dark:text-slate-100 mb-1">
           ✦ الكاتب الذكي
         </h1>
-        <p className="text-sm text-slate-500 font-cairo">
+        <p className="text-sm text-slate-500 dark:text-slate-400 font-cairo">
           اكتب الموضوع → AI يولّد بوست لكل منصة → راجع → اضغط نشر.
         </p>
       </header>
 
       {/* GENERATOR FORM */}
-      <section className="bg-gradient-to-br from-rose-50 to-pink-50 border-2 border-rose-200 rounded-2xl p-6 mb-8">
-        <h2 className="text-base font-black font-cairo text-slate-800 mb-3">
+      <section className="bg-gradient-to-br from-rose-50 to-pink-50 dark:from-rose-900/30 dark:to-pink-900/30 border-2 border-rose-200 dark:border-rose-800 rounded-2xl p-6 mb-8">
+        <h2 className="text-base font-black font-cairo text-slate-800 dark:text-slate-100 mb-3">
           📝 موضوع البوست الجديد
         </h2>
         <form action={generateAndDraftPosts} className="space-y-3">
@@ -143,7 +130,7 @@ export default async function SocialComposer({
               placeholder="مثلاً: ميزة جديدة في الـ payroll بتحسب التأمينات تلقائياً + قصة عميل وفّر 8 ساعات شهرياً + لينك للـ landing page"
               className={inputCls}
             />
-            <p className="text-[10px] text-slate-500 font-cairo mt-1">
+            <p className="text-[10px] text-slate-500 dark:text-slate-400 font-cairo mt-1">
               💡 كل ما الموضوع محدد وفيه أرقام / case study، كل ما الـ AI يولّد بوست أحسن.
             </p>
           </div>
@@ -186,7 +173,7 @@ export default async function SocialComposer({
               ).map((p) => (
                 <label
                   key={p}
-                  className="flex items-center gap-2 p-2 rounded-lg bg-white border border-slate-200 hover:border-rose-300 cursor-pointer text-sm font-cairo"
+                  className="flex items-center gap-2 p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-rose-300 dark:hover:border-rose-700 cursor-pointer text-sm font-cairo"
                 >
                   <input
                     type="checkbox"
@@ -201,7 +188,7 @@ export default async function SocialComposer({
           </div>
 
           <details className="text-xs">
-            <summary className="cursor-pointer text-slate-500 hover:text-rose-700 font-cairo">
+            <summary className="cursor-pointer text-slate-500 dark:text-slate-400 hover:text-rose-700 dark:hover:text-rose-400 font-cairo">
               ✏ تعديل الـ tone (اختياري)
             </summary>
             <div className="mt-2">
@@ -220,19 +207,19 @@ export default async function SocialComposer({
           >
             ✦ ولّد البوستات بالـ AI
           </button>
-          <p className="text-[10px] text-slate-500 font-cairo text-center">
+          <p className="text-[10px] text-slate-500 dark:text-slate-400 font-cairo text-center">
             ⏱ 15-30 ثانية لكل variant · مستخدم Groq gpt-oss-120b
           </p>
         </form>
       </section>
 
       {/* DRAFTS LIST */}
-      <h2 className="text-base font-black font-cairo text-slate-800 mb-3">
+      <h2 className="text-base font-black font-cairo text-slate-800 dark:text-slate-100 mb-3">
         📋 المسودات والبوستات المجدولة ({orderedDrafts.length})
       </h2>
 
       {accounts.length === 0 && (
-        <div className="mb-4 p-3 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-800 font-cairo">
+        <div className="mb-4 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 text-sm text-amber-800 dark:text-amber-300 font-cairo">
           ⚠ مفيش حساب مربوط — مش هتقدر تنشر. روح{" "}
           <Link href="/admin/social/accounts" className="underline">
             ربط الحسابات
@@ -242,9 +229,9 @@ export default async function SocialComposer({
       )}
 
       {orderedDrafts.length === 0 ? (
-        <div className="bg-white border border-slate-200 rounded-2xl p-10 text-center">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-10 text-center">
           <div className="text-5xl mb-3">📭</div>
-          <p className="text-sm text-slate-500 font-cairo">
+          <p className="text-sm text-slate-500 dark:text-slate-400 font-cairo">
             مفيش مسودات. عبّى الفورم فوق وولّد أول بوست.
           </p>
         </div>
@@ -275,12 +262,12 @@ function PostEditor({
 }) {
   return (
     <div
-      className={`bg-white border-2 rounded-2xl p-5 ${focused ? "border-rose-400 ring-4 ring-rose-100" : "border-slate-200"}`}
+      className={`bg-white dark:bg-slate-900 border-2 rounded-2xl p-5 ${focused ? "border-rose-400 dark:border-rose-600 ring-4 ring-rose-100 dark:ring-rose-900/40" : "border-slate-200 dark:border-slate-800"}`}
     >
       <div className="flex items-start justify-between gap-3 mb-3 flex-wrap">
         <div className="flex-1 min-w-0">
           {post.title && (
-            <div className="text-sm font-bold text-slate-700 font-cairo">
+            <div className="text-sm font-bold text-slate-700 dark:text-slate-200 font-cairo">
               {post.title}
             </div>
           )}
@@ -288,19 +275,19 @@ function PostEditor({
             <span
               className={`text-[10px] px-2 py-0.5 rounded-full font-bold font-cairo ${
                 post.status === "scheduled"
-                  ? "bg-amber-100 text-amber-800"
-                  : "bg-slate-100 text-slate-700"
+                  ? "bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300"
+                  : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300"
               }`}
             >
               {post.status === "scheduled" ? "⏰ مجدول" : "📝 مسودة"}
             </span>
             {post.source === "ai_generated" && (
-              <span className="text-[10px] text-rose-700 font-bold font-cairo">
+              <span className="text-[10px] text-rose-700 dark:text-rose-400 font-bold font-cairo">
                 ✦ AI
               </span>
             )}
             {post.ai_intent && (
-              <span className="text-[10px] text-slate-500 font-cairo truncate">
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-cairo truncate">
                 {post.ai_intent}
               </span>
             )}
@@ -310,7 +297,7 @@ function PostEditor({
           <input type="hidden" name="id" value={post.id} />
           <button
             type="submit"
-            className="text-xs text-slate-400 hover:text-rose-600 font-cairo"
+            className="text-xs text-slate-400 dark:text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 font-cairo"
             title="أرشفة"
           >
             🗑
@@ -346,7 +333,7 @@ function PostEditor({
           </div>
           <button
             type="submit"
-            className="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-800 text-white font-bold text-sm font-cairo"
+            className="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-800 dark:bg-slate-600 dark:hover:bg-slate-500 text-white font-bold text-sm font-cairo"
           >
             💾 احفظ
           </button>
@@ -355,8 +342,8 @@ function PostEditor({
 
       {/* Publish form */}
       {accounts.length > 0 && (
-        <div className="pt-3 border-t border-slate-100">
-          <div className="text-xs font-bold text-slate-600 mb-2 font-cairo">
+        <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
+          <div className="text-xs font-bold text-slate-600 dark:text-slate-300 mb-2 font-cairo">
             🚀 نشر فوري لـ:
           </div>
           <form action={publishSocialPost} className="space-y-2">
@@ -365,7 +352,7 @@ function PostEditor({
               {accounts.map((a) => (
                 <label
                   key={a.id}
-                  className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 hover:bg-rose-50 border border-slate-200 cursor-pointer text-sm font-cairo"
+                  className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-900/30 border border-slate-200 dark:border-slate-700 cursor-pointer text-sm font-cairo"
                 >
                   <input type="checkbox" name="account_ids" value={a.id} />
                   <span>
@@ -405,12 +392,12 @@ function ImageBlock({ post }: { post: PostRow }) {
   const history = images.slice(1);
 
   return (
-    <div className="mb-3 p-3 rounded-xl bg-gradient-to-br from-slate-50 to-rose-50/30 border border-slate-200">
+    <div className="mb-3 p-3 rounded-xl bg-gradient-to-br from-slate-50 to-rose-50/30 dark:from-slate-800 dark:to-rose-900/20 border border-slate-200 dark:border-slate-700">
       <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
-        <div className="text-xs font-bold text-slate-700 font-cairo">
+        <div className="text-xs font-bold text-slate-700 dark:text-slate-200 font-cairo">
           🖼 صورة البوست
           {images.length > 0 && (
-            <span className="text-[10px] text-slate-400 mr-2">
+            <span className="text-[10px] text-slate-400 dark:text-slate-500 mr-2">
               ({images.length}/5)
             </span>
           )}
@@ -427,11 +414,11 @@ function ImageBlock({ post }: { post: PostRow }) {
       </div>
 
       {!active ? (
-        <p className="text-[11px] text-slate-500 font-cairo">
+        <p className="text-[11px] text-slate-500 dark:text-slate-400 font-cairo">
           💡 البوستات بصور بتاخد engagement أكتر 5-10x. اضغط الزرار فوق
           والـ AI هيصمم صورة تناسب نص البوست.
           <br />
-          <span className="text-[10px] text-slate-400">
+          <span className="text-[10px] text-slate-400 dark:text-slate-500">
             ⏱ 15-30 ثانية · مجاناً عبر Pollinations/FLUX
           </span>
         </p>
@@ -443,7 +430,7 @@ function ImageBlock({ post }: { post: PostRow }) {
             <img
               src={active}
               alt="صورة البوست"
-              className="max-w-full sm:max-w-md max-h-72 rounded-lg border-2 border-emerald-300 shadow"
+              className="max-w-full sm:max-w-md max-h-72 rounded-lg border-2 border-emerald-300 dark:border-emerald-700 shadow"
             />
             <span className="absolute top-1 right-1 px-2 py-0.5 rounded-full bg-emerald-500 text-white text-[10px] font-bold font-cairo">
               ✅ نشطة
@@ -457,7 +444,7 @@ function ImageBlock({ post }: { post: PostRow }) {
               <button
                 type="submit"
                 title="حذف الصورة"
-                className="w-7 h-7 rounded-full bg-white/90 hover:bg-rose-100 text-rose-700 text-xs font-bold shadow"
+                className="w-7 h-7 rounded-full bg-white/90 dark:bg-slate-800/90 hover:bg-rose-100 dark:hover:bg-rose-900/40 text-rose-700 dark:text-rose-400 text-xs font-bold shadow"
               >
                 ✕
               </button>
@@ -466,8 +453,8 @@ function ImageBlock({ post }: { post: PostRow }) {
 
           {/* History thumbnails */}
           {history.length > 0 && (
-            <div className="flex gap-2 flex-wrap pt-2 border-t border-slate-200">
-              <div className="text-[10px] text-slate-500 font-cairo w-full">
+            <div className="flex gap-2 flex-wrap pt-2 border-t border-slate-200 dark:border-slate-700">
+              <div className="text-[10px] text-slate-500 dark:text-slate-400 font-cairo w-full">
                 📚 إصدارات سابقة:
               </div>
               {history.map((url) => (
@@ -476,7 +463,7 @@ function ImageBlock({ post }: { post: PostRow }) {
                   <img
                     src={url}
                     alt="إصدار سابق"
-                    className="w-16 h-16 object-cover rounded border border-slate-200 opacity-70"
+                    className="w-16 h-16 object-cover rounded border border-slate-200 dark:border-slate-700 opacity-70"
                   />
                   <form
                     action={removeImageFromPost}
@@ -487,7 +474,7 @@ function ImageBlock({ post }: { post: PostRow }) {
                     <button
                       type="submit"
                       title="حذف"
-                      className="w-5 h-5 rounded-full bg-white text-rose-600 text-[10px] shadow"
+                      className="w-5 h-5 rounded-full bg-white dark:bg-slate-800 text-rose-600 dark:text-rose-400 text-[10px] shadow"
                     >
                       ✕
                     </button>
@@ -503,34 +490,21 @@ function ImageBlock({ post }: { post: PostRow }) {
 }
 
 const inputCls =
-  "w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-rose-400 focus:ring-2 focus:ring-rose-200 outline-none text-sm";
+  "w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 focus:border-rose-400 dark:focus:border-rose-600 focus:ring-2 focus:ring-rose-200 dark:focus:ring-rose-900/40 outline-none text-sm";
 
 function Label({ children }: { children: React.ReactNode }) {
   return (
-    <label className="block text-xs font-bold text-slate-700 mb-1 font-cairo">
+    <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1 font-cairo">
       {children}
     </label>
   );
 }
 
 function Req() {
-  return <span className="text-rose-500"> *</span>;
+  return <span className="text-rose-500 dark:text-rose-400"> *</span>;
 }
 
-function Flash({
-  kind,
-  children,
-}: {
-  kind: "ok" | "err";
-  children: React.ReactNode;
-}) {
-  const cls =
-    kind === "ok"
-      ? "bg-emerald-50 border-emerald-200 text-emerald-800"
-      : "bg-rose-50 border-rose-200 text-rose-800";
-  return (
-    <div className={`mb-4 p-3 rounded-xl border font-cairo text-sm ${cls}`}>
-      {children}
-    </div>
-  );
-}
+// Flash helper removed — transient action messages now flow through
+// sonner toasts via the root-layout <UrlToasts> reader (see
+// src/components/url-toasts.tsx). Inline persistent diagnostics
+// (e.g. migration-missing banner) stay rendered.

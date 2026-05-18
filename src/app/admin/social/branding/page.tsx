@@ -106,27 +106,14 @@ export default async function BrandingPage({
 
   return (
     <div className="max-w-5xl mx-auto px-6 py-8">
-      {sp.profile && sp.uploaded && (
-        <Flash kind="ok">✅ تم رفع الصورة الشخصية بنجاح</Flash>
-      )}
-      {sp.cover && sp.uploaded && (
-        <Flash kind="ok">✅ تم رفع الغلاف بنجاح</Flash>
-      )}
-      {sp.profile && !sp.uploaded && (
-        <Flash kind="ok">✅ تم توليد صورة شخصية جديدة</Flash>
-      )}
-      {sp.cover && !sp.uploaded && (
-        <Flash kind="ok">✅ تم توليد غلاف جديد</Flash>
-      )}
-      {sp.error && (
-        <Flash kind="err">⚠ {decodeURIComponent(sp.error)}</Flash>
-      )}
+      {/* Transient action toasts now handled by <UrlToasts> in root
+          layout. */}
 
       <header className="mb-6">
-        <h1 className="text-2xl font-black font-cairo text-slate-800 mb-1">
+        <h1 className="text-2xl font-black font-cairo text-slate-800 dark:text-slate-100 mb-1">
           🎨 هوية بصرية للـ Facebook Page
         </h1>
-        <p className="text-sm text-slate-500 font-cairo">
+        <p className="text-sm text-slate-500 dark:text-slate-400 font-cairo">
           عندك خياران: ولّد صورة بالـ AI أو ارفع صورتك الجاهزة (لو معاك من
           مصمم أو Canva). الاتنين بيتخزّنوا في نفس المكان وبتقدر تنزّلهم
           ترفعهم يدوياً على Facebook.
@@ -134,7 +121,7 @@ export default async function BrandingPage({
       </header>
 
       {/* Quality note — set expectations honestly */}
-      <div className="mb-5 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 font-cairo">
+      <div className="mb-5 p-3 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-xl text-xs text-amber-800 dark:text-amber-300 font-cairo">
         💡 <strong>ملحوظة عن جودة الـ AI:</strong> النماذج المجانية
         (Gemini Flash Image + FLUX Schnell) جودتها متوسطة — مناسبة
         للبوستات اليومية بس مش لـ branding احترافي. **للهوية البصرية يفضّل ترفع
@@ -142,13 +129,13 @@ export default async function BrandingPage({
       </div>
 
       {/* PROFILE PICTURE */}
-      <section className="mb-8 p-5 bg-white border-2 border-indigo-200 rounded-2xl">
+      <section className="mb-8 p-5 bg-white dark:bg-slate-900 border-2 border-indigo-200 dark:border-indigo-800 rounded-2xl">
         <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
           <div>
-            <h2 className="text-base font-black font-cairo text-slate-800">
+            <h2 className="text-base font-black font-cairo text-slate-800 dark:text-slate-100">
               👤 الصورة الشخصية (Profile Picture)
             </h2>
-            <p className="text-[11px] text-slate-500 font-cairo mt-0.5">
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 font-cairo mt-0.5">
               1080×1080 مربعة · مناسبة لـ FB + IG + LinkedIn
             </p>
           </div>
@@ -176,14 +163,14 @@ export default async function BrandingPage({
               <img
                 src={profileUrl}
                 alt="Nidham profile"
-                className="w-48 h-48 rounded-full border-4 border-indigo-300 shadow-lg"
+                className="w-48 h-48 rounded-full border-4 border-indigo-300 dark:border-indigo-700 shadow-lg"
               />
             </div>
             <div className="flex-1 min-w-[250px]">
-              <h3 className="text-sm font-bold font-cairo text-slate-700 mb-2">
+              <h3 className="text-sm font-bold font-cairo text-slate-700 dark:text-slate-200 mb-2">
                 📥 إزاي تنزّلها وترفعها على Facebook:
               </h3>
-              <ol className="text-xs text-slate-600 font-cairo space-y-1.5 list-decimal pr-5">
+              <ol className="text-xs text-slate-600 dark:text-slate-300 font-cairo space-y-1.5 list-decimal pr-5">
                 <li>
                   اضغط <strong>تحميل الصورة</strong> تحت
                 </li>
@@ -193,7 +180,7 @@ export default async function BrandingPage({
                     href={fbPageUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-indigo-700 underline"
+                    className="text-indigo-700 dark:text-indigo-400 underline"
                   >
                     {fbAccount?.display_label ?? "افتح Facebook Page"}
                   </a>
@@ -217,12 +204,12 @@ export default async function BrandingPage({
             </div>
           </div>
         ) : (
-          <div className="p-8 text-center bg-slate-50 rounded-xl border-2 border-dashed border-slate-300">
+          <div className="p-8 text-center bg-slate-50 dark:bg-slate-950 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700">
             <div className="text-5xl mb-2">🖼</div>
-            <p className="text-sm text-slate-600 font-cairo">
+            <p className="text-sm text-slate-600 dark:text-slate-300 font-cairo">
               لسه ما تم توليد صورة شخصية. اضغط الزرار فوق علشان نبدأ.
             </p>
-            <p className="text-[10px] text-slate-400 font-cairo mt-1">
+            <p className="text-[10px] text-slate-400 dark:text-slate-500 font-cairo mt-1">
               ⏱ 20-40 ثانية
             </p>
           </div>
@@ -230,13 +217,13 @@ export default async function BrandingPage({
       </section>
 
       {/* COVER */}
-      <section className="mb-8 p-5 bg-white border-2 border-purple-200 rounded-2xl">
+      <section className="mb-8 p-5 bg-white dark:bg-slate-900 border-2 border-purple-200 dark:border-purple-800 rounded-2xl">
         <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
           <div>
-            <h2 className="text-base font-black font-cairo text-slate-800">
+            <h2 className="text-base font-black font-cairo text-slate-800 dark:text-slate-100">
               🌅 صورة الغلاف (Cover)
             </h2>
-            <p className="text-[11px] text-slate-500 font-cairo mt-0.5">
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 font-cairo mt-0.5">
               1280×720 (16:9) · مناسبة لـ FB cover + LinkedIn banner
             </p>
           </div>
@@ -263,7 +250,7 @@ export default async function BrandingPage({
             <img
               src={coverUrl}
               alt="Nidham cover"
-              className="w-full rounded-lg border-2 border-purple-300 shadow-lg"
+              className="w-full rounded-lg border-2 border-purple-300 dark:border-purple-700 shadow-lg"
             />
             <div className="flex items-start gap-4 flex-wrap">
               <a
@@ -274,10 +261,10 @@ export default async function BrandingPage({
                 📥 تحميل الغلاف
               </a>
               <details className="text-xs">
-                <summary className="cursor-pointer text-slate-600 hover:text-purple-700 font-cairo">
+                <summary className="cursor-pointer text-slate-600 dark:text-slate-300 hover:text-purple-700 dark:hover:text-purple-400 font-cairo">
                   ⚙ خطوات رفعها على Facebook
                 </summary>
-                <ol className="mt-2 text-xs text-slate-600 font-cairo space-y-1.5 list-decimal pr-5">
+                <ol className="mt-2 text-xs text-slate-600 dark:text-slate-300 font-cairo space-y-1.5 list-decimal pr-5">
                   <li>افتح صفحة Nidham Egypt على Facebook</li>
                   <li>
                     اضغط على منطقة الغلاف الفاضية → <strong>Add a cover photo</strong>
@@ -291,12 +278,12 @@ export default async function BrandingPage({
             </div>
           </div>
         ) : (
-          <div className="p-8 text-center bg-slate-50 rounded-xl border-2 border-dashed border-slate-300">
+          <div className="p-8 text-center bg-slate-50 dark:bg-slate-950 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700">
             <div className="text-5xl mb-2">🌄</div>
-            <p className="text-sm text-slate-600 font-cairo">
+            <p className="text-sm text-slate-600 dark:text-slate-300 font-cairo">
               لسه ما تم توليد غلاف. اضغط الزرار فوق علشان نبدأ.
             </p>
-            <p className="text-[10px] text-slate-400 font-cairo mt-1">
+            <p className="text-[10px] text-slate-400 dark:text-slate-500 font-cairo mt-1">
               ⏱ 25-50 ثانية (الـ 16:9 بياخد وقت أطول من المربع)
             </p>
           </div>
@@ -304,11 +291,11 @@ export default async function BrandingPage({
       </section>
 
       {/* TIPS */}
-      <section className="p-5 bg-amber-50 border border-amber-200 rounded-2xl mb-6">
-        <h3 className="text-sm font-black font-cairo text-amber-900 mb-2">
+      <section className="p-5 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-2xl mb-6">
+        <h3 className="text-sm font-black font-cairo text-amber-900 dark:text-amber-200 mb-2">
           💡 نصايح لو الصورة مش معجباك
         </h3>
-        <ul className="text-xs text-amber-800 font-cairo space-y-1 list-disc pr-5">
+        <ul className="text-xs text-amber-800 dark:text-amber-300 font-cairo space-y-1 list-disc pr-5">
           <li>
             اضغط <strong>"🔄 ولّد بديل"</strong> أكتر من مرة — كل مرة AI
             بيـ try ستايل تاني
@@ -328,7 +315,7 @@ export default async function BrandingPage({
       <div className="text-center">
         <Link
           href="/admin/social"
-          className="text-xs text-slate-500 hover:text-rose-700 font-cairo"
+          className="text-xs text-slate-500 dark:text-slate-400 hover:text-rose-700 dark:hover:text-rose-400 font-cairo"
         >
           ← الرجوع للوحة Social
         </Link>
@@ -337,20 +324,6 @@ export default async function BrandingPage({
   );
 }
 
-function Flash({
-  kind,
-  children,
-}: {
-  kind: "ok" | "err";
-  children: React.ReactNode;
-}) {
-  const cls =
-    kind === "ok"
-      ? "bg-emerald-50 border-emerald-200 text-emerald-800"
-      : "bg-rose-50 border-rose-200 text-rose-800";
-  return (
-    <div className={`mb-4 p-3 rounded-xl border font-cairo text-sm ${cls}`}>
-      {children}
-    </div>
-  );
-}
+// Flash helper removed — transient action messages now flow through
+// sonner toasts via the root-layout <UrlToasts> reader (see
+// src/components/url-toasts.tsx).

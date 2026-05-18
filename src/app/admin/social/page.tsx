@@ -170,25 +170,16 @@ export default async function SocialHomePage({
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-8">
-      {sp.archived && <Flash kind="ok">✓ تم الأرشفة</Flash>}
-      {sp.published && (
-        <Flash kind="ok">✅ تم النشر · شوف التفاصيل في كارت البوست</Flash>
-      )}
-      {sp.recovered !== undefined && (
-        <Flash kind="ok">
-          🔧 تم استعادة {sp.recovered} بوست كانوا عالقين في حالة &quot;بينشر&quot;
-          (رجّعتهم لـ مسودة)
-        </Flash>
-      )}
-      {sp.error && <Flash kind="err">⚠ {decodeURIComponent(sp.error)}</Flash>}
-
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+      {/* Transient action toasts now handled by <UrlToasts> in root
+          layout. We keep the migration-missing banner inline because
+          it's persistent diagnostics, not a transient notification. */}
       {tableMissing && (
-        <div className="mb-5 bg-amber-50 border-2 border-amber-300 rounded-2xl p-5 font-cairo">
-          <h3 className="font-black text-amber-900 mb-2">
+        <div className="mb-5 bg-amber-50 dark:bg-amber-900/30 border-2 border-amber-300 dark:border-amber-700 rounded-2xl p-5 font-cairo">
+          <h3 className="font-black text-amber-900 dark:text-amber-200 mb-2">
             ⚠ Migration 043 لسه ما اتطبّقتش
           </h3>
-          <p className="text-sm text-amber-800">
+          <p className="text-sm text-amber-800 dark:text-amber-300">
             طبّق على Supabase الكود في:{" "}
             <code dir="ltr">db/migrations/043_social_media_growth_suite.sql</code>
           </p>
@@ -196,10 +187,10 @@ export default async function SocialHomePage({
       )}
 
       <header className="mb-8">
-        <h1 className="text-3xl font-black font-cairo text-slate-800 mb-1">
+        <h1 className="text-2xl sm:text-3xl font-black font-cairo text-slate-800 dark:text-slate-100 mb-1">
           مرحباً يا basem — هنا بتكتب وبتنشر وبتبيع
         </h1>
-        <p className="text-sm text-slate-500 font-cairo">
+        <p className="text-sm text-slate-500 dark:text-slate-400 font-cairo">
           AI بيصمم البوستات · انت بتراجعها · النظام بينشرها على كل
           حساباتك · بيرد على التعليقات (بموافقتك).
         </p>
@@ -207,8 +198,8 @@ export default async function SocialHomePage({
 
       {/* Stuck-post recovery — only renders when there's something to recover */}
       {stats.stuckPosts > 0 && (
-        <div className="mb-5 p-4 rounded-2xl bg-amber-50 border-2 border-amber-300 flex items-center justify-between gap-3 flex-wrap font-cairo">
-          <div className="text-sm text-amber-900">
+        <div className="mb-5 p-4 rounded-2xl bg-amber-50 dark:bg-amber-900/30 border-2 border-amber-300 dark:border-amber-700 flex items-center justify-between gap-3 flex-wrap font-cairo">
+          <div className="text-sm text-amber-900 dark:text-amber-200">
             ⚠ في <strong>{stats.stuckPosts}</strong> بوست عالق في حالة
             &quot;بينشر…&quot; لأكتر من 5 دقايق (غالباً اتعطل في النص بسبب
             تايملاوت أو deploy). تقدر ترجّعهم لـ مسودة وتنشرهم تاني.
@@ -286,13 +277,13 @@ export default async function SocialHomePage({
 
       {/* Recent posts */}
       <section className="mb-8">
-        <h2 className="text-sm font-black font-cairo text-slate-700 mb-3 flex items-center gap-2">
+        <h2 className="text-sm font-black font-cairo text-slate-700 dark:text-slate-300 mb-3 flex items-center gap-2">
           📋 آخر البوستات ({posts.length})
         </h2>
         {posts.length === 0 ? (
-          <div className="bg-white border border-slate-200 rounded-2xl p-10 text-center">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-10 text-center">
             <div className="text-5xl mb-3">📭</div>
-            <p className="text-sm text-slate-500 font-cairo mb-3">
+            <p className="text-sm text-slate-500 dark:text-slate-400 font-cairo mb-3">
               مفيش بوستات لسه. ابدأ بـ AI generator.
             </p>
             <Link
@@ -317,17 +308,17 @@ export default async function SocialHomePage({
 
       {/* Connected accounts */}
       <section className="mb-8">
-        <h2 className="text-sm font-black font-cairo text-slate-700 mb-3 flex items-center gap-2">
+        <h2 className="text-sm font-black font-cairo text-slate-700 dark:text-slate-300 mb-3 flex items-center gap-2">
           🔌 الحسابات المربوطة ({accounts.length})
         </h2>
         {accounts.length === 0 ? (
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 text-center">
-            <p className="text-sm text-slate-500 font-cairo mb-2">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 text-center">
+            <p className="text-sm text-slate-500 dark:text-slate-400 font-cairo mb-2">
               لسه مفيش حسابات مربوطة
             </p>
             <Link
               href="/admin/social/accounts"
-              className="text-xs text-cyan-700 hover:text-cyan-900 font-bold font-cairo"
+              className="text-xs text-cyan-700 dark:text-cyan-400 hover:text-cyan-900 dark:hover:text-cyan-300 font-bold font-cairo"
             >
               ابدأ ربط حساب ←
             </Link>
@@ -356,11 +347,11 @@ function Kpi({
   color: "cyan" | "amber" | "emerald" | "rose" | "slate";
 }) {
   const cls: Record<typeof color, string> = {
-    cyan: "from-cyan-50 to-white border-cyan-200 text-cyan-800",
-    amber: "from-amber-50 to-white border-amber-200 text-amber-800",
-    emerald: "from-emerald-50 to-white border-emerald-200 text-emerald-800",
-    rose: "from-rose-50 to-white border-rose-200 text-rose-800",
-    slate: "from-slate-50 to-white border-slate-200 text-slate-800",
+    cyan: "from-cyan-50 to-white dark:from-cyan-900/30 dark:to-slate-900 border-cyan-200 dark:border-cyan-800 text-cyan-800 dark:text-cyan-200",
+    amber: "from-amber-50 to-white dark:from-amber-900/30 dark:to-slate-900 border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200",
+    emerald: "from-emerald-50 to-white dark:from-emerald-900/30 dark:to-slate-900 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200",
+    rose: "from-rose-50 to-white dark:from-rose-900/30 dark:to-slate-900 border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-200",
+    slate: "from-slate-50 to-white dark:from-slate-800 dark:to-slate-900 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200",
   };
   return (
     <div className={`p-4 rounded-2xl bg-gradient-to-br ${cls[color]} border shadow-sm`}>
@@ -406,20 +397,20 @@ function PostCard({
   targets: TargetRow[];
 }) {
   const statusLabel: Record<string, { cls: string; text: string }> = {
-    draft: { cls: "bg-slate-100 text-slate-700", text: "مسودة" },
-    scheduled: { cls: "bg-amber-100 text-amber-800", text: "مجدول" },
-    publishing: { cls: "bg-cyan-100 text-cyan-800", text: "بينشر…" },
-    published: { cls: "bg-emerald-100 text-emerald-800", text: "منشور" },
-    partially_failed: { cls: "bg-orange-100 text-orange-800", text: "نشر جزئي" },
-    failed: { cls: "bg-rose-100 text-rose-800", text: "فشل" },
-    archived: { cls: "bg-slate-100 text-slate-500", text: "مؤرشف" },
+    draft: { cls: "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300", text: "مسودة" },
+    scheduled: { cls: "bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300", text: "مجدول" },
+    publishing: { cls: "bg-cyan-100 dark:bg-cyan-900/40 text-cyan-800 dark:text-cyan-300", text: "بينشر…" },
+    published: { cls: "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300", text: "منشور" },
+    partially_failed: { cls: "bg-orange-100 dark:bg-orange-900/40 text-orange-800 dark:text-orange-300", text: "نشر جزئي" },
+    failed: { cls: "bg-rose-100 dark:bg-rose-900/40 text-rose-800 dark:text-rose-300", text: "فشل" },
+    archived: { cls: "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-500", text: "مؤرشف" },
   };
   const status = statusLabel[post.status] ?? statusLabel.draft;
 
   return (
     <Link
       href={`/admin/social/composer?first=${post.id}`}
-      className="bg-white border border-slate-200 hover:border-rose-300 rounded-2xl p-4 transition hover:shadow block"
+      className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-rose-300 dark:hover:border-rose-700 rounded-2xl p-4 transition hover:shadow block"
     >
       <div className="flex items-start justify-between mb-2 gap-2">
         <span
@@ -428,18 +419,18 @@ function PostCard({
           {status.text}
         </span>
         {post.source === "ai_generated" && (
-          <span className="text-[10px] text-rose-700 font-bold">✦ AI</span>
+          <span className="text-[10px] text-rose-700 dark:text-rose-400 font-bold">✦ AI</span>
         )}
       </div>
       {post.title && (
-        <div className="text-xs font-bold text-slate-700 font-cairo mb-1 truncate">
+        <div className="text-xs font-bold text-slate-700 dark:text-slate-200 font-cairo mb-1 truncate">
           {post.title}
         </div>
       )}
-      <p className="text-xs text-slate-600 font-cairo line-clamp-4 leading-relaxed whitespace-pre-line">
+      <p className="text-xs text-slate-600 dark:text-slate-400 font-cairo line-clamp-4 leading-relaxed whitespace-pre-line">
         {post.body}
       </p>
-      <div className="text-[10px] text-slate-400 font-cairo mt-2">
+      <div className="text-[10px] text-slate-400 dark:text-slate-500 font-cairo mt-2">
         {new Date(post.created_at).toLocaleString("ar-EG", {
           dateStyle: "short",
           timeStyle: "short",
@@ -448,7 +439,7 @@ function PostCard({
 
       {/* Per-platform publish results — the most important debug info. */}
       {targets.length > 0 && (
-        <div className="mt-3 pt-2 border-t border-slate-100 space-y-1">
+        <div className="mt-3 pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1">
           {targets.map((t) => {
             const platform = t.social_accounts?.platform ?? "?";
             const icon = PLATFORM_ICON[platform] ?? "🔌";
@@ -461,15 +452,15 @@ function PostCard({
                 key={t.id}
                 className={`text-[10px] font-cairo p-1.5 rounded ${
                   failed
-                    ? "bg-rose-50"
+                    ? "bg-rose-50 dark:bg-rose-900/30"
                     : ok
-                      ? "bg-emerald-50"
-                      : "bg-slate-50"
+                      ? "bg-emerald-50 dark:bg-emerald-900/30"
+                      : "bg-slate-50 dark:bg-slate-800/50"
                 }`}
               >
                 <div className="flex items-center gap-1">
                   <span>{icon}</span>
-                  <span className="flex-1 truncate text-slate-700">
+                  <span className="flex-1 truncate text-slate-700 dark:text-slate-300">
                     {t.social_accounts?.display_label ?? platform}
                   </span>
                   <span>
@@ -478,7 +469,7 @@ function PostCard({
                 </div>
                 {failed && t.last_error && (
                   <div
-                    className="text-rose-700 mt-1 text-[10px] leading-tight break-words"
+                    className="text-rose-700 dark:text-rose-300 mt-1 text-[10px] leading-tight break-words"
                     dir="ltr"
                   >
                     ⚠ {t.last_error}
@@ -486,7 +477,7 @@ function PostCard({
                 )}
                 {ok && t.external_url && (
                   <div className="mt-0.5">
-                    <span className="text-emerald-700 underline" dir="ltr">
+                    <span className="text-emerald-700 dark:text-emerald-400 underline" dir="ltr">
                       {t.external_url.slice(0, 50)}…
                     </span>
                   </div>
@@ -503,21 +494,25 @@ function PostCard({
 function AccountChip({ account }: { account: AccountRow }) {
   return (
     <div
-      className={`p-3 rounded-xl border ${account.is_active ? "bg-white border-slate-200" : "bg-slate-50 border-slate-300 opacity-60"}`}
+      className={`p-3 rounded-xl border ${
+        account.is_active
+          ? "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"
+          : "bg-slate-50 dark:bg-slate-800/50 border-slate-300 dark:border-slate-700 opacity-60"
+      }`}
     >
       <div className="flex items-center gap-2 mb-1">
         <span className="text-xl">
           {PLATFORM_ICON[account.platform] ?? "🔌"}
         </span>
-        <span className="text-xs font-bold font-cairo text-slate-800 truncate">
+        <span className="text-xs font-bold font-cairo text-slate-800 dark:text-slate-200 truncate">
           {account.display_label}
         </span>
       </div>
-      <div className="text-[10px] text-slate-500 font-cairo">
+      <div className="text-[10px] text-slate-500 dark:text-slate-400 font-cairo">
         {account.is_active ? "🟢 نشط" : "⏸ متوقف"}
       </div>
       {account.last_error && (
-        <div className="text-[10px] text-rose-600 font-cairo mt-1 truncate" title={account.last_error}>
+        <div className="text-[10px] text-rose-600 dark:text-rose-400 font-cairo mt-1 truncate" title={account.last_error}>
           ⚠ {account.last_error}
         </div>
       )}
@@ -525,20 +520,7 @@ function AccountChip({ account }: { account: AccountRow }) {
   );
 }
 
-function Flash({
-  kind,
-  children,
-}: {
-  kind: "ok" | "err";
-  children: React.ReactNode;
-}) {
-  const cls =
-    kind === "ok"
-      ? "bg-emerald-50 border-emerald-200 text-emerald-800"
-      : "bg-rose-50 border-rose-200 text-rose-800";
-  return (
-    <div className={`mb-4 p-3 rounded-xl border font-cairo text-sm ${cls}`}>
-      {children}
-    </div>
-  );
-}
+// Flash helper removed — transient action messages now flow through
+// sonner toasts via the root-layout <UrlToasts> reader (see
+// src/components/url-toasts.tsx). Inline persistent diagnostics
+// (e.g. migration-missing banner) stay rendered.
