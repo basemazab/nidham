@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getMyProfile } from "@/lib/permissions";
 import { updateCustomer, deleteCustomer } from "../actions";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 
@@ -36,11 +37,17 @@ export default async function EditCustomerPage({ params, searchParams }: PagePro
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  // Scope the employees dropdown to the caller's company — the customer
+  // row itself is fetched by unguessable id so RLS handles it.
+  const { profile } = await getMyProfile();
+  const callerCompanyId = profile?.company_id ?? "";
+
   const [customerRes, employeesRes] = await Promise.all([
     supabase.from("customers").select("*").eq("id", id).single<Customer>(),
     supabase
       .from("employees")
       .select("id, full_name")
+      .eq("company_id", callerCompanyId)
       .eq("status", "active")
       .order("full_name")
       .returns<EmployeeOption[]>(),

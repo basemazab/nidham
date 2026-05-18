@@ -12,6 +12,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getMyProfile } from "@/lib/permissions";
 import { canUseFeature } from "@/lib/subscriptions-server";
 import { UpgradeRequired } from "@/components/upgrade-required";
 import { createMarketingProject, archiveMarketingProject } from "./actions";
@@ -62,11 +63,17 @@ export default async function MarketingHubPage({
   const sp = await searchParams;
   const errorMsg = sp.error ? decodeURIComponent(sp.error) : null;
 
+  // Scope to the caller's company — mig 038 gives super-admin SELECT on
+  // marketing_projects across every tenant.
+  const { profile } = await getMyProfile();
+  const callerCompanyId = profile?.company_id ?? "";
+
   const { data, error: fetchError } = await supabase
     .from("marketing_projects")
     .select(
       "id, name, product_summary, industry, status, created_at, updated_at",
     )
+    .eq("company_id", callerCompanyId)
     .eq("status", "active")
     .order("updated_at", { ascending: false })
     .returns<Project[]>();

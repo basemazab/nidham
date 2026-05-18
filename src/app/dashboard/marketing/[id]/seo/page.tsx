@@ -5,6 +5,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getMyProfile } from "@/lib/permissions";
 import { canUseFeature } from "@/lib/subscriptions-server";
 import { UpgradeRequired } from "@/components/upgrade-required";
 import { runSeoMaster } from "../../actions";
@@ -69,6 +70,10 @@ export default async function SeoPage({ params, searchParams }: PageProps) {
     return <UpgradeRequired feature="marketing_studio" />;
   }
 
+  // Scope keywords to caller's company.
+  const { profile } = await getMyProfile();
+  const callerCompanyId = profile?.company_id ?? "";
+
   const [projectRes, keywordsRes] = await Promise.all([
     supabase
       .from("marketing_projects")
@@ -82,6 +87,7 @@ export default async function SeoPage({ params, searchParams }: PageProps) {
     supabase
       .from("marketing_keywords")
       .select("*")
+      .eq("company_id", callerCompanyId)
       .eq("project_id", id)
       .order("priority")
       .returns<Keyword[]>(),

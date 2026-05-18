@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getMyProfile } from "@/lib/permissions";
 import { canUseFeature } from "@/lib/subscriptions-server";
 import { UpgradeRequired } from "@/components/upgrade-required";
 
@@ -49,22 +50,31 @@ export default async function BridgeReportPage({
   const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
   const endDate = lastDayOfMonth(year, month);
 
+  // Scope every tenant-scoped query to the caller's company —
+  // otherwise mig 038 lets super-admin sessions read cross-tenant rows
+  // and pollutes the Bridge report.
+  const { profile } = await getMyProfile();
+  const callerCompanyId = profile?.company_id ?? "";
+
   const [employeesRes, attendanceRes, interactionsRes] = await Promise.all([
     supabase
       .from("employees")
       .select("id, full_name, job_title")
+      .eq("company_id", callerCompanyId)
       .eq("status", "active")
       .order("full_name")
       .returns<Employee[]>(),
     supabase
       .from("attendance")
       .select("employee_id, status")
+      .eq("company_id", callerCompanyId)
       .gte("date", startDate)
       .lte("date", endDate)
       .returns<AttendanceRow[]>(),
     supabase
       .from("interactions")
       .select("employee_id, customer_id, outcome")
+      .eq("company_id", callerCompanyId)
       .gte("date", startDate)
       .lte("date", endDate)
       .returns<InteractionRow[]>(),

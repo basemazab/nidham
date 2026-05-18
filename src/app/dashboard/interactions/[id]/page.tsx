@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getMyProfile } from "@/lib/permissions";
 import { updateInteraction, deleteInteraction } from "../actions";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 
@@ -32,10 +33,15 @@ export default async function EditInteractionPage({ params, searchParams }: Page
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  // Scope the dropdown lookups to the caller's company — the interaction
+  // row itself is unguessable-by-id so RLS suffices for that single row.
+  const { profile } = await getMyProfile();
+  const callerCompanyId = profile?.company_id ?? "";
+
   const [interactionRes, employeesRes, customersRes] = await Promise.all([
     supabase.from("interactions").select("*").eq("id", id).single<Interaction>(),
-    supabase.from("employees").select("id, full_name").eq("status", "active").order("full_name").returns<Option[]>(),
-    supabase.from("customers").select("id, full_name").order("created_at", { ascending: false }).returns<Option[]>(),
+    supabase.from("employees").select("id, full_name").eq("company_id", callerCompanyId).eq("status", "active").order("full_name").returns<Option[]>(),
+    supabase.from("customers").select("id, full_name").eq("company_id", callerCompanyId).order("created_at", { ascending: false }).returns<Option[]>(),
   ]);
 
   if (!interactionRes.data) notFound();

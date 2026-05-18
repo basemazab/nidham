@@ -31,14 +31,19 @@ export default async function NewAdvancePage({
 }: {
   searchParams: SearchParams;
 }) {
-  const { supabase } = await requireHRPage();
+  const { supabase, profile } = await requireHRPage();
   const sp = await searchParams;
   const error = sp.error ? decodeURIComponent(sp.error) : null;
+
+  // Scope picker to the caller's company — super-admin sessions can
+  // otherwise read employees across every tenant via mig 038.
+  const callerCompanyId = profile?.company_id ?? "";
 
   // All active employees -- the picker autocompletes from this list.
   const { data: employees } = await supabase
     .from("employees")
     .select("id, full_name, job_title, department")
+    .eq("company_id", callerCompanyId)
     .eq("status", "active")
     .order("full_name")
     .returns<EmployeeLite[]>();

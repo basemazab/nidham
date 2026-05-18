@@ -5,6 +5,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getMyProfile } from "@/lib/permissions";
 import { canUseFeature } from "@/lib/subscriptions-server";
 import { UpgradeRequired } from "@/components/upgrade-required";
 import { AiErrorBanner } from "@/components/ai-error-banner";
@@ -59,6 +60,10 @@ export default async function LandingPageEditPage({
     return <UpgradeRequired feature="marketing_studio" />;
   }
 
+  // Scope analytics queries to caller's company.
+  const { profile } = await getMyProfile();
+  const callerCompanyId = profile?.company_id ?? "";
+
   const { data: page } = await supabase
     .from("landing_pages")
     .select("*")
@@ -71,10 +76,12 @@ export default async function LandingPageEditPage({
     supabase
       .from("lead_events")
       .select("event_type", { count: "exact", head: false })
+      .eq("company_id", callerCompanyId)
       .eq("landing_page_id", id),
     supabase
       .from("customers")
       .select("id, full_name, phone, status, created_at", { count: "exact" })
+      .eq("company_id", callerCompanyId)
       .eq("landing_page_id", id)
       .order("created_at", { ascending: false })
       .limit(10)

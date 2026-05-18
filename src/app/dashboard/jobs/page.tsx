@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getMyProfile } from "@/lib/permissions";
 
 type Job = {
   id: string;
@@ -41,17 +42,24 @@ export default async function JobsPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  // Scope to caller's company — super-admin sessions can otherwise
+  // read jobs/applications across every tenant.
+  const { profile } = await getMyProfile();
+  const callerCompanyId = profile?.company_id ?? "";
+
   const [jobsRes, appsRes] = await Promise.all([
     supabase
       .from("jobs")
       .select(
         "id, title, department, job_type, location, status, experience_years_min, salary_min, salary_max, posted_at, created_at",
       )
+      .eq("company_id", callerCompanyId)
       .order("created_at", { ascending: false })
       .returns<Job[]>(),
     supabase
       .from("applications")
       .select("job_id, ai_score, status")
+      .eq("company_id", callerCompanyId)
       .returns<AppRow[]>(),
   ]);
 

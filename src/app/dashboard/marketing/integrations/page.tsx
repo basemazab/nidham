@@ -16,6 +16,7 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getMyProfile } from "@/lib/permissions";
 import { canUseFeature } from "@/lib/subscriptions-server";
 import { UpgradeRequired } from "@/components/upgrade-required";
 import {
@@ -73,23 +74,30 @@ export default async function IntegrationsPage({
 
   const sp = await searchParams;
 
+  // Scope every tenant-scoped query to the caller's company.
+  const { profile } = await getMyProfile();
+  const callerCompanyId = profile?.company_id ?? "";
+
   const [integrationsRes, importsRes, pagesRes] = await Promise.all([
     supabase
       .from("meta_integrations")
       .select(
         "id, page_id, page_name, app_id, display_label, default_landing_page_id, is_active, last_webhook_at, last_error, webhooks_received, leads_imported, created_at",
       )
+      .eq("company_id", callerCompanyId)
       .order("created_at", { ascending: false })
       .returns<Integration[]>(),
     supabase
       .from("meta_lead_imports")
       .select("id, leadgen_id, outcome, error_message, occurred_at, customer_id")
+      .eq("company_id", callerCompanyId)
       .order("occurred_at", { ascending: false })
       .limit(15)
       .returns<ImportRow[]>(),
     supabase
       .from("landing_pages")
       .select("id, name")
+      .eq("company_id", callerCompanyId)
       .eq("is_active", true)
       .order("name")
       .returns<LandingPageMini[]>(),

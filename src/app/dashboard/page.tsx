@@ -22,28 +22,33 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
-  // Fetch everything in parallel. Profile is needed up-front for the
-  // subscription scoping (super_admin RLS bypass otherwise returns
-  // multi-tenant rows and breaks .single()).
-  const [
-    profileRes,
-    employeesCount,
-    customersCount,
-    interactionsCount,
-  ] = await Promise.all([
+  // Fetch the profile first so we can scope every count to the caller's
+  // company. The other counts can't be safely parallelised with the
+  // profile fetch because super-admin sessions would otherwise count
+  // rows across every tenant (mig 038-style policies).
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("full_name, role, company_id, companies(name, industry)")
+    .eq("id", user.id)
+    .single<Profile & { company_id: string }>();
+
+  const callerCompanyId = profile?.company_id ?? "";
+
+  const [employeesCount, customersCount, interactionsCount] = await Promise.all([
     supabase
-      .from("profiles")
-      .select("full_name, role, company_id, companies(name, industry)")
-      .eq("id", user.id)
-      .single<Profile & { company_id: string }>(),
-    supabase.from("employees").select("id", { count: "exact", head: true }),
-    supabase.from("customers").select("id", { count: "exact", head: true }),
+      .from("employees")
+      .select("id", { count: "exact", head: true })
+      .eq("company_id", callerCompanyId),
+    supabase
+      .from("customers")
+      .select("id", { count: "exact", head: true })
+      .eq("company_id", callerCompanyId),
     supabase
       .from("interactions")
-      .select("id", { count: "exact", head: true }),
+      .select("id", { count: "exact", head: true })
+      .eq("company_id", callerCompanyId),
   ]);
 
-  const profile = profileRes.data;
   const empCount = employeesCount.count ?? 0;
   const custCount = customersCount.count ?? 0;
   const intCount = interactionsCount.count ?? 0;

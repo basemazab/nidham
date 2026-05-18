@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getMyProfile } from "@/lib/permissions";
 import { formatEGP } from "@/lib/format";
 
 type Customer = {
@@ -44,11 +45,17 @@ export default async function CustomersPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  // Scope to the caller's company — super-admin sessions (mig 038) can
+  // SELECT customers across every tenant otherwise.
+  const { profile } = await getMyProfile();
+  const callerCompanyId = profile?.company_id ?? "";
+
   const { data: customers } = await supabase
     .from("customers")
     .select(
       "id, full_name, contact_name, type, phone, status, estimated_value, assigned_to, employees:assigned_to(full_name)",
     )
+    .eq("company_id", callerCompanyId)
     .order("created_at", { ascending: false })
     .returns<Customer[]>();
 

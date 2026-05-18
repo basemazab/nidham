@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getMyProfile } from "@/lib/permissions";
 import {
   STATUS_LABELS_AR,
   STATUS_CLASSES,
@@ -63,7 +64,11 @@ export default async function RequestsInboxPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  // Pull the three kinds in parallel. RLS scopes them to the HR's company.
+  // Pull the three kinds in parallel. Scope every one to the caller's
+  // company explicitly — super-admin sessions can otherwise pull pending
+  // requests from every tenant into this inbox.
+  const { profile } = await getMyProfile();
+  const callerCompanyId = profile?.company_id ?? "";
   const statusFilter = showAll ? null : "pending";
 
   const [leaveRes, advanceRes, permRes] = await Promise.all([
@@ -73,6 +78,7 @@ export default async function RequestsInboxPage({
           .select(
             "id, leave_type, start_date, end_date, days_count, reason, status, created_at, employees(id, full_name, job_title)",
           )
+          .eq("company_id", callerCompanyId)
           .eq("status", statusFilter)
           .order("created_at", { ascending: false })
       : supabase
@@ -80,6 +86,7 @@ export default async function RequestsInboxPage({
           .select(
             "id, leave_type, start_date, end_date, days_count, reason, status, created_at, employees(id, full_name, job_title)",
           )
+          .eq("company_id", callerCompanyId)
           .order("created_at", { ascending: false })
           .limit(50)
     ).returns<LeaveRow[]>(),
@@ -89,6 +96,7 @@ export default async function RequestsInboxPage({
           .select(
             "id, amount, installments, reason, status, created_at, employees(id, full_name, job_title)",
           )
+          .eq("company_id", callerCompanyId)
           .eq("status", statusFilter)
           .order("created_at", { ascending: false })
       : supabase
@@ -96,6 +104,7 @@ export default async function RequestsInboxPage({
           .select(
             "id, amount, installments, reason, status, created_at, employees(id, full_name, job_title)",
           )
+          .eq("company_id", callerCompanyId)
           .order("created_at", { ascending: false })
           .limit(50)
     ).returns<AdvanceRow[]>(),
@@ -105,6 +114,7 @@ export default async function RequestsInboxPage({
           .select(
             "id, permission_type, permission_date, from_time, to_time, reason, status, created_at, employees(id, full_name, job_title)",
           )
+          .eq("company_id", callerCompanyId)
           .eq("status", statusFilter)
           .order("created_at", { ascending: false })
       : supabase
@@ -112,6 +122,7 @@ export default async function RequestsInboxPage({
           .select(
             "id, permission_type, permission_date, from_time, to_time, reason, status, created_at, employees(id, full_name, job_title)",
           )
+          .eq("company_id", callerCompanyId)
           .order("created_at", { ascending: false })
           .limit(50)
     ).returns<PermissionRow[]>(),

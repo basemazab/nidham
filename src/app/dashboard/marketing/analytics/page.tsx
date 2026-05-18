@@ -16,6 +16,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getMyProfile } from "@/lib/permissions";
 import { canUseFeature } from "@/lib/subscriptions-server";
 import { UpgradeRequired } from "@/components/upgrade-required";
 
@@ -61,6 +62,11 @@ export default async function AnalyticsPage() {
     return <UpgradeRequired feature="marketing_studio" />;
   }
 
+  // Scope to the caller's company — super-admin sessions can otherwise
+  // pull lead_events / customers / landing_pages across every tenant.
+  const { profile } = await getMyProfile();
+  const callerCompanyId = profile?.company_id ?? "";
+
   // Pull recent activity. We cap at 5000 events / 2000 customers per
   // request because that's well within Postgres' return budget for a
   // single tenant; anything more and we'd need to slice by date range.
@@ -73,6 +79,7 @@ export default async function AnalyticsPage() {
       .select(
         "id, event_type, utm_source, utm_campaign, landing_page_id, customer_id, session_id, occurred_at",
       )
+      .eq("company_id", callerCompanyId)
       .gte("occurred_at", since)
       .order("occurred_at", { ascending: false })
       .limit(5000)
@@ -82,6 +89,7 @@ export default async function AnalyticsPage() {
       .select(
         "id, status, estimated_value, source, first_utm_source, first_utm_medium, first_utm_campaign, landing_page_id, converted_at, created_at",
       )
+      .eq("company_id", callerCompanyId)
       .gte("created_at", since)
       .order("created_at", { ascending: false })
       .limit(2000)
@@ -89,6 +97,7 @@ export default async function AnalyticsPage() {
     supabase
       .from("landing_pages")
       .select("id, name, slug, views_count, conversions_count")
+      .eq("company_id", callerCompanyId)
       .order("conversions_count", { ascending: false })
       .returns<LPRow[]>(),
   ]);

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getMyProfile } from "@/lib/permissions";
 import {
   approvePayrollPeriod,
   markPayrollAsPaid,
@@ -90,6 +91,13 @@ export default async function PayrollPeriodPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  // Scope every list-style query to the caller's company. The period
+  // row itself is identified by an unguessable UUID so RLS is fine
+  // for the single() fetch, but the entries/employees lookups would
+  // otherwise let a super-admin browse cross-tenant rows.
+  const { profile } = await getMyProfile();
+  const callerCompanyId = profile?.company_id ?? "";
+
   const [periodRes, entriesRes] = await Promise.all([
     supabase
       .from("payroll_periods")
@@ -101,6 +109,7 @@ export default async function PayrollPeriodPage({
       .select(
         "id, employee_id, attended_days, half_day_days, absent_days, leave_days, gross_salary, social_insurance, income_tax, bonuses, total_deductions, net_salary, eos_gratuity, employees(employee_code, full_name, job_title, department)",
       )
+      .eq("company_id", callerCompanyId)
       .eq("period_id", id)
       .order("employee_id")
       .returns<RawEntry[]>(),
@@ -124,21 +133,25 @@ export default async function PayrollPeriodPage({
       supabase
         .from("employees")
         .select("id", { count: "exact", head: true })
+        .eq("company_id", callerCompanyId)
         .eq("status", "active")
         .eq("pay_frequency", "monthly"),
       supabase
         .from("employees")
         .select("id", { count: "exact", head: true })
+        .eq("company_id", callerCompanyId)
         .eq("status", "active")
         .eq("pay_frequency", "weekly"),
       supabase
         .from("employees")
         .select("id", { count: "exact", head: true })
+        .eq("company_id", callerCompanyId)
         .eq("status", "active")
         .is("pay_frequency", null),
       supabase
         .from("employees")
         .select("id", { count: "exact", head: true })
+        .eq("company_id", callerCompanyId)
         .eq("status", "active")
         .or("basic_salary.is.null,basic_salary.eq.0"),
     ]);
@@ -178,6 +191,7 @@ export default async function PayrollPeriodPage({
     const { data: prev } = await supabase
       .from("payroll_periods")
       .select("id, start_date")
+      .eq("company_id", callerCompanyId)
       .eq("frequency", period.frequency ?? "monthly")
       .lt("start_date", period.start_date)
       .in("status", ["approved", "paid"])
@@ -188,6 +202,7 @@ export default async function PayrollPeriodPage({
       const { data: prevEntries } = await supabase
         .from("payroll_entries")
         .select("net_salary")
+        .eq("company_id", callerCompanyId)
         .eq("period_id", prev.id);
       const net = (prevEntries ?? []).reduce(
         (s, r: { net_salary: number }) => s + Number(r.net_salary),

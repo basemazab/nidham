@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getMyProfile } from "@/lib/permissions";
 import { deleteJob, changeJobStatus } from "../actions";
 import {
   STATUS_LABELS_AR,
@@ -81,6 +82,10 @@ export default async function JobDetailPage({ params }: PageProps) {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  // Scope applications list to caller's company.
+  const { profile } = await getMyProfile();
+  const callerCompanyId = profile?.company_id ?? "";
+
   const [jobRes, appsRes] = await Promise.all([
     supabase.from("jobs").select("*").eq("id", id).single<Job>(),
     supabase
@@ -89,6 +94,7 @@ export default async function JobDetailPage({ params }: PageProps) {
         `id, status, ai_score, ai_recommendation, ai_summary, ai_analyzed_at, ai_error, applied_at,
          candidates(full_name, current_title, years_experience, location)`,
       )
+      .eq("company_id", callerCompanyId)
       .eq("job_id", id)
       .order("ai_score", { ascending: false, nullsFirst: false })
       .returns<Application[]>(),

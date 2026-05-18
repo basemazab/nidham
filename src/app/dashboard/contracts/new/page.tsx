@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getMyProfile } from "@/lib/permissions";
 import { createContract } from "../actions";
 
 type SearchParams = Promise<{ error?: string }>;
@@ -19,15 +20,22 @@ export default async function NewContractPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  // Scope dropdowns to the caller's company so super-admin sessions
+  // don't see cross-tenant customers/employees in the picker.
+  const { profile } = await getMyProfile();
+  const callerCompanyId = profile?.company_id ?? "";
+
   const [customersRes, employeesRes] = await Promise.all([
     supabase
       .from("customers")
       .select("id, full_name")
+      .eq("company_id", callerCompanyId)
       .order("full_name")
       .returns<Option[]>(),
     supabase
       .from("employees")
       .select("id, full_name")
+      .eq("company_id", callerCompanyId)
       .eq("status", "active")
       .order("full_name")
       .returns<Option[]>(),

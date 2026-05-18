@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getMyProfile } from "@/lib/permissions";
 import { logInteraction, deleteInteraction } from "./actions";
 
 type SearchParams = Promise<{ error?: string; saved?: string }>;
@@ -58,16 +59,23 @@ export default async function InteractionsPage({
   const params = await searchParams;
   const today = new Date().toISOString().split("T")[0];
 
+  // Scope to the caller's company — super-admin sessions (mig 038) can
+  // otherwise read employees/customers/interactions across every tenant.
+  const { profile } = await getMyProfile();
+  const callerCompanyId = profile?.company_id ?? "";
+
   const [employeesRes, customersRes, interactionsRes] = await Promise.all([
     supabase
       .from("employees")
       .select("id, full_name")
+      .eq("company_id", callerCompanyId)
       .eq("status", "active")
       .order("full_name")
       .returns<Option[]>(),
     supabase
       .from("customers")
       .select("id, full_name")
+      .eq("company_id", callerCompanyId)
       .order("created_at", { ascending: false })
       .returns<Option[]>(),
     supabase
@@ -75,6 +83,7 @@ export default async function InteractionsPage({
       .select(
         "id, date, type, outcome, notes, employees:employee_id(full_name), customers:customer_id(full_name)",
       )
+      .eq("company_id", callerCompanyId)
       .order("date", { ascending: false })
       .order("created_at", { ascending: false })
       .limit(30)

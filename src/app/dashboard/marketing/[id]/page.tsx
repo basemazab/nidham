@@ -9,6 +9,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getMyProfile } from "@/lib/permissions";
 import { canUseFeature } from "@/lib/subscriptions-server";
 import { UpgradeRequired } from "@/components/upgrade-required";
 import { getProviderStatus } from "@/lib/ai-models";
@@ -67,6 +68,11 @@ export default async function MarketingProjectPage({
     return <UpgradeRequired feature="marketing_studio" />;
   }
 
+  // Scope counts to the caller's company — the project row itself
+  // is fetched by unguessable id so RLS handles it.
+  const { profile } = await getMyProfile();
+  const callerCompanyId = profile?.company_id ?? "";
+
   const [projectRes, personasCount, creativesCount, keywordsCount, campaignsCount] =
     await Promise.all([
       supabase
@@ -77,18 +83,22 @@ export default async function MarketingProjectPage({
       supabase
         .from("marketing_personas")
         .select("id", { count: "exact", head: true })
+        .eq("company_id", callerCompanyId)
         .eq("project_id", id),
       supabase
         .from("marketing_ad_creatives")
         .select("id", { count: "exact", head: true })
+        .eq("company_id", callerCompanyId)
         .eq("project_id", id),
       supabase
         .from("marketing_keywords")
         .select("id", { count: "exact", head: true })
+        .eq("company_id", callerCompanyId)
         .eq("project_id", id),
       supabase
         .from("marketing_campaigns")
         .select("id", { count: "exact", head: true })
+        .eq("company_id", callerCompanyId)
         .eq("project_id", id),
     ]);
 

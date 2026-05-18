@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getMyProfile } from "@/lib/permissions";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { ReviewBatchTable } from "./review-batch-table";
 import {
@@ -73,6 +74,12 @@ export default async function AttendanceReviewPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  // Resolve the caller's company once so every nested view scopes
+  // its attendance/batch queries to it — otherwise super-admin
+  // sessions can browse other tenants' batches via a forged ?batch UUID.
+  const { profile } = await getMyProfile();
+  const callerCompanyId = profile?.company_id ?? "";
+
   const sp = await searchParams;
   const batchId = sp.batch ?? null;
 
@@ -81,6 +88,7 @@ export default async function AttendanceReviewPage({
       <SingleBatchView
         supabase={supabase}
         batchId={batchId}
+        callerCompanyId={callerCompanyId}
         sp={sp}
       />
     );
@@ -95,10 +103,12 @@ export default async function AttendanceReviewPage({
 async function SingleBatchView({
   supabase,
   batchId,
+  callerCompanyId,
   sp,
 }: {
   supabase: Awaited<ReturnType<typeof createClient>>;
   batchId: string;
+  callerCompanyId: string;
   sp: Awaited<Params>;
 }) {
   const { data: rowsData } = await supabase
@@ -106,6 +116,7 @@ async function SingleBatchView({
     .select(
       "id, date, status, check_in, check_out, tardiness_minutes, early_leave_minutes, notes, employees(id, full_name, employee_code, pay_frequency)",
     )
+    .eq("company_id", callerCompanyId)
     .eq("import_batch_id", batchId)
     .order("date", { ascending: true })
     .order("employees(full_name)" as never, { ascending: true });

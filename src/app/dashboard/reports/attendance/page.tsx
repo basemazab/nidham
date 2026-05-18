@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getMyProfile } from "@/lib/permissions";
 
 type SearchParams = Promise<{
   year?: string;
@@ -68,17 +69,23 @@ export default async function AttendanceReportPage({
   // day as 'holiday' to take it out of the count once recorded).
   const expectedWorkdays = countNonFridays(year, month);
 
-  // Fetch in parallel — RLS scopes both to the user's company
+  // Scope both queries to the caller's company. RLS isn't enough on
+  // super-admin sessions (mig 038) — they'd see every tenant's rows.
+  const { profile } = await getMyProfile();
+  const callerCompanyId = profile?.company_id ?? "";
+
   const [employeesRes, attendanceRes] = await Promise.all([
     supabase
       .from("employees")
       .select("id, full_name, job_title")
+      .eq("company_id", callerCompanyId)
       .eq("status", "active")
       .order("full_name")
       .returns<Employee[]>(),
     supabase
       .from("attendance")
       .select("employee_id, status, tardiness_minutes, early_leave_minutes")
+      .eq("company_id", callerCompanyId)
       .gte("date", startDate)
       .lte("date", endDate)
       .returns<AttendanceRow[]>(),

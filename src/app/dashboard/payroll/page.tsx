@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getMyProfile } from "@/lib/permissions";
 import { formatEGP } from "@/lib/payroll";
 import { formatNumber } from "@/lib/format";
 
@@ -73,6 +74,11 @@ export default async function PayrollPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  // Scope every tenant-scoped query to the caller's company so a
+  // super-admin session doesn't pull other tenants' payroll into view.
+  const { profile } = await getMyProfile();
+  const callerCompanyId = profile?.company_id ?? "";
+
   const sp = await searchParams;
   // Filter periods by frequency from the URL (?freq=weekly|monthly).
   // "all" or missing -> show everything (default).
@@ -95,6 +101,7 @@ export default async function PayrollPage({
           .select(
             "id, year, month, frequency, start_date, end_date, status, working_days, approved_at, paid_at, created_at",
           )
+          .eq("company_id", callerCompanyId)
           .order("start_date", { ascending: false, nullsFirst: false })
           .order("year", { ascending: false })
           .order("month", { ascending: false })
@@ -103,6 +110,7 @@ export default async function PayrollPage({
           .select(
             "id, year, month, frequency, start_date, end_date, status, working_days, approved_at, paid_at, created_at",
           )
+          .eq("company_id", callerCompanyId)
           .eq("frequency", filter)
           .order("start_date", { ascending: false, nullsFirst: false })
           .order("year", { ascending: false })
@@ -111,11 +119,13 @@ export default async function PayrollPage({
     supabase
       .from("employees")
       .select("id", { count: "exact", head: true })
+      .eq("company_id", callerCompanyId)
       .eq("status", "active")
       .eq("pay_frequency", "monthly"),
     supabase
       .from("employees")
       .select("id", { count: "exact", head: true })
+      .eq("company_id", callerCompanyId)
       .eq("status", "active")
       .eq("pay_frequency", "weekly"),
     supabase.rpc("ytd_payroll_totals"),
@@ -131,6 +141,7 @@ export default async function PayrollPage({
   const { data: entries } = await supabase
     .from("payroll_entries")
     .select("period_id, net_salary")
+    .eq("company_id", callerCompanyId)
     .returns<AggRow[]>();
 
   const totals = new Map<string, { count: number; total: number }>();

@@ -84,18 +84,26 @@ export default async function ShiftsPage({
 }: {
   searchParams: Params;
 }) {
-  const { supabase } = await requireHRPage();
+  const { supabase, profile } = await requireHRPage();
   const sp = await searchParams;
+
+  // Scope shifts + rotations to the caller's company. While no
+  // super-admin SELECT bypass exists for these tables today, future
+  // policies could grant cross-tenant access, so the explicit filter
+  // is defense in depth.
+  const callerCompanyId = profile?.company_id ?? "";
 
   const [{ data: shifts }, { data: rotations }, rosterResult] = await Promise.all([
     supabase
       .from("shifts")
       .select("id, name, start_time, end_time, is_overnight, expected_hours, color, is_active")
+      .eq("company_id", callerCompanyId)
       .order("start_time")
       .returns<Shift[]>(),
     supabase
       .from("shift_rotations")
       .select("id, name, cycle_days, pattern, description")
+      .eq("company_id", callerCompanyId)
       .order("created_at", { ascending: false })
       .returns<Rotation[]>(),
     supabase.rpc("get_todays_roster"),

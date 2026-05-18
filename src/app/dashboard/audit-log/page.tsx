@@ -64,7 +64,7 @@ export default async function AuditLogPage({
 }: {
   searchParams: Params;
 }) {
-  const { supabase } = await requireHRPage();
+  const { supabase, profile } = await requireHRPage();
 
   // Audit log is an Enterprise feature (compliance + forensics value
   // scales with company size; SMBs on basic/pro don't need full
@@ -74,10 +74,15 @@ export default async function AuditLogPage({
   }
   const params = await searchParams;
 
+  // Scope the audit log to the caller's company — super-admin sessions
+  // can otherwise read every tenant's events via the mig 021 policy.
+  const callerCompanyId = profile?.company_id ?? "";
+
   // Build the query
   let q = supabase
     .from("audit_log")
     .select("id, actor_id, table_name, row_id, action, before_data, after_data, created_at")
+    .eq("company_id", callerCompanyId)
     .order("created_at", { ascending: false })
     .order("id", { ascending: false })
     .limit(PAGE_SIZE + 1);

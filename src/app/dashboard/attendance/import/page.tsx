@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getMyProfile } from "@/lib/permissions";
 import { importAttendance } from "./actions";
 import { SubmitButton } from "@/components/submit-button";
 
@@ -26,6 +27,11 @@ export default async function AttendanceImportPage({
 
   const params = await searchParams;
 
+  // Scope counts to the caller's company so super-admin sessions
+  // don't inflate the "active employees" badge with cross-tenant rows.
+  const { profile } = await getMyProfile();
+  const callerCompanyId = profile?.company_id ?? "";
+
   // Count employees with codes + split by pay_frequency so the mode
   // picker can show "X monthly · Y weekly" badges.
   const [
@@ -37,20 +43,24 @@ export default async function AttendanceImportPage({
     supabase
       .from("employees")
       .select("id", { count: "exact", head: true })
+      .eq("company_id", callerCompanyId)
       .eq("status", "active"),
     supabase
       .from("employees")
       .select("id", { count: "exact", head: true })
+      .eq("company_id", callerCompanyId)
       .eq("status", "active")
       .not("employee_code", "is", null),
     supabase
       .from("employees")
       .select("id", { count: "exact", head: true })
+      .eq("company_id", callerCompanyId)
       .eq("status", "active")
       .eq("pay_frequency", "monthly"),
     supabase
       .from("employees")
       .select("id", { count: "exact", head: true })
+      .eq("company_id", callerCompanyId)
       .eq("status", "active")
       .eq("pay_frequency", "weekly"),
   ]);

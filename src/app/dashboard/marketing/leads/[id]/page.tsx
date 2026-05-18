@@ -13,6 +13,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getMyProfile } from "@/lib/permissions";
 import { canUseFeature } from "@/lib/subscriptions-server";
 import { UpgradeRequired } from "@/components/upgrade-required";
 import {
@@ -126,6 +127,11 @@ export default async function LeadDetailPage({
     return <UpgradeRequired feature="marketing_studio" />;
   }
 
+  // Scope every list-style query to the caller's company — the customer
+  // row itself is fetched by an unguessable id so RLS is fine there.
+  const { profile } = await getMyProfile();
+  const callerCompanyId = profile?.company_id ?? "";
+
   const { data: customer } = await supabase
     .from("customers")
     .select("*")
@@ -140,6 +146,7 @@ export default async function LeadDetailPage({
         .select(
           "id, event_type, occurred_at, utm_source, utm_campaign, referrer, metadata",
         )
+        .eq("company_id", callerCompanyId)
         .eq("customer_id", id)
         .order("occurred_at", { ascending: false })
         .limit(50)
@@ -147,6 +154,7 @@ export default async function LeadDetailPage({
       supabase
         .from("interactions")
         .select("id, type, outcome, notes, date, created_at")
+        .eq("company_id", callerCompanyId)
         .eq("customer_id", id)
         .order("created_at", { ascending: false })
         .limit(50)
@@ -154,6 +162,7 @@ export default async function LeadDetailPage({
       supabase
         .from("employees")
         .select("id, full_name")
+        .eq("company_id", callerCompanyId)
         .order("full_name")
         .returns<EmployeeRow[]>(),
       customer.landing_page_id

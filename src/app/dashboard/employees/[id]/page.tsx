@@ -80,21 +80,25 @@ export default async function EditEmployeePage({ params, searchParams }: PagePro
   // employee snapshots an EOS gratuity and locks them out of the system.
   const { profile: currentProfile } = await getMyProfile();
   const isAdmin = currentProfile?.role === "admin";
+  const callerCompanyId = currentProfile?.company_id ?? "";
 
   // Fetch shifts + rotations for the assignment card + resolve today's
   // shift for the badge. Doing this here keeps the card a pure client
-  // component without its own DB call.
+  // component without its own DB call. Scope each list to the caller's
+  // company so the picker can't accidentally surface cross-tenant rows.
   const [{ data: shifts }, { data: rotations }, { data: todaysShiftId }] =
     await Promise.all([
       supabase
         .from("shifts")
         .select("id, name, start_time, end_time")
+        .eq("company_id", callerCompanyId)
         .eq("is_active", true)
         .order("start_time")
         .returns<{ id: string; name: string; start_time: string; end_time: string }[]>(),
       supabase
         .from("shift_rotations")
         .select("id, name, cycle_days")
+        .eq("company_id", callerCompanyId)
         .eq("is_active", true)
         .order("created_at", { ascending: false })
         .returns<{ id: string; name: string; cycle_days: number }[]>(),

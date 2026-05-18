@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getMyProfile } from "@/lib/permissions";
 import { createCustomer } from "../actions";
 
 type SearchParams = Promise<{ error?: string }>;
@@ -20,10 +21,16 @@ export default async function NewCustomerPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  // Scope the employees dropdown to the caller's company so a super-admin
+  // session can't accidentally assign cross-tenant employees as owners.
+  const { profile } = await getMyProfile();
+  const callerCompanyId = profile?.company_id ?? "";
+
   // Load active employees for the "assigned to" dropdown
   const { data: employees } = await supabase
     .from("employees")
     .select("id, full_name")
+    .eq("company_id", callerCompanyId)
     .eq("status", "active")
     .order("full_name")
     .returns<EmployeeOption[]>();

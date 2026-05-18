@@ -5,6 +5,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getMyProfile } from "@/lib/permissions";
 import { canUseFeature } from "@/lib/subscriptions-server";
 import { UpgradeRequired } from "@/components/upgrade-required";
 import { runAudienceBuilder } from "../../actions";
@@ -66,6 +67,11 @@ export default async function PersonasPage({ params, searchParams }: PageProps) 
     return <UpgradeRequired feature="marketing_studio" />;
   }
 
+  // Scope personas to caller's company so super-admin sessions don't
+  // bleed cross-tenant rows via a forged project_id.
+  const { profile } = await getMyProfile();
+  const callerCompanyId = profile?.company_id ?? "";
+
   const [projectRes, personasRes] = await Promise.all([
     supabase
       .from("marketing_projects")
@@ -75,6 +81,7 @@ export default async function PersonasPage({ params, searchParams }: PageProps) 
     supabase
       .from("marketing_personas")
       .select("*")
+      .eq("company_id", callerCompanyId)
       .eq("project_id", id)
       .order("priority")
       .returns<Persona[]>(),

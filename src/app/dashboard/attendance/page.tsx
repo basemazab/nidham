@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getMyProfile } from "@/lib/permissions";
 import {
   saveAttendance,
   bulkSaveAttendance,
@@ -48,10 +49,16 @@ export default async function AttendancePage({
   const todayIso = new Date().toISOString().split("T")[0];
   const selectedDate = params.date ?? todayIso;
 
+  // Scope everything to the caller's company explicitly so super-admin
+  // sessions (mig 038) don't bleed rows from other tenants into the grid.
+  const { profile } = await getMyProfile();
+  const callerCompanyId = profile?.company_id ?? "";
+
   // Active employees only
   const { data: employeesData } = await supabase
     .from("employees")
     .select("id, full_name, job_title, department")
+    .eq("company_id", callerCompanyId)
     .eq("status", "active")
     .order("full_name")
     .returns<Employee[]>();
@@ -71,6 +78,7 @@ export default async function AttendancePage({
   const { data: existing } = await supabase
     .from("attendance")
     .select("employee_id, status, tardiness_minutes, early_leave_minutes")
+    .eq("company_id", callerCompanyId)
     .eq("date", selectedDate)
     .returns<
       Array<{

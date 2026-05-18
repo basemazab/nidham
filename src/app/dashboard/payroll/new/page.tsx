@@ -44,6 +44,9 @@ export default async function NewPayrollPage({
     .single<{ company_id: string }>();
 
   const companyId = profile?.company_id ?? null;
+  // Used to scope the employee count queries below — a super-admin
+  // session would otherwise see employees across every tenant here.
+  const callerCompanyId = companyId ?? "";
 
   const [{ data: settings }, monthlyCountRes, weeklyCountRes, missingSalaryRes] =
     await Promise.all([
@@ -57,16 +60,19 @@ export default async function NewPayrollPage({
       supabase
         .from("employees")
         .select("id", { count: "exact", head: true })
+        .eq("company_id", callerCompanyId)
         .eq("status", "active")
         .eq("pay_frequency", "monthly"),
       supabase
         .from("employees")
         .select("id", { count: "exact", head: true })
+        .eq("company_id", callerCompanyId)
         .eq("status", "active")
         .eq("pay_frequency", "weekly"),
       supabase
         .from("employees")
         .select("id", { count: "exact", head: true })
+        .eq("company_id", callerCompanyId)
         .eq("status", "active")
         .or("basic_salary.is.null,basic_salary.eq.0"),
     ]);

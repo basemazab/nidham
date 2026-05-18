@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getMyProfile } from "@/lib/permissions";
 import { updateContract, deleteContract } from "../actions";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 
@@ -37,10 +38,16 @@ export default async function EditContractPage({ params, searchParams }: PagePro
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  // Scope the dropdown lookups to the caller's company (the contract
+  // itself is fetched by id which is unguessable, so RLS-only scoping
+  // is fine for that single row).
+  const { profile } = await getMyProfile();
+  const callerCompanyId = profile?.company_id ?? "";
+
   const [contractRes, customersRes, employeesRes] = await Promise.all([
     supabase.from("contracts").select("*").eq("id", id).single<Contract>(),
-    supabase.from("customers").select("id, full_name").order("full_name").returns<Option[]>(),
-    supabase.from("employees").select("id, full_name").eq("status", "active").order("full_name").returns<Option[]>(),
+    supabase.from("customers").select("id, full_name").eq("company_id", callerCompanyId).order("full_name").returns<Option[]>(),
+    supabase.from("employees").select("id, full_name").eq("company_id", callerCompanyId).eq("status", "active").order("full_name").returns<Option[]>(),
   ]);
 
   if (!contractRes.data) notFound();

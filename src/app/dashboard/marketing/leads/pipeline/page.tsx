@@ -10,6 +10,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getMyProfile } from "@/lib/permissions";
 import { canUseFeature } from "@/lib/subscriptions-server";
 import { UpgradeRequired } from "@/components/upgrade-required";
 import { PipelineBoard } from "./pipeline-board";
@@ -38,11 +39,17 @@ export default async function PipelinePage() {
     return <UpgradeRequired feature="marketing_studio" />;
   }
 
+  // Scope to caller's company so super-admin sessions don't see leads
+  // across every tenant in the kanban view.
+  const { profile } = await getMyProfile();
+  const callerCompanyId = profile?.company_id ?? "";
+
   const { data: leadsData } = await supabase
     .from("customers")
     .select(
       "id, full_name, phone, whatsapp, status, source, first_utm_source, first_utm_campaign, estimated_value, last_contacted_at, created_at",
     )
+    .eq("company_id", callerCompanyId)
     .order("created_at", { ascending: false })
     .limit(500)
     .returns<PipelineLead[]>();

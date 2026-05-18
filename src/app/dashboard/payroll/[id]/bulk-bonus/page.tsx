@@ -10,7 +10,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { requireHRPage } from "@/lib/permissions";
+import { getMyProfile, requireHRPage } from "@/lib/permissions";
 import { applyBulkBonus } from "../../actions";
 import { formatEGP } from "@/lib/payroll";
 
@@ -48,6 +48,11 @@ export default async function BulkBonusPage({
   await requireHRPage();
   const supabase = await createClient();
 
+  // Scope the entries list to the caller's company so a super-admin
+  // session can't load another tenant's period via a forged periodId.
+  const { profile } = await getMyProfile();
+  const callerCompanyId = profile?.company_id ?? "";
+
   const [periodRes, entriesRes] = await Promise.all([
     supabase
       .from("payroll_periods")
@@ -59,6 +64,7 @@ export default async function BulkBonusPage({
       .select(
         "id, bonuses, employees(full_name, job_title, department)",
       )
+      .eq("company_id", callerCompanyId)
       .eq("period_id", periodId)
       .returns<EntryWithEmployee[]>(),
   ]);

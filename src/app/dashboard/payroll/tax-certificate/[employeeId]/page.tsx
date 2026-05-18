@@ -13,7 +13,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { requireHRPage } from "@/lib/permissions";
+import { getMyProfile, requireHRPage } from "@/lib/permissions";
 import { formatEGP } from "@/lib/payroll";
 import { DownloadPdfButton } from "@/components/download-pdf-button";
 
@@ -66,6 +66,11 @@ export default async function TaxCertificatePage({
   await requireHRPage();
   const supabase = await createClient();
 
+  // Scope tenant lookups so a super-admin session can't pull another
+  // tenant's payroll periods just because they know an employee UUID.
+  const { profile } = await getMyProfile();
+  const callerCompanyId = profile?.company_id ?? "";
+
   const year = yearRaw ? parseInt(yearRaw, 10) : new Date().getFullYear();
   if (!Number.isFinite(year) || year < 2000 || year > 2100) {
     redirect(`/dashboard/payroll/tax-certificate/${employeeId}`);
@@ -94,6 +99,7 @@ export default async function TaxCertificatePage({
       .select(
         "id, start_date, end_date, year, month, status, payroll_entries(gross_salary, social_insurance, income_tax, bonuses, net_salary, employee_id)",
       )
+      .eq("company_id", callerCompanyId)
       .eq("year", year)
       .in("status", ["approved", "paid"])
       .order("month")
@@ -129,6 +135,7 @@ export default async function TaxCertificatePage({
   const { data: yearsData } = await supabase
     .from("payroll_periods")
     .select("year")
+    .eq("company_id", callerCompanyId)
     .order("year", { ascending: false });
   const availableYears = Array.from(
     new Set((yearsData ?? []).map((y) => y.year as number)),

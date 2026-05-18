@@ -15,6 +15,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getMyProfile } from "@/lib/permissions";
 import { canUseFeature } from "@/lib/subscriptions-server";
 import { UpgradeRequired } from "@/components/upgrade-required";
 
@@ -104,12 +105,18 @@ export default async function LeadsInbox({
   const staleOnly = sp.stale === "1";
   const searchQuery = (sp.q ?? "").trim();
 
+  // Scope to the caller's company — super-admin sessions can otherwise
+  // pull customers + landing_pages across every tenant.
+  const { profile } = await getMyProfile();
+  const callerCompanyId = profile?.company_id ?? "";
+
   // Build query
   let q = supabase
     .from("customers")
     .select(
       "id, full_name, phone, whatsapp, email, status, source, first_utm_source, first_utm_campaign, landing_page_id, estimated_value, last_contacted_at, created_at, assigned_to",
     )
+    .eq("company_id", callerCompanyId)
     .order("created_at", { ascending: false })
     .limit(200);
 
@@ -165,6 +172,7 @@ export default async function LeadsInbox({
     const { data: pagesData } = await supabase
       .from("landing_pages")
       .select("id, name")
+      .eq("company_id", callerCompanyId)
       .in("id", pageIds)
       .returns<LPMini[]>();
     pageNames = new Map((pagesData ?? []).map((p) => [p.id, p.name]));

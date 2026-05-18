@@ -5,6 +5,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getMyProfile } from "@/lib/permissions";
 import { canUseFeature } from "@/lib/subscriptions-server";
 import { UpgradeRequired } from "@/components/upgrade-required";
 import { runAdCopyGenerator } from "../../actions";
@@ -61,6 +62,10 @@ export default async function AdsPage({ params, searchParams }: PageProps) {
     return <UpgradeRequired feature="marketing_studio" />;
   }
 
+  // Scope personas + creatives to caller's company.
+  const { profile } = await getMyProfile();
+  const callerCompanyId = profile?.company_id ?? "";
+
   const [projectRes, personasRes, creativesRes] = await Promise.all([
     supabase
       .from("marketing_projects")
@@ -70,12 +75,14 @@ export default async function AdsPage({ params, searchParams }: PageProps) {
     supabase
       .from("marketing_personas")
       .select("id, name")
+      .eq("company_id", callerCompanyId)
       .eq("project_id", id)
       .order("priority")
       .returns<Persona[]>(),
     supabase
       .from("marketing_ad_creatives")
       .select("*")
+      .eq("company_id", callerCompanyId)
       .eq("project_id", id)
       .order("created_at", { ascending: false })
       .returns<Creative[]>(),

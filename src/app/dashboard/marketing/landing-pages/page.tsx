@@ -10,6 +10,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getMyProfile } from "@/lib/permissions";
 import { canUseFeature } from "@/lib/subscriptions-server";
 import { UpgradeRequired } from "@/components/upgrade-required";
 import { createLandingPage } from "./actions";
@@ -65,18 +66,25 @@ export default async function LandingPagesHub({
   const sp = await searchParams;
   const errorMsg = sp.error ? decodeURIComponent(sp.error) : null;
 
+  // Scope to the caller's company — super-admin sessions can otherwise
+  // read landing_pages + marketing_projects across every tenant.
+  const { profile } = await getMyProfile();
+  const callerCompanyId = profile?.company_id ?? "";
+
   const [pagesRes, projectsRes] = await Promise.all([
     supabase
       .from("landing_pages")
       .select(
         "id, slug, name, template, headline, cta_action, is_active, views_count, conversions_count, updated_at",
       )
+      .eq("company_id", callerCompanyId)
       .eq("is_active", true)
       .order("updated_at", { ascending: false })
       .returns<LPRow[]>(),
     supabase
       .from("marketing_projects")
       .select("id, name")
+      .eq("company_id", callerCompanyId)
       .eq("status", "active")
       .order("name")
       .returns<ProjectRow[]>(),

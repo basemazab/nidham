@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getMyProfile } from "@/lib/permissions";
 import { formatEGP } from "@/lib/format";
 
 type Contract = {
@@ -27,11 +28,17 @@ export default async function ContractsPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  // Scope to the caller's company — super-admin sessions can read
+  // contracts across every tenant by virtue of mig 038-style policies.
+  const { profile } = await getMyProfile();
+  const callerCompanyId = profile?.company_id ?? "";
+
   const { data: contracts } = await supabase
     .from("contracts")
     .select(
       "id, contract_number, service_type, start_date, end_date, contract_value, payment_terms, status, customers:customer_id(full_name), employees:assigned_to(full_name)",
     )
+    .eq("company_id", callerCompanyId)
     .order("end_date", { ascending: true })
     .returns<Contract[]>();
 
