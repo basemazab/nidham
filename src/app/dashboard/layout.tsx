@@ -94,7 +94,7 @@ export default async function DashboardLayout({
   const featureOverrides = await getMyFeatureOverrides();
 
   return (
-    <div className="flex flex-col md:flex-row min-h-screen bg-slate-50">
+    <div className="flex flex-col md:flex-row min-h-screen bg-slate-50 dark:bg-slate-950">
       <DashboardSidebar
         userName={userName}
         companyName={companyName}
@@ -105,6 +105,8 @@ export default async function DashboardLayout({
         daysLeft={daysLeft}
         featureOverrides={featureOverrides}
       />
+      {/* min-w-0 prevents flex children from forcing horizontal scroll
+          when they contain wide content like tables or pre tags. */}
       <div className="flex-1 min-w-0">{children}</div>
     </div>
   );

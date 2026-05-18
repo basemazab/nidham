@@ -55,6 +55,57 @@ body {
   color: var(--foreground);
   font-family: var(--font-tajawal), Arial, Helvetica, sans-serif;
   transition: background-color 200ms ease, color 200ms ease;
+  /* iOS Safari respects safe-area-inset-bottom for the home-indicator
+     bar; without this padding, fixed/sticky bottom nav can be tucked
+     under the gesture area. Also smooths sticky-header behaviour. */
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+/* ---------------------------------------------------------------------------
+   Mobile / Touch polish
+   ---------------------------------------------------------------------------
+   - Disable the gray tap-highlight rectangle iOS draws on Links / buttons.
+     Replaced visually by our own hover / active utility classes (sufficient
+     feedback without the harsh box).
+   - Set a minimum 44×44 touch target on bare <button> + role=button so we
+     don't ship sub-Apple-HIG sized hit areas inadvertently. Components that
+     intentionally render smaller (icon chip in a row, ✕ on a thumbnail) can
+     opt out by adding `.min-touch-none`.
+*/
+@media (hover: none) and (pointer: coarse) {
+  a, button, [role="button"], summary {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Tables — wrap wide ones in <div class="table-scroll"> ... </div>
+   so they scroll horizontally on mobile instead of forcing the entire
+   page to scroll. The thin scrollbar styling makes the affordance
+   visible without dominating the layout.
+   --------------------------------------------------------------------------- */
+.table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+.table-scroll table {
+  min-width: 600px; /* below this, horizontal scroll kicks in */
+}
+
+/* ---------------------------------------------------------------------------
+   Reduced motion — honor users who set prefers-reduced-motion. We don't
+   strip every animation (loading spinners still spin), just the ones
+   that are decorative (hover transforms, theme transition, etc.).
+   --------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* ----------------------------------------------------------------------------
