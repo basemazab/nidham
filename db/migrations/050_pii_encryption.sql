@@ -139,9 +139,10 @@ begin
     return pgp_sym_decrypt(ciphertext, public._pii_key());
   exception when others then
     -- Hard-fail-mode would crash payslip rendering for one bad row.
-    -- Soft-fail: return a sentinel so the UI can show "تعذّر فك تشفير
-    -- هذه البيانة — راجع المدير" rather than blowing up.
-    return '⚠ decryption-error';
+    -- Soft-fail: return an ASCII sentinel so the UI can show "تعذّر
+    -- فك تشفير هذه البيانة - راجع المدير" rather than blowing up.
+    -- ASCII keeps the value Supabase-SQL-Editor-safe when echoed.
+    return 'decryption-error';
   end;
 end;
 $$;
@@ -162,15 +163,13 @@ alter table public.employees
   add column if not exists bank_name_encrypted                bytea,
   add column if not exists social_insurance_number_encrypted  bytea;
 
-comment on column public.employees.national_id_encrypted is
-  'pgp_sym_encrypt(national_id) — encrypted at-rest via mig 050. ' ||
-  'Read via the employees_with_pii view, never directly.';
-comment on column public.employees.bank_account_number_encrypted is
-  'pgp_sym_encrypt(bank_account_number) — encrypted at-rest via mig 050.';
-comment on column public.employees.bank_name_encrypted is
-  'pgp_sym_encrypt(bank_name) — encrypted at-rest via mig 050.';
-comment on column public.employees.social_insurance_number_encrypted is
-  'pgp_sym_encrypt(social_insurance_number) — encrypted at-rest via mig 050.';
+-- Single-line ASCII comments — multi-line `'foo ' || 'bar'` concatenation
+-- inside COMMENT ON tripped a syntax error in Supabase's SQL Editor for
+-- one operator. Cheaper to keep these flat than to debug the editor.
+comment on column public.employees.national_id_encrypted is 'pgp_sym_encrypt of national_id. Read via employees_with_pii view.';
+comment on column public.employees.bank_account_number_encrypted is 'pgp_sym_encrypt of bank_account_number.';
+comment on column public.employees.bank_name_encrypted is 'pgp_sym_encrypt of bank_name.';
+comment on column public.employees.social_insurance_number_encrypted is 'pgp_sym_encrypt of social_insurance_number.';
 
 
 -- ----------------------------------------------------------------------------
@@ -304,11 +303,7 @@ select
   pii_decrypt(e.social_insurance_number_encrypted) as social_insurance_number_dec
 from public.employees e;
 
-comment on view public.employees_with_pii is
-  'Employees with decrypted PII. Use *_dec columns (national_id_dec, ' ||
-  'bank_account_number_dec, etc.) for read paths that need the original ' ||
-  'plaintext: payslip / tax cert / bank export / employment contract. ' ||
-  'RLS is inherited from the underlying table.';
+comment on view public.employees_with_pii is 'Employees with decrypted PII. Use *_dec columns for plaintext reads (payslip / tax cert / bank export / forms). RLS inherited from employees.';
 
 
 -- ----------------------------------------------------------------------------
