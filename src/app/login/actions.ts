@@ -1,8 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { checkLoginRateLimit } from "@/lib/rate-limit";
 
 // Map Supabase auth error codes / messages to Arabic strings the user
 // can act on, without leaking enumeration oracles (e.g. "this email is
@@ -23,11 +25,53 @@ function arabicizeAuthError(message: string): string {
   return "حصلت مشكلة في التسجيل — حاول تاني";
 }
 
+/**
+ * Resolve the caller's IP from Vercel's edge headers. We try the standard
+ * forwarded-for chain first; fall back to a constant when we can't tell
+ * (local dev). The constant means rate-limit buckets collapse to one
+ * shared bucket on localhost — fine for testing, terrible for production
+ * — and that's exactly what we want (anyone in production has an IP).
+ */
+async function getClientIp(): Promise<string> {
+  const h = await headers();
+  const xff = h.get("x-forwarded-for");
+  if (xff) return xff.split(",")[0].trim();
+  const real = h.get("x-real-ip");
+  if (real) return real.trim();
+  return "unknown";
+}
+
+/**
+ * Convert "retry after X seconds" to a readable Arabic phrase. Avoids
+ * shipping "120 seconds" when "دقيقتين" is friendlier.
+ */
+function arabicRetryAfter(seconds: number): string {
+  if (seconds < 60) return `بعد ${seconds} ثانية`;
+  const minutes = Math.ceil(seconds / 60);
+  if (minutes < 60) return `بعد ${minutes} دقيقة`;
+  const hours = Math.ceil(minutes / 60);
+  return `بعد ${hours} ساعة`;
+}
+
 export async function login(formData: FormData) {
+  const email = (formData.get("email") as string | null) ?? "";
+  const ip = await getClientIp();
+
+  // Rate-limit BEFORE talking to Supabase. A blocked attacker shouldn't
+  // get to consume Supabase auth quota either.
+  const rl = checkLoginRateLimit(ip, email);
+  if (!rl.ok) {
+    redirect(
+      `/login?error=${encodeURIComponent(
+        `حاولت كتير في وقت قصير — جرّب ${arabicRetryAfter(rl.retryAfterSeconds)}`,
+      )}`,
+    );
+  }
+
   const supabase = await createClient();
 
   const { error } = await supabase.auth.signInWithPassword({
-    email: formData.get("email") as string,
+    email,
     password: formData.get("password") as string,
   });
 

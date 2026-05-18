@@ -1,11 +1,24 @@
-// In-process token-bucket rate limiter, scoped per user.
+// In-process token-bucket rate limiter, scoped per key.
 //
-// Used to keep AI endpoints (Gemini-backed) from being drained by a
-// single account. This is a stopgap -- a single Next.js instance can
-// only enforce limits across the requests it sees, so a horizontally-
-// scaled deployment would need a shared store (Upstash, Redis). For
-// Vercel's single-function model and our current scale it's enough to
-// stop accidental loops + intentional abuse from a single session.
+// Originally introduced for AI endpoints (Gemini-backed) to keep a
+// single account from draining the model quota. As of 2026-05-18, also
+// used by the /login server action to slow down brute-force attempts
+// (P0 #3 in PRODUCTION_READINESS_AUDIT.md §4).
+//
+// Caveat: this is in-memory. A horizontally-scaled deployment (Vercel
+// runs N concurrent function instances) gets N separate buckets — so
+// the *effective* limit is roughly limit × N. That's still strictly
+// better than no limit, but proper protection requires a shared store
+// (Upstash Redis, Vercel KV). When the team migrates, swap the BUCKETS
+// Map for `@upstash/ratelimit` — the API is intentionally similar:
+//
+//   import { Ratelimit } from "@upstash/ratelimit";
+//   import { Redis } from "@upstash/redis";
+//   const rl = new Ratelimit({
+//     redis: Redis.fromEnv(),
+//     limiter: Ratelimit.slidingWindow(10, "1 h"),
+//   });
+//   const { success, reset } = await rl.limit(key);
 
 type Bucket = {
   // Tokens remaining in the current window.
@@ -65,4 +78,50 @@ export function checkRateLimit(
 
   b.tokens -= 1;
   return { ok: true, remaining: b.tokens, resetAt: b.resetAt };
+}
+
+// ----------------------------------------------------------------------------
+// Login-attempt limiter — narrower, more aggressive defaults.
+//
+// We check the same attempt against TWO buckets:
+//   1) the IP        — stops a brute-forcer from one IP cycling passwords
+//   2) the email     — stops the same attacker rotating IPs to hit one
+//                      victim account
+// Whichever runs out first wins. The email-keyed bucket gets a stricter
+// limit because we accept some false positives there (e.g. shared family
+// device where two people try wrong passwords once each — 5 attempts /
+// 15 min is plenty of headroom).
+//
+// Returns the SAME shape as checkRateLimit so the caller can pattern-
+// match on `ok`. On block, the suggested response is a 429 / redirect
+// with `retryAfterSeconds` so the UI can render "حاول تاني بعد 4 دقايق".
+//
+// The reason this lives in a separate function — not a parametrised
+// checkRateLimit call — is so the buckets stay distinct from AI's. A
+// busy HR user calling 10 AI screenings doesn't drain their login
+// budget.
+// ----------------------------------------------------------------------------
+export function checkLoginRateLimit(
+  ip: string,
+  email: string | null | undefined,
+): RateLimitResult {
+  // IP bucket: 10 attempts per hour. Captures the "spray-and-pray" style
+  // bot that tries common passwords across many emails from one IP.
+  const ipResult = checkRateLimit(`login:ip:${ip}`, 10, 60 * 60_000);
+  if (!ipResult.ok) return ipResult;
+
+  // Email bucket: 5 attempts per 15 min. Captures the "targeted attack"
+  // style where the attacker has a victim's email and rotates IPs.
+  // Skipped if no email — the form requires it but malformed payloads
+  // could have null.
+  if (email && email.trim()) {
+    const emailResult = checkRateLimit(
+      `login:email:${email.trim().toLowerCase()}`,
+      5,
+      15 * 60_000,
+    );
+    if (!emailResult.ok) return emailResult;
+  }
+
+  return ipResult;
 }
