@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import { Tajawal, Cairo, Reem_Kufi } from "next/font/google";
+import { Suspense } from "react";
+import { Toaster } from "sonner";
 import "./globals.css";
+import { UrlToasts } from "@/components/url-toasts";
 
 const tajawal = Tajawal({
   variable: "--font-tajawal",
@@ -70,7 +73,31 @@ export default function RootLayout({
       dir="rtl"
       className={`${tajawal.variable} ${cairo.variable} ${reemKufi.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col font-sans">{children}</body>
+      <body className="min-h-full flex flex-col font-sans">
+        {children}
+        {/* Sonner toaster — top-center so RTL feels natural. richColors
+            gives success / error a subtle tint instead of the plain
+            dark default. Suspense wraps the URL reader because
+            useSearchParams suspends during navigation. */}
+        <Toaster
+          position="top-center"
+          dir="rtl"
+          richColors
+          expand={false}
+          closeButton={false}
+          toastOptions={{
+            classNames: {
+              toast:
+                "font-cairo !shadow-lg !rounded-2xl !border !px-4 !py-3 !text-sm",
+              title: "font-bold",
+              description: "text-slate-600",
+            },
+          }}
+        />
+        <Suspense fallback={null}>
+          <UrlToasts />
+        </Suspense>
+      </body>
     </html>
   );
 }
