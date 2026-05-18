@@ -1,12 +1,18 @@
 "use client";
 
 // Global error boundary. Next.js routes unhandled exceptions through
-// here. We log to the console for the developer + show a friendly
-// Arabic message with a Retry button -- the previous behaviour was
-// Next's English default error screen, which looks broken in an
-// Arabic product and gives the user nothing actionable.
+// here. We:
+//   1) ship the error to Sentry (if the SDK is configured) so the team
+//      gets paged in production,
+//   2) log to console for local dev,
+//   3) show a friendly Arabic UI with a Retry button + the Sentry digest
+//      so support can match the user's report to a specific event.
+//
+// Previously this just console.error()'d the issue — Sentry capture
+// was P0 #5 in PRODUCTION_READINESS_AUDIT.md.
 
 import { useEffect } from "react";
+import * as Sentry from "@sentry/nextjs";
 
 export default function GlobalError({
   error,
@@ -16,6 +22,10 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
+    // Capture to Sentry. If the SDK isn't initialised (missing DSN), this
+    // is a silent no-op — no exception bubbles up.
+    Sentry.captureException(error);
+
     // eslint-disable-next-line no-console
     console.error("Unhandled error in route:", error);
   }, [error]);
