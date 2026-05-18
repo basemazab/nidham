@@ -95,7 +95,21 @@ export async function signup(formData: FormData) {
     );
   }
 
-  const { error } = await supabase.auth.signUp({
+  // PDPL Article 12: lawful basis = consent. The signup form has a
+  // mandatory checkbox; an HTTP-level forge (curl with no consent) must
+  // still be rejected server-side. We store the consent version + the
+  // timestamp on profiles below.
+  const consent = formData.get("consent");
+  const consentVersion = formData.get("consent_version") as string | null;
+  if (consent !== "on" && consent !== "true" && consent !== "1") {
+    redirect(
+      `/signup?error=${encodeURIComponent(
+        "لازم توافق على سياسة الخصوصية عشان تكمل التسجيل",
+      )}`,
+    );
+  }
+
+  const { data, error } = await supabase.auth.signUp({
     email: formData.get("email") as string,
     password,
     options: {
@@ -108,6 +122,22 @@ export async function signup(formData: FormData) {
 
   if (error) {
     redirect(`/signup?error=${encodeURIComponent(arabicizeAuthError(error.message))}`);
+  }
+
+  // Stamp the consent on the freshly-created profile. The handle_new_user
+  // trigger (mig 001) inserts the profile row synchronously, so by the
+  // time signUp() returns we can UPDATE it. If something raced and the
+  // row isn't there yet, we redirect successfully anyway — the user can
+  // still log in, and the consent prompt logic (TODO) will re-ask on
+  // next session.
+  if (data?.user?.id) {
+    await supabase
+      .from("profiles")
+      .update({
+        consent_given_at: new Date().toISOString(),
+        consent_version: consentVersion ?? "v1.0",
+      })
+      .eq("id", data.user.id);
   }
 
   revalidatePath("/", "layout");

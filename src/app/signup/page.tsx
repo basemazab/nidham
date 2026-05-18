@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { signup } from "../login/actions";
 import { SubmitButton } from "@/components/submit-button";
+import { POLICY_VERSION } from "../privacy/page";
 
 type SearchParams = Promise<{ error?: string }>;
 
@@ -95,18 +96,45 @@ export default async function SignupPage({
                 htmlFor="password"
                 className="block text-sm font-medium text-slate-700 mb-2 font-cairo"
               >
-                كلمة السر <span className="text-slate-400 text-xs">(6 حروف على الأقل)</span>
+                كلمة السر <span className="text-slate-400 text-xs">(8 حروف على الأقل)</span>
               </label>
               <input
                 id="password"
                 name="password"
                 type="password"
                 required
-                minLength={6}
+                minLength={8}
                 autoComplete="new-password"
                 className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none transition text-slate-900"
               />
             </div>
+
+            {/* PDPL 151/2020 Article 12 — explicit, recorded consent. The
+                checkbox is `required` so the form won't submit without it,
+                and the server action re-validates (a curl with no consent
+                gets rejected). consent_version is hidden so we record
+                exactly which policy version the user agreed to. */}
+            <input type="hidden" name="consent_version" value={POLICY_VERSION} />
+            <label className="flex items-start gap-2 text-sm text-slate-700 font-cairo cursor-pointer">
+              <input
+                type="checkbox"
+                name="consent"
+                value="on"
+                required
+                className="mt-1 w-4 h-4 rounded border-slate-300 text-brand-cyan focus:ring-brand-cyan/40 cursor-pointer"
+              />
+              <span>
+                أوافق على{" "}
+                <Link
+                  href="/privacy"
+                  target="_blank"
+                  className="text-brand-cyan-dark font-bold hover:underline"
+                >
+                  سياسة الخصوصية
+                </Link>
+                {" "}وعلى معالجة بيانات شركتي والموظفين وفقاً لقانون 151/2020.
+              </span>
+            </label>
 
             <SubmitButton
               loadingText="جاري إنشاء الحساب..."

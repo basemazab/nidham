@@ -1625,9 +1625,15 @@ function Footer() {
 
       <div className="max-w-6xl mx-auto mt-10 pt-6 border-t border-slate-800 flex flex-col md:flex-row justify-between items-center gap-3 text-xs">
         <p className="font-cairo">© 2026 Nidham. كل الحقوق محفوظة.</p>
-        <p className="font-mono tracking-wider text-slate-500">
-          BETA · v0.1 · BUILT IN DAMIETTA, EGYPT
-        </p>
+        <div className="flex items-center gap-4 font-cairo">
+          <Link href="/privacy" className="hover:text-white transition">
+            سياسة الخصوصية
+          </Link>
+          <span className="text-slate-700">·</span>
+          <span className="font-mono tracking-wider text-slate-500">
+            BETA · v0.1 · BUILT IN DAMIETTA, EGYPT
+          </span>
+        </div>
       </div>
     </footer>
   );
