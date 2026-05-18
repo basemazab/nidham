@@ -92,23 +92,41 @@ export async function resolveFormContext(opts: {
 
   // Employee (only if pre-filled mode).
   //
-  // Read from the PII view (mig 050) so national_id and
-  // social_insurance_number come back decrypted as `*_dec` columns. The
-  // FormEmployee type pre-dates the encryption migration, so we alias
-  // the _dec columns back to the original names PostgREST-side via the
-  // `national_id:national_id_dec` syntax — keeps the downstream form
-  // templates unchanged.
+  // Two-step fetch:
+  //   1) Main row from the employees TABLE — RLS through PostgREST is
+  //      proven on the base table.
+  //   2) Decrypted PII (national_id, social_insurance_number) from the
+  //      employees_with_pii VIEW. The view doesn't always pass RLS through
+  //      cleanly in production (see employees/[id]/page.tsx note), so we
+  //      query it separately and tolerate a null response — the form still
+  //      renders with blank PII rather than 404'ing the whole page.
   let employee: FormEmployee | null = null;
   const empId = opts.employeeId?.trim();
   if (empId && /^[0-9a-f-]{36}$/i.test(empId)) {
-    const { data } = await supabase
-      .from("employees_with_pii")
+    const { data: base } = await supabase
+      .from("employees")
       .select(
-        "id, full_name, employee_code, job_title, department, phone, email, hire_date, basic_salary, housing_allowance, transport_allowance, other_allowances, incentive_allowance, pay_frequency, national_id:national_id_dec, social_insurance_number:social_insurance_number_dec",
+        "id, full_name, employee_code, job_title, department, phone, email, hire_date, basic_salary, housing_allowance, transport_allowance, other_allowances, incentive_allowance, pay_frequency",
       )
       .eq("id", empId)
-      .maybeSingle<FormEmployee>();
-    if (data) employee = data;
+      .maybeSingle<Omit<FormEmployee, "national_id" | "social_insurance_number">>();
+
+    if (base) {
+      const { data: pii } = await supabase
+        .from("employees_with_pii")
+        .select("national_id_dec, social_insurance_number_dec")
+        .eq("id", empId)
+        .maybeSingle<{
+          national_id_dec: string | null;
+          social_insurance_number_dec: string | null;
+        }>();
+
+      employee = {
+        ...base,
+        national_id: pii?.national_id_dec ?? null,
+        social_insurance_number: pii?.social_insurance_number_dec ?? null,
+      };
+    }
   }
 
   // Today + reference number

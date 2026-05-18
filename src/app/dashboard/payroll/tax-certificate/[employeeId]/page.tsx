@@ -82,19 +82,20 @@ export default async function TaxCertificatePage({
       p_employee_id: employeeId,
       p_year: year,
     }),
-    // Read through employees_with_pii (mig 050) so national_id comes back
-    // decrypted. PostgREST `name:source` aliases `national_id_dec` back
-    // to `national_id` for downstream code.
+    // Two-step pattern: read main employee from the TABLE (RLS proven),
+    // splice in decrypted national_id from the VIEW below if it
+    // returns. Reading directly from the view in this position dropped
+    // RLS context for the authenticated user — see employees/[id]/page.tsx
+    // note for details.
     supabase
-      .from("employees_with_pii")
-      .select("full_name, job_title, department, hire_date, national_id:national_id_dec, basic_salary")
+      .from("employees")
+      .select("full_name, job_title, department, hire_date, basic_salary")
       .eq("id", employeeId)
       .single<{
         full_name: string;
         job_title: string | null;
         department: string | null;
         hire_date: string | null;
-        national_id: string | null;
         basic_salary: number | null;
       }>(),
     supabase
@@ -121,7 +122,20 @@ export default async function TaxCertificatePage({
   ]);
 
   if (!employeeRes.data) notFound();
-  const employee = employeeRes.data;
+
+  // Splice in decrypted national_id from the view. Best-effort: if the
+  // view returns null (RLS quirk), we render the certificate with a
+  // blank national_id rather than 404'ing the page.
+  const { data: pii } = await supabase
+    .from("employees_with_pii")
+    .select("national_id_dec")
+    .eq("id", employeeId)
+    .maybeSingle<{ national_id_dec: string | null }>();
+
+  const employee = {
+    ...employeeRes.data,
+    national_id: pii?.national_id_dec ?? null,
+  };
 
   const certArr = (certRes.data ?? []) as CertRow[];
   const cert = certArr[0] ?? null;
