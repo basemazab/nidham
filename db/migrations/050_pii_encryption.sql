@@ -30,30 +30,82 @@
 -- SETUP — required ONCE before this migration runs
 -- ──────────────────────────────────────────────────────────────────────
 --
--- The encryption key is read via `current_setting('app.encryption_key',
--- true)`. Set it ONCE per database (replace the hex with a 32-byte
--- random value — `openssl rand -hex 32` is fine):
+-- Supabase Vault stores the encryption key. We can't use `ALTER DATABASE
+-- ... SET app.encryption_key` on managed Supabase — the postgres role
+-- in the SQL Editor lacks the SET permission. Vault is the supported
+-- path: a built-in extension, available on every Supabase plan.
 --
---   ALTER DATABASE postgres
---     SET app.encryption_key = 'PASTE-A-LONG-RANDOM-32-BYTE-HEX-STRING-HERE';
+-- 1) Generate a 32-byte random key. On any machine:
+--      openssl rand -hex 32
+--    (PowerShell:
+--      -join ((1..64) | %{ (Get-Random -Maximum 16).ToString('x') })
+--    )
 --
--- Then reload: SELECT pg_reload_conf();
+-- 2) In the Supabase SQL Editor, run ONCE — paste your key:
 --
--- 🔐 STORE THE KEY SAFELY. Losing it = losing every employee's national_id
---    + bank info permanently. Best practice: keep a copy in 1Password +
---    a printed sealed envelope in a safe.
+--      select vault.create_secret(
+--        'PASTE-YOUR-64-CHAR-HEX-KEY-HERE',
+--        'app_encryption_key',
+--        'Symmetric key for pgp_sym_encrypt of PII columns (mig 050)'
+--      );
+--
+--    If you previously created the secret and want to rotate, use
+--    `vault.update_secret(id, ...)` instead — `create_secret` errors on
+--    a duplicate name.
+--
+-- 3) Then run THIS migration file.
+--
+-- 🔐 STORE THE KEY SAFELY OUTSIDE SUPABASE TOO. Losing it = losing every
+--    employee's national_id + bank info forever. Best practice: a copy
+--    in 1Password + a printed sealed envelope in a safe.
 --
 -- ──────────────────────────────────────────────────────────────────────
 
 create extension if not exists pgcrypto;
+create extension if not exists supabase_vault;
 
 
 -- ----------------------------------------------------------------------------
--- 1) Helper functions
+-- 1) Helper functions — read the key from Vault, then encrypt/decrypt
 -- ----------------------------------------------------------------------------
+--
+-- vault.decrypted_secrets is a built-in Supabase view that exposes
+-- `decrypted_secret` (the plaintext key we stored). It's restricted to
+-- the service role + SECURITY DEFINER functions — which is exactly the
+-- access pattern we want.
 
--- Encrypt plaintext using the configured key. Returns NULL for NULL/empty
--- input so the trigger logic can leave NULL columns alone.
+-- Private helper — read the symmetric key from Vault by name. Errors
+-- loudly if the secret is missing so a botched setup fails fast rather
+-- than silently swallowing every encrypt call.
+create or replace function public._pii_key()
+returns text
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_key text;
+begin
+  select decrypted_secret
+    into v_key
+    from vault.decrypted_secrets
+   where name = 'app_encryption_key'
+   limit 1;
+  if v_key is null or length(v_key) < 16 then
+    raise exception
+      'PII encryption key not configured. Run vault.create_secret(...) — see migration 050 header.';
+  end if;
+  return v_key;
+end;
+$$;
+
+-- Lock the key-reader down hard. Only postgres-role functions running
+-- as SECURITY DEFINER (the two below) need to call it.
+revoke all on function public._pii_key() from public, anon, authenticated;
+
+-- Encrypt plaintext using the Vault-stored key. Returns NULL for NULL/
+-- empty input so the trigger logic can leave NULL columns alone.
 create or replace function public.pii_encrypt(plaintext text)
 returns bytea
 language plpgsql
@@ -61,17 +113,11 @@ stable
 security definer
 set search_path = public, extensions
 as $$
-declare
-  v_key text;
 begin
   if plaintext is null or length(plaintext) = 0 then
     return null;
   end if;
-  v_key := current_setting('app.encryption_key', true);
-  if v_key is null or length(v_key) < 16 then
-    raise exception 'pii_encrypt: app.encryption_key is not configured. See migration 050 header.';
-  end if;
-  return pgp_sym_encrypt(plaintext, v_key);
+  return pgp_sym_encrypt(plaintext, public._pii_key());
 end;
 $$;
 
@@ -85,18 +131,12 @@ stable
 security definer
 set search_path = public, extensions
 as $$
-declare
-  v_key text;
 begin
   if ciphertext is null then
     return null;
   end if;
-  v_key := current_setting('app.encryption_key', true);
-  if v_key is null or length(v_key) < 16 then
-    raise exception 'pii_decrypt: app.encryption_key is not configured.';
-  end if;
   begin
-    return pgp_sym_decrypt(ciphertext, v_key);
+    return pgp_sym_decrypt(ciphertext, public._pii_key());
   exception when others then
     -- Hard-fail-mode would crash payslip rendering for one bad row.
     -- Soft-fail: return a sentinel so the UI can show "تعذّر فك تشفير
