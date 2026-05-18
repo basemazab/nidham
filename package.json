@@ -16,7 +16,8 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:install": "playwright install --with-deps chromium",
-    "test:load": "echo \"k6 is a separate binary — see tests/load/README.md\" && k6 run tests/load/landing.js"
+    "test:load": "echo \"k6 is a separate binary — see tests/load/README.md\" && k6 run tests/load/landing.js",
+    "uat:seed": "tsx tests/uat/seed-test-tenant.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.78",

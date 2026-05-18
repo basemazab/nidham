@@ -1,6 +1,6 @@
 # Tests
 
-Four layers covering what matters most. Each is opt-in so you only pay
+Five layers covering what matters most. Each is opt-in so you only pay
 the cost of the layer you care about right now.
 
 | Layer            | Tool       | Where it lives             | How to run                 |
@@ -9,9 +9,11 @@ the cost of the layer you care about right now.
 | **Integration**  | Vitest     | `tests/integration/`       | `npm run test:integration` |
 | **E2E**          | Playwright | `tests/e2e/`               | `npm run test:e2e`         |
 | **Load**         | k6         | `tests/load/`              | `k6 run tests/load/*.js`   |
+| **UAT** (manual) | Markdown   | `tests/uat/`               | see [`uat/README.md`](./uat/README.md) |
 
 `npm test` runs unit + integration together (~1 second on a warm cache).
-Everything else is opt-in because it's slow or needs extra setup.
+Everything else is opt-in because it's slow or needs extra setup. UAT is
+manual business-validation — see `tests/uat/UAT_PLAN.md`.
 
 ## Unit (`src/lib/*.test.ts`)
 
