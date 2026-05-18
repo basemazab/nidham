@@ -1,0 +1,111 @@
+# ============================================================================
+# CI — run the test suite on every push + PR
+# ============================================================================
+#
+# Three jobs run in parallel:
+#   1) unit-integration → Vitest. Cheap (~30s on cold). Runs on every push.
+#   2) e2e              → Playwright against the prod build. Slower (~3-5min).
+#                         Runs on PRs only (skipped on main pushes that just
+#                         touched docs).
+#   3) typecheck        → tsc --noEmit. Belt-and-braces for refactors.
+#
+# Load tests (k6) intentionally do NOT run in CI — they hit a real
+# deployed environment and need coordinated execution. Run them manually
+# from a workstation, or on a schedule against staging.
+
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel in-progress runs on the same branch when a new push arrives —
+# saves CI minutes on noisy days.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # --------------------------------------------------------------------------
+  # 1) Unit + integration tests (Vitest)
+  # --------------------------------------------------------------------------
+  unit-integration:
+    name: unit + integration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit + integration tests
+        run: npm test
+
+      - name: Upload coverage report
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage/
+          retention-days: 14
+
+  # --------------------------------------------------------------------------
+  # 2) Type-check
+  # --------------------------------------------------------------------------
+  typecheck:
+    name: typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+      - run: npx tsc --noEmit
+
+  # --------------------------------------------------------------------------
+  # 3) Playwright E2E
+  # --------------------------------------------------------------------------
+  # Note: this job needs the same environment variables the dev server
+  # needs (Supabase URL + anon key) to render the public pages. They're
+  # set on the GitHub repo as secrets — see .env.example for the names.
+  e2e:
+    name: e2e (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright tests
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          # The dev server is started by Playwright's webServer config.
+        run: npm run test:e2e
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14

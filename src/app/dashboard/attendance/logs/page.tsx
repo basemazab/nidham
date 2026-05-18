@@ -27,6 +27,12 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getMyProfile } from "@/lib/permissions";
 import { formatEGP } from "@/lib/format";
+import {
+  workedHours,
+  perMinuteWage,
+  formatTime,
+  formatHours,
+} from "@/lib/attendance";
 
 // Force fresh data — operators expect to see new clock-ins immediately
 // after the import flow or after manually registering attendance.
@@ -80,61 +86,9 @@ const STATUS_META: Record<
 
 const PAGE_SIZE = 100;
 
-// ----------------------------------------------------------------------------
-// Helpers — all pure, run server-side
-// ----------------------------------------------------------------------------
-
-/**
- * Compute worked hours from check_in / check_out (HH:MM strings).
- * Returns 0 if either is null. Handles wrap-around (check-out next day)
- * defensively: if check_out < check_in, we add 24h.
- */
-function workedHours(checkIn: string | null, checkOut: string | null): number {
-  if (!checkIn || !checkOut) return 0;
-  const [inH, inM] = checkIn.split(":").map(Number);
-  const [outH, outM] = checkOut.split(":").map(Number);
-  if (
-    !Number.isFinite(inH) ||
-    !Number.isFinite(inM) ||
-    !Number.isFinite(outH) ||
-    !Number.isFinite(outM)
-  ) {
-    return 0;
-  }
-  const inMins = inH * 60 + inM;
-  let outMins = outH * 60 + outM;
-  if (outMins < inMins) outMins += 24 * 60;
-  return Math.max(0, (outMins - inMins) / 60);
-}
-
-/**
- * Per-minute wage estimate. Real payroll engine considers shift length,
- * social insurance, etc. — for this list view we use a simple model:
- *   monthly:  basic_salary / 30 days / 8 hours / 60 min
- *   weekly:   basic_salary / 6 days / 8 hours / 60 min
- * This is a glanceable estimate; the actual payroll cycle still does
- * the rigorous math.
- */
-function perMinuteWage(
-  basic: number | null | undefined,
-  freq: "monthly" | "weekly" | null,
-): number {
-  if (!basic || basic <= 0) return 0;
-  const daysInCycle = freq === "weekly" ? 6 : 30;
-  return basic / daysInCycle / 8 / 60;
-}
-
-function formatTime(t: string | null): string {
-  if (!t) return "—";
-  // Trim seconds if present: "08:30:00" → "08:30"
-  return t.slice(0, 5);
-}
-
-function formatHours(h: number): string {
-  if (h === 0) return "—";
-  return h.toFixed(2);
-}
-
+// Pure helpers (workedHours, perMinuteWage, formatTime, formatHours) live
+// in src/lib/attendance.ts so they can be unit-tested in isolation and
+// reused by /dashboard/reports/attendance.
 
 // ----------------------------------------------------------------------------
 // Main page
