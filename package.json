@@ -10,6 +10,7 @@
     "screenshots": "tsx scripts/capture-screenshots.ts"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.78",
     "@ai-sdk/google": "^3.0.73",
     "@ai-sdk/groq": "^3.0.39",
     "@ai-sdk/react": "^3.0.182",

@@ -45,6 +45,11 @@ const INDUSTRIES = [
   { value: "other", label: "أخرى" },
 ];
 
+// Force the page to revalidate on every request. Without this, Next.js
+// caches the row list + counters between requests, so newly-added rows
+// from server actions or import flows take minutes to appear.
+export const dynamic = "force-dynamic";
+
 export default async function MarketingHubPage({
   searchParams,
 }: {

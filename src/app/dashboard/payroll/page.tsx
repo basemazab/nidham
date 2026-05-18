@@ -63,6 +63,11 @@ const STATUS_LABELS: Record<Period["status"], { text: string; classes: string }>
   cancelled: { text: "ملغية", classes: "bg-slate-100 text-slate-600 border-slate-200" },
 };
 
+// Force the page to revalidate on every request. Without this, Next.js
+// caches the row list + counters between requests, so newly-added rows
+// from server actions or import flows take minutes to appear.
+export const dynamic = "force-dynamic";
+
 export default async function PayrollPage({
   searchParams,
 }: {

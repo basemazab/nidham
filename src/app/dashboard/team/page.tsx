@@ -29,6 +29,11 @@ type Invitation = {
   expires_at: string;
 };
 
+// Force the page to revalidate on every request. Without this, Next.js
+// caches the row list + counters between requests, so newly-added rows
+// from server actions or import flows take minutes to appear.
+export const dynamic = "force-dynamic";
+
 const ROLE_LABELS: Record<Member["role"], string> = {
   admin: "مدير",
   manager: "مشرف",
