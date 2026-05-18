@@ -130,6 +130,13 @@ export default async function AttendancePage({
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href="/dashboard/attendance/logs"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border-2 border-brand-cyan/40 text-brand-cyan-dark hover:bg-brand-cyan/5 hover:border-brand-cyan font-bold text-sm shadow-sm font-cairo transition"
+            >
+              <span>📋</span>
+              <span>كل السجلات</span>
+            </Link>
             <BulkAttendanceModal
               defaultDate={selectedDate}
               action={bulkSaveAttendance}
