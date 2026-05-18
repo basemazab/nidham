@@ -126,6 +126,33 @@ function buildSystemPrompt(companyName: string, userName: string): string {
    د) نادي الأداة بـ rows + user_confirmed: true
    ه) ابن الـ rows من البيانات الموجودة في الـ chat، **متخترعش بيانات**
 
+   ⚠️ **خريطة الأعمدة المهمة جداً** (الـ Excel المصري بيستخدم تسميات
+   مختلفة لنفس الحقل — لازم تـ-map صح وإلا الـ field هيضيع):
+
+   | عناوين Excel ممكنة | الحقل في الأداة |
+   |---|---|
+   | "كود البصمة" / "رقم البصمة" / "بصمة" / "كود" / "كود الموظف" / "Code" | **employee_code** |
+   | "الاسم" / "اسم الموظف" / "Name" / "Full Name" | **full_name** |
+   | "الوظيفة" / "المسمى الوظيفي" / "Job Title" | **job_title** |
+   | "القسم" / "الإدارة" / "Department" | **department** |
+   | "تليفون" / "موبايل" / "هاتف" / "Phone" / "Mobile" | **phone** |
+   | "الإيميل" / "بريد إلكتروني" / "Email" | **email** |
+   | "تاريخ التعيين" / "تاريخ بدء العمل" / "Hire Date" | **hire_date** |
+   | "الراتب الأساسي" / "المرتب الأساسي" / "الأساسي" / "Basic Salary" | **basic_salary** |
+   | "بدل سكن" / "سكن" / "Housing" | **housing_allowance** |
+   | "بدل انتقال" / "مواصلات" / "انتقال" / "Transport" | **transport_allowance** |
+   | "بدلات أخرى" / "أخرى" / "Other" | **other_allowances** |
+   | "حافز" / "حوافز" / "Incentive" | **incentive_allowance** |
+   | "رقم قومي" / "البطاقة" / "National ID" | **national_id** |
+   | "تأمين اجتماعي" / "رقم التأمين" | **social_insurance_number** |
+   | "البنك" / "Bank" | **bank_name** |
+   | "حساب البنك" / "رقم الحساب" / "IBAN" | **bank_account_number** |
+
+   **القاعدة الذهبية**: لو شفت عمود اسمه "كود البصمة" أو "رقم البصمة"
+   أو حتى "بصمة" — ده دايماً **employee_code**. في الشركات المصرية اللي
+   عندها جهاز ZKTeco، كود البصمة هو نفسه كود الموظف اللي بيربط الموظف
+   بالجهاز. لا تتجاهل العمود ده أبداً.
+
 9. **bulk_import_attendance** — أداة تنفيذية لرفع سجلات حضور دفعة واحدة.
    نفس flow rules الـ bulk_import_employees بالضبط. ممكن المستخدم يرفع
    Excel أو PDF (لو PDF، الـ AI استخرج الصفوف لك تلقائياً). كل صف لازم
@@ -872,11 +899,34 @@ export async function POST(req: Request) {
         rows: z
           .array(
             z.object({
-              full_name: z.string().min(2),
-              employee_code: z.string().nullable().optional(),
-              job_title: z.string().nullable().optional(),
-              department: z.string().nullable().optional(),
-              phone: z.string().nullable().optional(),
+              full_name: z
+                .string()
+                .min(2)
+                .describe('من عمود "الاسم" / "اسم الموظف" / "Name"'),
+              employee_code: z
+                .string()
+                .nullable()
+                .optional()
+                .describe(
+                  'من عمود "كود البصمة" / "رقم البصمة" / "بصمة" / "كود الموظف" / "Code". ' +
+                    "في الشركات المصرية ده هو نفسه كود ربط الموظف بجهاز ZKTeco. " +
+                    "لا تتجاهله أبداً لو موجود في الـ Excel.",
+                ),
+              job_title: z
+                .string()
+                .nullable()
+                .optional()
+                .describe('من "الوظيفة" / "المسمى الوظيفي" / "Job Title"'),
+              department: z
+                .string()
+                .nullable()
+                .optional()
+                .describe('من "القسم" / "الإدارة" / "Department"'),
+              phone: z
+                .string()
+                .nullable()
+                .optional()
+                .describe('من "تليفون" / "موبايل" / "هاتف" / "Phone"'),
               email: z.string().nullable().optional(),
               hire_date: z
                 .string()
