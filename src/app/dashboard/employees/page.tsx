@@ -35,6 +35,15 @@ import { EmployeesAnalytics } from "./employees-analytics";
 
 export type { EmployeeRow as Employee };
 
+// Force the employees page to revalidate on every request. Without
+// this, Next.js was holding the row list + analytics counters in the
+// Data Cache, so newly added employees / department-count changes
+// took up to several minutes to appear (the operator reported adding
+// "كذا موظف في قسم التشطيب والعدد متغيرش"). Marking it dynamic
+// trades a tiny latency hit for fresh numbers — the right call for
+// a write-heavy admin page.
+export const dynamic = "force-dynamic";
+
 type Params = Promise<{
   deleted_all?: string;
   error?: string;

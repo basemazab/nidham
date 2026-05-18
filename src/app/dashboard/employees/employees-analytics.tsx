@@ -52,13 +52,22 @@ export function EmployeesAnalytics({
   );
   const weeklyActive = active.filter((e) => e.pay_frequency === "weekly");
 
-  // Monthly payroll cost = sum of total comp for monthly + weekly*~4.33
-  // The weekly part is approximated (weekly basic × 4.33) so the headline
-  // figure reflects real outflow. Keep simple — this is a glanceable KPI
-  // not an accounting figure.
-  const monthlyPayroll =
-    monthlyActive.reduce((s, e) => s + totalComp(e), 0) +
-    weeklyActive.reduce((s, e) => s + totalComp(e) * 4.33, 0);
+  // Monthly payroll cost = sum of total comp for the monthly cohort.
+  // The weekly cohort is reported in its own KPI below, so we don't
+  // mix the two anymore (mixing made the "monthly" total feel
+  // fictional — operators kept asking "what's the weekly figure?").
+  const monthlyPayroll = monthlyActive.reduce(
+    (s, e) => s + totalComp(e),
+    0,
+  );
+
+  // Weekly payroll cost = sum of total comp for the weekly cohort per
+  // pay cycle (i.e., what goes out THIS week, not the monthly
+  // equivalent). The user asked for this as a separate KPI.
+  const weeklyPayroll = weeklyActive.reduce(
+    (s, e) => s + totalComp(e),
+    0,
+  );
 
   const avgSalary =
     active.length === 0
@@ -112,7 +121,8 @@ export function EmployeesAnalytics({
   return (
     <section className="mb-6 space-y-4">
       {/* ===== KPI Cards ===== */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      {/* 5-card KPI strip: 2 columns on mobile, 3 on tablet, 5 on desktop */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
         <KpiCard
           icon="👥"
           label="موظفين نشطين"
@@ -124,8 +134,23 @@ export function EmployeesAnalytics({
           icon="💰"
           label="إجمالي الرواتب الشهري"
           value={formatEGP(Math.round(monthlyPayroll))}
-          subtext="تقريبي · يشمل البدلات"
+          subtext={
+            monthlyActive.length === 0
+              ? "مفيش موظفين شهريين"
+              : `${monthlyActive.length} موظف · يشمل البدلات`
+          }
           color="emerald"
+        />
+        <KpiCard
+          icon="📆"
+          label="إجمالي الرواتب الأسبوعي"
+          value={formatEGP(Math.round(weeklyPayroll))}
+          subtext={
+            weeklyActive.length === 0
+              ? "مفيش موظفين أسبوعيين"
+              : `${weeklyActive.length} موظف · لكل دورة صرف`
+          }
+          color="sky"
         />
         <KpiCard
           icon="📊"
@@ -288,19 +313,21 @@ function KpiCard({
   label: string;
   value: string;
   subtext: string;
-  color: "cyan" | "emerald" | "amber" | "violet";
+  color: "cyan" | "emerald" | "amber" | "violet" | "sky";
 }) {
   const bgs: Record<typeof color, string> = {
     cyan: "from-cyan-50 to-white border-cyan-200",
     emerald: "from-emerald-50 to-white border-emerald-200",
     amber: "from-amber-50 to-white border-amber-200",
     violet: "from-violet-50 to-white border-violet-200",
+    sky: "from-sky-50 to-white border-sky-200",
   };
   const txts: Record<typeof color, string> = {
     cyan: "text-cyan-700",
     emerald: "text-emerald-700",
     amber: "text-amber-700",
     violet: "text-violet-700",
+    sky: "text-sky-700",
   };
   return (
     <div
