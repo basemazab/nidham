@@ -1381,7 +1381,13 @@ export async function POST(req: Request) {
               .enum(["active", "inactive", "terminated", "on_leave"])
               .optional(),
             phone: z.string().optional(),
-            email: z.string().email().optional(),
+            // Plain string (not z.string().email()) — the email regex
+            // zod generates uses negative lookahead which some AI
+            // providers' JSON-Schema validators reject as not valid
+            // ECMA-262 regex. We accept any string and let the model
+            // judge "looks like an email"; downstream DB constraints
+            // handle the validation rigorously.
+            email: z.string().optional(),
           })
           .describe(
             "الحقول المراد تعديلها. أي حقل مش مذكور = مش هيتغيّر.",
