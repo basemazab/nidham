@@ -295,6 +295,14 @@ function CoreModulesSection() {
 // the brand color palette (navy / cyan / gold / cream) so they look
 // like they came out of the design system rather than off-the-shelf
 // stock illustrations.
+//
+// CRITICAL: every <svg> root carries direction="ltr". The page is
+// inside <html dir="rtl">, and without an explicit override the SVG
+// inherits RTL — which silently flips Latin labels (NIDHAM → MAHDIN,
+// EMP-0142 → 2410-PME) and clips text positioned with textAnchor.
+// Forcing LTR keeps positioning math straightforward; Arabic glyphs
+// inside each <text> still render right-to-left through the Unicode
+// Bidi algorithm.
 
 function LiveScreenshotsSection() {
   return (
@@ -379,6 +387,7 @@ function BridgeMockup() {
     <svg
       viewBox="0 0 400 240"
       xmlns="http://www.w3.org/2000/svg"
+      direction="ltr"
       className="w-full h-auto"
       role="img"
       aria-label="Bridge Analytics dashboard mockup"
@@ -451,6 +460,7 @@ function PayslipMockup() {
     <svg
       viewBox="0 0 400 240"
       xmlns="http://www.w3.org/2000/svg"
+      direction="ltr"
       className="w-full h-auto"
       role="img"
       aria-label="Payslip mockup"
@@ -502,6 +512,7 @@ function MobileAttendanceMockup() {
     <svg
       viewBox="0 0 400 240"
       xmlns="http://www.w3.org/2000/svg"
+      direction="ltr"
       className="w-full h-auto"
       role="img"
       aria-label="Mobile attendance mockup"
@@ -588,6 +599,7 @@ function CvReviewMockup() {
     <svg
       viewBox="0 0 400 240"
       xmlns="http://www.w3.org/2000/svg"
+      direction="ltr"
       className="w-full h-auto"
       role="img"
       aria-label="AI CV review mockup"
