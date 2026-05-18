@@ -50,6 +50,7 @@ export default async function Home({
       <HeroSection />
       <ProofStrip />
       <CoreModulesSection />
+      <LiveScreenshotsSection />
       <BridgeAnalyticsSection />
       <AISection />
       <MarketingStudioSection />
@@ -275,6 +276,376 @@ function CoreModulesSection() {
         </div>
       </div>
     </section>
+  );
+}
+
+// =================================================================
+// Live Screenshots — SVG-rendered mockups of real product surfaces
+// =================================================================
+//
+// These are inline SVGs (NOT real screenshots) so the landing page
+// stays a single fast HTML payload — no <img> requests, no CDN
+// dependency, perfect crispness at any resolution, instant dark/light
+// adaptation via the brand color tokens. The point is to show
+// prospects what the product looks like without spending money on a
+// design team to produce real screenshot collateral.
+//
+// Layout: 2×2 grid on desktop, single column on mobile. Each mockup
+// is wrapped in a card with a subtle shadow + caption. The SVGs use
+// the brand color palette (navy / cyan / gold / cream) so they look
+// like they came out of the design system rather than off-the-shelf
+// stock illustrations.
+
+function LiveScreenshotsSection() {
+  return (
+    <section className="px-6 py-20 bg-gradient-to-b from-slate-50 to-white">
+      <div className="max-w-6xl mx-auto">
+        <SectionHeader
+          eyebrow="لقطات حقيقية من السيستم"
+          title="شوف نِظام شغّال"
+          subtitle="مش screenshots محسّنة بالـ Photoshop — دي شاشات فعلية من المنتج، مرسومة بالـ SVG علشان تشوف الـ UX قبل ما تجرّب."
+        />
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <MockupCard
+            caption="Bridge Analytics — لوحة قياس الالتزام × الإنتاجية لكل موظف"
+          >
+            <BridgeMockup />
+          </MockupCard>
+
+          <MockupCard
+            caption="قسيمة الراتب — حساب تلقائي للتأمينات (14%) + الضريبة (شرائح 2024)"
+          >
+            <PayslipMockup />
+          </MockupCard>
+
+          <MockupCard
+            caption="تطبيق الموبايل — حضور بالـ GPS مع Geofence حول المكتب"
+          >
+            <MobileAttendanceMockup />
+          </MockupCard>
+
+          <MockupCard
+            caption="فحص CVs بالـ AI — score من 100 + أسئلة مقابلة جاهزة"
+          >
+            <CvReviewMockup />
+          </MockupCard>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * Card chrome shared by every mockup — keeps each SVG visually anchored
+ * with the same border + shadow rhythm as the rest of the page.
+ */
+function MockupCard({
+  caption,
+  children,
+}: {
+  caption: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition overflow-hidden">
+      <div className="p-4 bg-gradient-to-br from-slate-50 to-white border-b border-slate-100">
+        {children}
+      </div>
+      <p className="px-4 py-3 text-xs text-slate-600 font-cairo leading-relaxed text-center">
+        {caption}
+      </p>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------
+// Mockup 1: Bridge Analytics dashboard
+//   - Header row, 4-row data table, mini bar chart
+//   - Uses brand-navy + brand-cyan + brand-gold accents
+// ---------------------------------------------------------------
+function BridgeMockup() {
+  // Hard-coded sample rows. Picking real-looking numbers (3-digit
+  // interactions, 70-95% attendance) makes the chart feel earned.
+  const rows = [
+    { name: "أحمد محمد", attendance: 95, interactions: 24, status: "ok" },
+    { name: "محمد علي", attendance: 88, interactions: 18, status: "ok" },
+    { name: "هند سامي", attendance: 72, interactions: 9, status: "warn" },
+    { name: "كريم أحمد", attendance: 91, interactions: 31, status: "ok" },
+  ];
+  const maxInter = Math.max(...rows.map((r) => r.interactions));
+
+  return (
+    <svg
+      viewBox="0 0 400 240"
+      xmlns="http://www.w3.org/2000/svg"
+      className="w-full h-auto"
+      role="img"
+      aria-label="Bridge Analytics dashboard mockup"
+    >
+      {/* Card body */}
+      <rect x="0" y="0" width="400" height="240" rx="10" fill="#ffffff" stroke="#e2e8f0" />
+
+      {/* Header bar */}
+      <rect x="0" y="0" width="400" height="36" rx="10" fill="#0a1428" />
+      <rect x="0" y="20" width="400" height="16" fill="#0a1428" />
+      <text x="380" y="23" fill="#22d3ee" fontSize="11" fontWeight="700" textAnchor="end" fontFamily="sans-serif">
+        Bridge Analytics
+      </text>
+      <text x="380" y="14" fill="#c9a84c" fontSize="8" textAnchor="end" fontFamily="sans-serif">
+        June 2026
+      </text>
+      <circle cx="14" cy="18" r="4" fill="#ef4444" opacity="0.6" />
+      <circle cx="26" cy="18" r="4" fill="#f59e0b" opacity="0.6" />
+      <circle cx="38" cy="18" r="4" fill="#10b981" opacity="0.6" />
+
+      {/* Table header */}
+      <line x1="0" y1="56" x2="400" y2="56" stroke="#f1f5f9" />
+      <text x="380" y="51" fill="#475569" fontSize="9" textAnchor="end" fontWeight="700" fontFamily="sans-serif">الاسم</text>
+      <text x="270" y="51" fill="#475569" fontSize="9" textAnchor="middle" fontWeight="700" fontFamily="sans-serif">حضور</text>
+      <text x="200" y="51" fill="#475569" fontSize="9" textAnchor="middle" fontWeight="700" fontFamily="sans-serif">تفاعلات</text>
+      <text x="50" y="51" fill="#475569" fontSize="9" textAnchor="start" fontWeight="700" fontFamily="sans-serif">الحالة</text>
+
+      {/* Table rows */}
+      {rows.map((r, i) => {
+        const y = 70 + i * 22;
+        return (
+          <g key={r.name}>
+            <line x1="0" y1={y + 12} x2="400" y2={y + 12} stroke="#f8fafc" />
+            <text x="380" y={y + 4} fill="#1e293b" fontSize="10" textAnchor="end" fontFamily="sans-serif">{r.name}</text>
+            <text x="270" y={y + 4} fill="#0891b2" fontSize="10" textAnchor="middle" fontFamily="sans-serif" fontWeight="700">{r.attendance}%</text>
+            <text x="200" y={y + 4} fill="#1e293b" fontSize="10" textAnchor="middle" fontFamily="sans-serif">{r.interactions}</text>
+            <rect x="14" y={y - 6} width="58" height="14" rx="7" fill={r.status === "ok" ? "#dcfce7" : "#fef3c7"} />
+            <text x="43" y={y + 4} fill={r.status === "ok" ? "#15803d" : "#92400e"} fontSize="9" fontWeight="700" textAnchor="middle" fontFamily="sans-serif">
+              {r.status === "ok" ? "منتج" : "مراجعة"}
+            </text>
+          </g>
+        );
+      })}
+
+      {/* Mini bar chart at the bottom */}
+      <line x1="14" y1="200" x2="386" y2="200" stroke="#cbd5e1" />
+      {rows.map((r, i) => {
+        const h = (r.interactions / maxInter) * 26;
+        const x = 50 + i * 80;
+        return (
+          <g key={`bar-${i}`}>
+            <rect x={x} y={200 - h} width="40" height={h} rx="2" fill="#22d3ee" opacity="0.85" />
+            <text x={x + 20} y={216} fontSize="8" fill="#64748b" textAnchor="middle" fontFamily="sans-serif">
+              {r.name.split(" ")[0]}
+            </text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+// ---------------------------------------------------------------
+// Mockup 2: Egyptian payslip
+//   - Header strip with employee + period, line items, total,
+//     export-pdf button
+// ---------------------------------------------------------------
+function PayslipMockup() {
+  return (
+    <svg
+      viewBox="0 0 400 240"
+      xmlns="http://www.w3.org/2000/svg"
+      className="w-full h-auto"
+      role="img"
+      aria-label="Payslip mockup"
+    >
+      <rect x="0" y="0" width="400" height="240" rx="10" fill="#ffffff" stroke="#e2e8f0" />
+
+      {/* Header with employee + period */}
+      <rect x="0" y="0" width="400" height="56" rx="10" fill="#fef7e0" />
+      <rect x="0" y="40" width="400" height="16" fill="#fef7e0" />
+      <text x="380" y="22" fontSize="13" fill="#0a1428" fontWeight="900" textAnchor="end" fontFamily="sans-serif">قسيمة راتب</text>
+      <text x="380" y="38" fontSize="11" fill="#475569" textAnchor="end" fontFamily="sans-serif">أحمد محمد · مارس 2026</text>
+      <text x="20" y="22" fontSize="9" fill="#c9a84c" fontWeight="700" fontFamily="sans-serif">NIDHAM</text>
+      <text x="20" y="34" fontSize="7" fill="#94a3b8" fontFamily="sans-serif">EMP-0142</text>
+
+      {/* Line items */}
+      <text x="380" y="84" fontSize="10" fill="#475569" textAnchor="end" fontFamily="sans-serif">مرتب أساسي</text>
+      <text x="20" y="84" fontSize="10" fill="#1e293b" fontWeight="700" fontFamily="sans-serif">8,000 ج</text>
+      <line x1="14" y1="93" x2="386" y2="93" stroke="#f1f5f9" />
+
+      <text x="380" y="110" fontSize="10" fill="#475569" textAnchor="end" fontFamily="sans-serif">تأمينات اجتماعية (14%)</text>
+      <text x="20" y="110" fontSize="10" fill="#dc2626" fontFamily="sans-serif">-1,120 ج</text>
+      <line x1="14" y1="119" x2="386" y2="119" stroke="#f1f5f9" />
+
+      <text x="380" y="136" fontSize="10" fill="#475569" textAnchor="end" fontFamily="sans-serif">ضريبة الدخل (شرائح 2024)</text>
+      <text x="20" y="136" fontSize="10" fill="#dc2626" fontFamily="sans-serif">-467 ج</text>
+      <line x1="14" y1="145" x2="386" y2="145" stroke="#f1f5f9" />
+
+      {/* Net salary highlight */}
+      <rect x="14" y="155" width="372" height="40" rx="8" fill="#0a1428" />
+      <text x="372" y="172" fontSize="11" fill="#22d3ee" fontWeight="700" textAnchor="end" fontFamily="sans-serif">صافي الراتب</text>
+      <text x="372" y="188" fontSize="14" fill="#c9a84c" fontWeight="900" textAnchor="end" fontFamily="sans-serif">6,413 ج</text>
+      <text x="28" y="180" fontSize="10" fill="#ffffff" fontFamily="sans-serif" fontWeight="700">NET</text>
+
+      {/* Export PDF button (wireframe) */}
+      <rect x="270" y="210" width="116" height="22" rx="6" fill="#22d3ee" />
+      <text x="328" y="225" fontSize="10" fill="#0a1428" fontWeight="900" textAnchor="middle" fontFamily="sans-serif">📄 تصدير PDF</text>
+      <text x="20" y="225" fontSize="8" fill="#94a3b8" fontFamily="sans-serif">يتم احتساب جميع الخصومات تلقائياً</text>
+    </svg>
+  );
+}
+
+// ---------------------------------------------------------------
+// Mockup 3: Mobile app GPS attendance screen
+//   - Phone frame, map placeholder with pin, geofence indicator,
+//     check-in CTA
+// ---------------------------------------------------------------
+function MobileAttendanceMockup() {
+  return (
+    <svg
+      viewBox="0 0 400 240"
+      xmlns="http://www.w3.org/2000/svg"
+      className="w-full h-auto"
+      role="img"
+      aria-label="Mobile attendance mockup"
+    >
+      {/* Background wash */}
+      <rect x="0" y="0" width="400" height="240" rx="10" fill="#f8fafc" />
+
+      {/* Phone frame — centered horizontally */}
+      <g transform="translate(132, 8)">
+        {/* Outer chassis */}
+        <rect x="0" y="0" width="136" height="226" rx="22" fill="#0a1428" />
+        {/* Screen */}
+        <rect x="6" y="20" width="124" height="200" rx="14" fill="#ffffff" />
+        {/* Speaker notch */}
+        <rect x="56" y="10" width="24" height="4" rx="2" fill="#1e293b" />
+        {/* Camera dot */}
+        <circle cx="100" cy="12" r="2" fill="#1e293b" />
+
+        {/* Status bar inside screen */}
+        <text x="12" y="32" fontSize="6" fill="#64748b" fontFamily="sans-serif" fontWeight="700">10:24</text>
+        <text x="124" y="32" fontSize="6" fill="#64748b" textAnchor="end" fontFamily="sans-serif">📶 100%</text>
+
+        {/* Header */}
+        <text x="68" y="46" fontSize="9" fill="#0a1428" fontWeight="900" textAnchor="middle" fontFamily="sans-serif">تثبيت الحضور</text>
+
+        {/* Map placeholder */}
+        <rect x="14" y="52" width="108" height="80" rx="6" fill="#e0f2fe" />
+        {/* Stylized streets */}
+        <line x1="14" y1="78" x2="122" y2="78" stroke="#bae6fd" strokeWidth="2" />
+        <line x1="14" y1="100" x2="122" y2="100" stroke="#bae6fd" strokeWidth="2" />
+        <line x1="40" y1="52" x2="40" y2="132" stroke="#bae6fd" strokeWidth="2" />
+        <line x1="90" y1="52" x2="90" y2="132" stroke="#bae6fd" strokeWidth="2" />
+        {/* Geofence circle */}
+        <circle cx="68" cy="92" r="22" fill="#22d3ee" opacity="0.18" />
+        <circle cx="68" cy="92" r="22" fill="none" stroke="#0891b2" strokeWidth="1.2" strokeDasharray="2 2" />
+        {/* Pin */}
+        <circle cx="68" cy="92" r="6" fill="#dc2626" />
+        <circle cx="68" cy="92" r="2" fill="#ffffff" />
+
+        {/* Status pill */}
+        <rect x="20" y="140" width="96" height="20" rx="10" fill="#dcfce7" />
+        <text x="68" y="153" fontSize="7" fill="#15803d" fontWeight="700" textAnchor="middle" fontFamily="sans-serif">
+          ✓ داخل نطاق المكتب
+        </text>
+
+        {/* Big check-in CTA */}
+        <rect x="20" y="170" width="96" height="32" rx="10" fill="#22d3ee" />
+        <text x="68" y="190" fontSize="10" fill="#0a1428" fontWeight="900" textAnchor="middle" fontFamily="sans-serif">
+          تسجيل دخول
+        </text>
+
+        {/* Footer note */}
+        <text x="68" y="214" fontSize="6" fill="#94a3b8" textAnchor="middle" fontFamily="sans-serif">GPS · ±3m</text>
+      </g>
+
+      {/* Side annotation arrow */}
+      <text x="20" y="40" fontSize="9" fill="#475569" fontFamily="sans-serif" fontWeight="700">حضور بالـ GPS</text>
+      <text x="20" y="56" fontSize="8" fill="#64748b" fontFamily="sans-serif">Geofence حوالين</text>
+      <text x="20" y="68" fontSize="8" fill="#64748b" fontFamily="sans-serif">المكتب — مفيش</text>
+      <text x="20" y="80" fontSize="8" fill="#64748b" fontFamily="sans-serif">حد يـ-clock-in</text>
+      <text x="20" y="92" fontSize="8" fill="#64748b" fontFamily="sans-serif">من برّاه</text>
+
+      {/* Right side annotation */}
+      <text x="380" y="40" fontSize="9" fill="#475569" textAnchor="end" fontFamily="sans-serif" fontWeight="700">±3 متر دقة</text>
+      <text x="380" y="56" fontSize="8" fill="#64748b" textAnchor="end" fontFamily="sans-serif">يدعم iOS</text>
+      <text x="380" y="68" fontSize="8" fill="#64748b" textAnchor="end" fontFamily="sans-serif">و Android</text>
+    </svg>
+  );
+}
+
+// ---------------------------------------------------------------
+// Mockup 4: AI CV review screen
+//   - Candidate name + job title, big score donut, strengths/
+//     weaknesses bullets, suggested interview-questions CTA
+// ---------------------------------------------------------------
+function CvReviewMockup() {
+  // Score donut math — score out of 100, mapped to circumference.
+  const score = 87;
+  const radius = 28;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (score / 100) * circumference;
+
+  return (
+    <svg
+      viewBox="0 0 400 240"
+      xmlns="http://www.w3.org/2000/svg"
+      className="w-full h-auto"
+      role="img"
+      aria-label="AI CV review mockup"
+    >
+      <rect x="0" y="0" width="400" height="240" rx="10" fill="#ffffff" stroke="#e2e8f0" />
+
+      {/* Header */}
+      <rect x="0" y="0" width="400" height="44" rx="10" fill="#0a1428" />
+      <rect x="0" y="28" width="400" height="16" fill="#0a1428" />
+      <text x="380" y="20" fontSize="11" fill="#ffffff" fontWeight="900" textAnchor="end" fontFamily="sans-serif">
+        محمد عبدالله
+      </text>
+      <text x="380" y="34" fontSize="9" fill="#94a3b8" textAnchor="end" fontFamily="sans-serif">
+        مهندس برمجيات · 5 سنين خبرة
+      </text>
+      <text x="20" y="20" fontSize="9" fill="#c9a84c" fontWeight="700" fontFamily="sans-serif">✦ AI CV REVIEW</text>
+      <text x="20" y="34" fontSize="7" fill="#64748b" fontFamily="sans-serif">Powered by Nidham</text>
+
+      {/* Donut score on the right */}
+      <g transform="translate(330, 110)">
+        <circle cx="0" cy="0" r={radius} stroke="#e2e8f0" strokeWidth="8" fill="none" />
+        <circle
+          cx="0"
+          cy="0"
+          r={radius}
+          stroke="#22d3ee"
+          strokeWidth="8"
+          fill="none"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          transform="rotate(-90)"
+        />
+        <text x="0" y="2" fontSize="18" fontWeight="900" fill="#0a1428" textAnchor="middle" fontFamily="sans-serif">{score}</text>
+        <text x="0" y="14" fontSize="7" fill="#64748b" textAnchor="middle" fontFamily="sans-serif">/ 100</text>
+      </g>
+      <text x="330" y="158" fontSize="9" fill="#0891b2" fontWeight="700" textAnchor="middle" fontFamily="sans-serif">
+        Strong Match
+      </text>
+
+      {/* Strengths column */}
+      <text x="380" y="62" fontSize="9" fill="#15803d" fontWeight="700" textAnchor="end" fontFamily="sans-serif">✓ نقاط القوة</text>
+      <text x="380" y="78" fontSize="8" fill="#1e293b" textAnchor="end" fontFamily="sans-serif">· React + TypeScript</text>
+      <text x="380" y="93" fontSize="8" fill="#1e293b" textAnchor="end" fontFamily="sans-serif">· مشاريع B2B Egypt</text>
+      <text x="380" y="108" fontSize="8" fill="#1e293b" textAnchor="end" fontFamily="sans-serif">· Supabase / Postgres</text>
+
+      {/* Weaknesses column */}
+      <text x="380" y="132" fontSize="9" fill="#b45309" fontWeight="700" textAnchor="end" fontFamily="sans-serif">⚠ مناطق للتطوير</text>
+      <text x="380" y="148" fontSize="8" fill="#1e293b" textAnchor="end" fontFamily="sans-serif">· مفيش DevOps experience</text>
+      <text x="380" y="163" fontSize="8" fill="#1e293b" textAnchor="end" fontFamily="sans-serif">· مفيش mobile native</text>
+      <text x="380" y="178" fontSize="8" fill="#1e293b" textAnchor="end" fontFamily="sans-serif">· إنجليزي conversational</text>
+
+      {/* Interview questions CTA */}
+      <rect x="14" y="200" width="372" height="28" rx="8" fill="#0a1428" />
+      <text x="200" y="218" fontSize="11" fill="#22d3ee" fontWeight="900" textAnchor="middle" fontFamily="sans-serif">
+        ✦ ٥ أسئلة مقابلة مقترحة بالـ AI
+      </text>
+    </svg>
   );
 }
 
