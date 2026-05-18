@@ -37,7 +37,7 @@ import {
   type EmployeeSignals,
   monthsBetween,
 } from "@/lib/retention";
-import { pickAgentModel } from "@/lib/ai-models";
+import { pickAgentModelLargeContext } from "@/lib/ai-models";
 
 export const maxDuration = 60;
 
@@ -2014,13 +2014,18 @@ export async function POST(req: Request) {
   };
 
   // --------------------------------------------------------------------
-  // Stream the response — uses pickAgentModel() for multi-provider
-  // fallback. Default order:
-  //   Groq Llama 3.3 70B → Groq Llama 3.1 8B → Gemini 2.5 Flash Lite
-  // Combined free quota is ~30,000 RPD, ~120 RPM — effectively unlimited
-  // for SMB workloads without ever enabling billing. See /lib/ai-models.ts.
+  // Stream the response — uses pickAgentModelLargeContext() which prefers
+  // Gemini Flash for the agent route because:
+  //   - File uploads dump 5-12k tokens of JSON into the message thread
+  //   - Tool calls + multi-turn confirmations stack history quickly
+  //   - The system prompt is large (~3k tokens of Arabic + tool docs)
+  // Groq's free tier caps gpt-oss-120b at 8k TPM per request, which 80-
+  // employee imports routinely exceed. Gemini's per-request budget is
+  // 1M+ tokens, so it's the safer default for tool-calling agents.
+  // For Marketing Studio etc. (small requests, latency matters more)
+  // the regular pickAgentModel() still picks Groq first.
   // --------------------------------------------------------------------
-  const picked = pickAgentModel();
+  const picked = pickAgentModelLargeContext();
 
   const result = streamText({
     model: picked.model,

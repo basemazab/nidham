@@ -130,6 +130,66 @@ export function pickAgentModel(): AgentModelInfo {
 }
 
 // ----------------------------------------------------------------------------
+// pickAgentModelLargeContext — preferred picker for the /api/ai/agent route
+// ----------------------------------------------------------------------------
+// The agent route differs from Marketing Studio / single-shot generations:
+//   - File uploads (Excel/PDF) inject 5-12k tokens of JSON into the messages
+//   - Tool calls + multi-turn confirmations stack up history fast
+//   - System prompt is large (~3k tokens of Arabic instructions + column maps)
+// Groq's free tier caps gpt-oss-120b at 8k TPM and gpt-oss-20b at 12k TPM
+// per request, which 80-employee imports routinely blow through ("Request
+// too large for model openai/gpt-oss-120b ... Limit 8000, Requested 12672").
+//
+// Gemini Flash Lite's free tier has a much higher per-request budget
+// (1M+ tokens). So for the agent specifically, we prefer Gemini first
+// and fall back to Groq only when Gemini isn't configured.
+//
+// This is OPPOSITE of pickAgentModel()'s normal Groq-first ordering.
+// We keep the normal helper for everything else (chat assistant, marketing
+// studio tools) where requests are tiny and Groq's latency wins.
+export function pickAgentModelLargeContext(): AgentModelInfo {
+  const groq = getGroqProvider();
+  const google = getGoogleProvider();
+
+  // Honor explicit operator override first.
+  const override = process.env.AI_AGENT_MODEL;
+  if (override) {
+    const [providerName, ...rest] = override.split(":");
+    const modelName = rest.join(":");
+    if (providerName === "groq" && groq && modelName) {
+      return { provider: "groq", modelName, model: groq(modelName) };
+    }
+    if (providerName === "gemini" && google && modelName) {
+      return { provider: "gemini", modelName, model: google(modelName) };
+    }
+  }
+
+  // 1) Gemini first — TPM headroom for file uploads.
+  if (google) {
+    return {
+      provider: "gemini",
+      modelName: "gemini-2.5-flash",
+      model: google("gemini-2.5-flash"),
+    };
+  }
+
+  // 2) Groq as fallback. gpt-oss-20b has 12k TPM (vs 120b's 8k), giving
+  //    SLIGHTLY more room for file context. Still tight; if even this
+  //    fails the agent will surface the TPM error.
+  if (groq) {
+    return {
+      provider: "groq",
+      modelName: "openai/gpt-oss-20b",
+      model: groq("openai/gpt-oss-20b"),
+    };
+  }
+
+  throw new Error(
+    "AI configuration missing — set GEMINI_API_KEY (recommended for agent) or GROQ_API_KEY",
+  );
+}
+
+// ----------------------------------------------------------------------------
 // pickFallbackAgentModel — used when the primary returns a quota error
 // ----------------------------------------------------------------------------
 // Returns the OTHER configured provider, so an exhausted Groq quota falls
