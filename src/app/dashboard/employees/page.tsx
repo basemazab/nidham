@@ -62,12 +62,28 @@ export default async function EmployeesPage({
   const { profile } = await getMyProfile();
   const isAdmin = profile?.role === "admin";
 
+  // CRITICAL: scope the employees list to the caller's company explicitly.
+  // RLS already does this for regular tenants, but super-admin sessions
+  // (mig 038's "Super-Admin Read Access Policies") let them SELECT
+  // employees from EVERY tenant — handy for the /admin panel, disastrous
+  // here because:
+  //   1) The deleteAllEmployees action filters by profile.company_id,
+  //      so the count it reports (0) won't match the list shown (4
+  //      cross-tenant rows leaking in).
+  //   2) Editing one of those leaked rows from this page would touch
+  //      another tenant's data via the .update().eq("id", ...) path.
+  // Adding the explicit company_id filter restores the per-tenant view
+  // that the dashboard is meant to be. Super-admins who want cross-
+  // tenant data should use /admin instead.
+  const callerCompanyId = profile?.company_id ?? "";
+
   const [employeesRes, dupCountRes] = await Promise.all([
     supabase
       .from("employees")
       .select(
         "id, full_name, employee_code, job_title, department, phone, status, hire_date, pay_frequency, basic_salary, housing_allowance, transport_allowance, other_allowances, incentive_allowance",
       )
+      .eq("company_id", callerCompanyId)
       .order("created_at", { ascending: false })
       .returns<EmployeeRow[]>(),
     isAdmin
