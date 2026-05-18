@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { logout } from "@/app/login/actions";
 import { TierBadge } from "@/components/tier-badge";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { hasFeature, type Plan, type Feature } from "@/lib/subscriptions";
 
 type Role = "admin" | "manager" | "employee";
@@ -147,24 +148,27 @@ export function DashboardSidebar({
   return (
     <>
       {/* Mobile top bar — visible only on small screens */}
-      <header className="md:hidden sticky top-0 z-40 bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between">
+      <header className="md:hidden sticky top-0 z-40 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 py-3 flex items-center justify-between">
         <Logo />
-        <button
-          type="button"
-          onClick={() => setMobileOpen((v) => !v)}
-          aria-label="القائمة"
-          className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 transition"
-        >
-          {mobileOpen ? (
-            <svg className="w-6 h-6 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          ) : (
-            <svg className="w-6 h-6 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          )}
-        </button>
+        <div className="flex items-center gap-2">
+          <ThemeToggle size="sm" />
+          <button
+            type="button"
+            onClick={() => setMobileOpen((v) => !v)}
+            aria-label="القائمة"
+            className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 transition"
+          >
+            {mobileOpen ? (
+              <svg className="w-6 h-6 text-slate-700 dark:text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            ) : (
+              <svg className="w-6 h-6 text-slate-700 dark:text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            )}
+          </button>
+        </div>
       </header>
 
       {/* Mobile drawer overlay */}
@@ -174,16 +178,16 @@ export function DashboardSidebar({
             className="md:hidden fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40"
             onClick={() => setMobileOpen(false)}
           />
-          <aside className="md:hidden fixed top-0 right-0 bottom-0 w-72 bg-white z-50 flex flex-col shadow-2xl">
-            <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+          <aside className="md:hidden fixed top-0 right-0 bottom-0 w-72 bg-white dark:bg-slate-900 z-50 flex flex-col shadow-2xl">
+            <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
               <Logo />
               <button
                 type="button"
                 onClick={() => setMobileOpen(false)}
-                className="p-1.5 rounded-lg hover:bg-slate-100"
+                className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
                 aria-label="إغلاق"
               >
-                <svg className="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 text-slate-600 dark:text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
@@ -208,8 +212,8 @@ export function DashboardSidebar({
       )}
 
       {/* Desktop sidebar — visible on md+ */}
-      <aside className="hidden md:flex w-64 bg-white border-l border-slate-200 flex-col shrink-0">
-        <div className="p-5 border-b border-slate-100">
+      <aside className="hidden md:flex w-64 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 flex-col shrink-0">
+        <div className="p-5 border-b border-slate-100 dark:border-slate-800">
           <Logo />
         </div>
         <nav className="flex-1 overflow-y-auto p-3">
@@ -255,7 +259,7 @@ function NavSection({
   if (items.length === 0) return null;
   return (
     <>
-      <div className="text-[10px] text-slate-400 font-bold tracking-wider mb-2 px-3 font-cairo uppercase">
+      <div className="text-[10px] text-slate-400 dark:text-slate-500 font-bold tracking-wider mb-2 px-3 font-cairo uppercase">
         {label}
       </div>
       <div className="space-y-1 mb-5">
@@ -275,11 +279,11 @@ function NavSection({
               className={`flex items-center gap-3 px-3 py-2.5 rounded-lg font-cairo text-sm transition ${
                 active
                   ? isReport
-                    ? "bg-amber-50 text-amber-800 font-bold border-r-4 border-amber-500"
-                    : "bg-brand-cyan/10 text-brand-cyan-dark font-bold border-r-4 border-brand-cyan-dark"
+                    ? "bg-amber-50 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 font-bold border-r-4 border-amber-500"
+                    : "bg-brand-cyan/10 dark:bg-brand-cyan/20 text-brand-cyan-dark dark:text-brand-cyan font-bold border-r-4 border-brand-cyan-dark"
                   : locked
-                    ? "text-slate-400 hover:bg-slate-50 hover:text-slate-600"
-                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                    ? "text-slate-400 dark:text-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-600 dark:hover:text-slate-400"
+                    : "text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white"
               }`}
             >
               <span className="text-base">{item.icon}</span>
@@ -318,7 +322,7 @@ function UserFooter({
   daysLeft?: number;
 }) {
   return (
-    <div className="p-3 border-t border-slate-100 bg-slate-50/50 space-y-1">
+    <div className="p-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 space-y-1">
       {plan && (
         <div className="flex justify-center pb-1">
           <TierBadge plan={plan} daysLeft={daysLeft} />
@@ -327,7 +331,7 @@ function UserFooter({
       {isSuperAdmin && (
         <Link
           href="/admin"
-          className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-300 text-amber-800 font-cairo text-sm font-bold hover:from-amber-100 hover:to-yellow-100 transition"
+          className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-900/30 dark:to-yellow-900/30 border border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-300 font-cairo text-sm font-bold hover:from-amber-100 hover:to-yellow-100 dark:hover:from-amber-900/50 dark:hover:to-yellow-900/50 transition"
         >
           <span>👑</span>
           <span>Super Admin Panel</span>
@@ -337,8 +341,8 @@ function UserFooter({
         href="/dashboard/subscription"
         className={`flex items-center gap-2 px-3 py-2 rounded-lg transition font-cairo text-sm ${
           isActive("/dashboard/subscription")
-            ? "bg-amber-50 text-amber-700 font-bold"
-            : "text-slate-600 hover:bg-slate-100"
+            ? "bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 font-bold"
+            : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
         }`}
       >
         <span>💎</span>
@@ -347,26 +351,29 @@ function UserFooter({
       <Link
         href="/dashboard/profile"
         className={`block px-3 py-2 rounded-lg transition ${
-          isActive("/dashboard/profile") ? "bg-brand-cyan/10" : "hover:bg-slate-100"
+          isActive("/dashboard/profile") ? "bg-brand-cyan/10 dark:bg-brand-cyan/20" : "hover:bg-slate-100 dark:hover:bg-slate-800"
         }`}
       >
         <div className="text-[10px] text-brand-gold font-bold tracking-wider mb-1 font-cairo uppercase">
           {companyName}
         </div>
-        <div className="text-sm font-bold text-slate-800 font-cairo">{userName}</div>
-        <div className="text-xs text-slate-500 truncate font-mono">{userEmail}</div>
-        <div className="text-[10px] text-brand-cyan-dark font-cairo font-bold mt-1">
+        <div className="text-sm font-bold text-slate-800 dark:text-slate-100 font-cairo">{userName}</div>
+        <div className="text-xs text-slate-500 dark:text-slate-400 truncate font-mono">{userEmail}</div>
+        <div className="text-[10px] text-brand-cyan-dark dark:text-brand-cyan font-cairo font-bold mt-1">
           ⚙ الإعدادات الشخصية ←
         </div>
       </Link>
-      <form action={logout}>
-        <button
-          type="submit"
-          className="w-full px-3 py-2 text-right text-sm text-red-600 hover:bg-red-50 rounded-lg font-cairo font-medium transition"
-        >
-          🚪 تسجيل الخروج
-        </button>
-      </form>
+      <div className="flex items-center justify-between gap-2 pt-1">
+        <form action={logout} className="flex-1">
+          <button
+            type="submit"
+            className="w-full px-3 py-2 text-right text-sm text-red-600 hover:bg-red-50 dark:text-rose-400 dark:hover:bg-rose-900/20 rounded-lg font-cairo font-medium transition"
+          >
+            🚪 تسجيل الخروج
+          </button>
+        </form>
+        <ThemeToggle size="sm" />
+      </div>
     </div>
   );
 }

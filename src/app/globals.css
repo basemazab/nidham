@@ -1,8 +1,20 @@
 @import "tailwindcss";
 
+/* ---------------------------------------------------------------------------
+   Tailwind v4 dark-mode wiring.
+   We use class-based switching so next-themes can flip <html class="dark">
+   without touching prefers-color-scheme. The @variant directive teaches
+   utility classes (bg-X, text-X, border-X) to also honor "dark:" prefixes.
+   --------------------------------------------------------------------------- */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
+  /* Light theme — the default */
   --background: #ffffff;
   --foreground: #0a1428;
+  --surface: #ffffff;          /* card / panel bg */
+  --surface-muted: #f8fafc;    /* subtle alt bg (slate-50) */
+  --border-soft: #e2e8f0;      /* slate-200 */
 
   --brand-navy: #0a1428;
   --brand-navy-light: #152540;
@@ -11,9 +23,23 @@
   --brand-gold: #c9a84c;
 }
 
+.dark {
+  /* Dark theme — applied when <html> has class="dark". next-themes
+     toggles this for us. Values pick a deep slate base + lighter
+     foreground so brand-cyan accents still pop. */
+  --background: #0a1428;
+  --foreground: #e2e8f0;
+  --surface: #152540;
+  --surface-muted: #1e293b;    /* slate-800 */
+  --border-soft: #334155;      /* slate-700 */
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-border-soft: var(--border-soft);
   --color-brand-navy: var(--brand-navy);
   --color-brand-navy-light: var(--brand-navy-light);
   --color-brand-cyan: var(--brand-cyan);
@@ -28,6 +54,7 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-tajawal), Arial, Helvetica, sans-serif;
+  transition: background-color 200ms ease, color 200ms ease;
 }
 
 /* ----------------------------------------------------------------------------
