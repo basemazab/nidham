@@ -111,6 +111,10 @@ export async function removeMember(formData: FormData) {
   }
 
   // Verify target lives inside the same tenant.
+  // Preview check so we can surface a friendly "member not in your
+  // company" error before invoking the RPC. The RPC ALSO checks this
+  // (it's SECURITY DEFINER and walks the tenant chain server-side),
+  // but the app-side guard gives a cleaner error message.
   const { data: target } = await supabase
     .from("profiles")
     .select("id, full_name, role, company_id")
@@ -130,11 +134,15 @@ export async function removeMember(formData: FormData) {
     );
   }
 
-  const { error } = await supabase
-    .from("profiles")
-    .delete()
-    .eq("id", memberId)
-    .eq("company_id", actor.company_id);
+  // CRITICAL: profiles has SELECT + UPDATE RLS policies (mig 001 + 008)
+  // but no DELETE policy, so a plain user-scoped DELETE returns
+  // 0-rows-affected without raising an error — the action would
+  // silently "succeed" while leaving the member intact. We use a
+  // SECURITY DEFINER RPC (mig 046) that performs the delete with
+  // application-layer admin + same-tenant checks built in.
+  const { error } = await supabase.rpc("remove_team_member", {
+    p_target_id: memberId,
+  });
 
   if (error) {
     redirect(
