@@ -1496,7 +1496,9 @@ export async function POST(req: Request) {
         transport_allowance: z.number().nonnegative().optional(),
         other_allowances: z.number().nonnegative().optional(),
         phone: z.string().optional(),
-        email: z.string().email().optional(),
+        // Plain string — see comment in update_employee. zod's email
+        // regex breaks JSON-Schema strict ECMA-262 validation.
+        email: z.string().optional(),
         national_id: z.string().optional(),
         user_confirmed: z
           .boolean()
