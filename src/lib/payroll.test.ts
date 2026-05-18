@@ -6,57 +6,82 @@
 // product: a 0.5% mistake here means every employee at every customer is
 // getting paid wrong, every month. Test paranoidly.
 //
-// Source of truth for the brackets + rates:
-//   - Law 175/2023 (income tax brackets, applied 2024+)
-//   - Law 148/2019 (social insurance, 14% employee share, capped at the
-//     MAX_INSURABLE_WAGE)
-//   - Annual personal exemption: 20,000 EGP
+// Source of truth (effective 2026):
+//   - Law 175/2023 income tax brackets — with the 0% slice on the first
+//     40k after personal exemption (PwC Egypt + KPMG + Andersen confirm).
+//   - Law 148/2019 social insurance — employee share 11%, employer share
+//     18.75%. NOSI 2026 decree: min insurable wage 2,700, max 16,700.
+//   - Annual personal exemption: 20,000 EGP (unchanged from 2024).
 
 import { describe, it, expect } from "vitest";
 import {
   calculateAnnualIncomeTax,
   calculateMonthlyIncomeTax,
   calculateSocialInsurance,
+  calculateEmployerSocialInsurance,
   calculatePayroll,
   SOCIAL_INSURANCE_RATE,
+  EMPLOYER_SOCIAL_INSURANCE_RATE,
   MAX_INSURABLE_WAGE,
+  MIN_INSURABLE_WAGE,
   PERSONAL_EXEMPTION,
   TAX_BRACKETS_2024,
+  TAX_BRACKETS_2026,
 } from "./payroll";
 
-describe("calculateAnnualIncomeTax — 2024 brackets", () => {
+describe("calculateAnnualIncomeTax — 2026 brackets (default)", () => {
   it("returns 0 when income falls entirely within the personal exemption", () => {
     expect(calculateAnnualIncomeTax(0)).toBe(0);
     expect(calculateAnnualIncomeTax(PERSONAL_EXEMPTION)).toBe(0);
     expect(calculateAnnualIncomeTax(PERSONAL_EXEMPTION - 1)).toBe(0);
   });
 
-  it("applies 10% to the first 40k taxable slice (after exemption)", () => {
-    // 60,000 gross - 20,000 PE = 40,000 taxable in the 10% bracket
-    expect(calculateAnnualIncomeTax(60_000)).toBe(4_000);
+  it("applies 0% to the first 40k taxable slice (the new 2026 zero bracket)", () => {
+    // 60,000 gross − 20,000 PE = 40,000 taxable in the 0% bracket.
+    // Was 4,000 under TAX_BRACKETS_2024; now 0 under the 2026 schedule.
+    expect(calculateAnnualIncomeTax(60_000)).toBe(0);
+  });
+
+  it("crosses the 0% → 10% boundary at 60k income (40k taxable)", () => {
+    // 70,000 gross − 20,000 PE = 50,000 taxable
+    //   40,000 @ 0%  = 0
+    //   10,000 @ 10% = 1,000
+    // → 1,000
+    expect(calculateAnnualIncomeTax(70_000)).toBe(1_000);
   });
 
   it("walks across the 10% → 15% boundary correctly", () => {
-    // 80,000 gross - 20,000 PE = 60,000 taxable
-    //   40,000 @ 10% = 4,000
-    //   20,000 @ 15% = 3,000   (the 40k→55k bracket = 15k slice, then 5k more @20%)
-    // Wait — brackets are [40k, 55k, 70k, 200k, 400k, ∞]. So after 40k:
-    //   15k @ 15% (40k→55k) = 2,250
-    //    5k @ 20% (55k→70k) = 1,000
-    // Total = 4,000 + 2,250 + 1,000 = 7,250
-    expect(calculateAnnualIncomeTax(80_000)).toBe(7_250);
+    // 80,000 gross − 20,000 PE = 60,000 taxable
+    //   40,000 @ 0%  =     0   (0 → 40k)
+    //   15,000 @ 10% = 1,500   (40k → 55k)
+    //    5,000 @ 15% =   750   (55k → 70k)
+    // → 2,250
+    expect(calculateAnnualIncomeTax(80_000)).toBe(2_250);
   });
 
   it("respects all brackets for a very high earner", () => {
-    // 500,000 gross - 20,000 PE = 480,000 taxable
-    //   40,000 @ 10%   =  4,000   (0→40k)
-    //   15,000 @ 15%   =  2,250   (40k→55k)
-    //   15,000 @ 20%   =  3,000   (55k→70k)
-    //  130,000 @ 22.5% = 29,250   (70k→200k)
-    //  200,000 @ 25%   = 50,000   (200k→400k)
-    //   80,000 @ 27.5% = 22,000   (400k→480k)
-    // Total = 110,500
-    expect(calculateAnnualIncomeTax(500_000)).toBeCloseTo(110_500, 2);
+    // 500,000 gross − 20,000 PE = 480,000 taxable
+    //   40,000 @ 0%    =     0   (0 → 40k)
+    //   15,000 @ 10%   = 1,500   (40k → 55k)
+    //   15,000 @ 15%   = 2,250   (55k → 70k)
+    //  130,000 @ 20%   = 26,000  (70k → 200k)
+    //  200,000 @ 22.5% = 45,000  (200k → 400k)
+    //   80,000 @ 25%   = 20,000  (400k → 480k)
+    // → 94,750
+    expect(calculateAnnualIncomeTax(500_000)).toBeCloseTo(94_750, 2);
+  });
+
+  it("hits the top 27.5% bracket only above 1.22M income (1.2M taxable)", () => {
+    // 1,500,000 gross − 20,000 PE = 1,480,000 taxable
+    //   40,000 @ 0%    =       0
+    //   15,000 @ 10%   =   1,500
+    //   15,000 @ 15%   =   2,250
+    //  130,000 @ 20%   =  26,000
+    //  200,000 @ 22.5% =  45,000
+    //  800,000 @ 25%   = 200,000  (400k → 1.2M)
+    //  280,000 @ 27.5% =  77,000  (1.2M → 1.48M)
+    // → 351,750
+    expect(calculateAnnualIncomeTax(1_500_000)).toBeCloseTo(351_750, 2);
   });
 
   it("never returns a negative number for any input", () => {
@@ -64,7 +89,7 @@ describe("calculateAnnualIncomeTax — 2024 brackets", () => {
     expect(calculateAnnualIncomeTax(-1)).toBe(0);
   });
 
-  it("accepts custom brackets (for future-year overrides)", () => {
+  it("accepts custom brackets (for future-year overrides or historicals)", () => {
     // Hypothetical: flat 20% above personal exemption
     const flat: Array<[number, number]> = [
       [Number.POSITIVE_INFINITY, 0.2],
@@ -73,44 +98,92 @@ describe("calculateAnnualIncomeTax — 2024 brackets", () => {
       (50_000 - PERSONAL_EXEMPTION) * 0.2,
     );
   });
+
+  it("still computes 2024 numbers correctly when passed TAX_BRACKETS_2024", () => {
+    // Same example as the 2026 60k test, but with the old schedule:
+    // 60,000 − 20,000 PE = 40,000 taxable @ 10% = 4,000.
+    expect(calculateAnnualIncomeTax(60_000, TAX_BRACKETS_2024)).toBe(4_000);
+  });
 });
 
 describe("calculateMonthlyIncomeTax", () => {
   it("divides annual tax by 12 cleanly", () => {
-    // Monthly 5000 → annual 60,000 → tax 4,000 → monthly 333.33...
-    expect(calculateMonthlyIncomeTax(5_000)).toBeCloseTo(4_000 / 12, 4);
+    // Monthly 6,000 → annual 72,000 → after PE 52,000
+    //   40,000 @ 0%  = 0
+    //   12,000 @ 10% = 1,200
+    // → 1,200 / 12 = 100/month
+    expect(calculateMonthlyIncomeTax(6_000)).toBeCloseTo(1_200 / 12, 4);
   });
 
   it("returns 0 when the annualized salary is below the personal exemption", () => {
     // 1,000/mo × 12 = 12,000/yr < 20,000 PE
     expect(calculateMonthlyIncomeTax(1_000)).toBe(0);
   });
+
+  it("returns 0 when annual taxable falls entirely in the 0% bracket", () => {
+    // 5,000/mo × 12 = 60,000/yr − 20,000 PE = 40,000 taxable → all 0%
+    expect(calculateMonthlyIncomeTax(5_000)).toBe(0);
+  });
 });
 
-describe("calculateSocialInsurance", () => {
-  it("charges 14% of the salary when below the cap", () => {
-    // The function rounds to 2dp, so `5000 * 0.14` in raw IEEE-754 (= 700.0000000000001)
-    // becomes 700 after the round trip. Compare to the rounded value, not the raw one.
-    expect(calculateSocialInsurance(5_000)).toBe(
-      Math.round(5_000 * SOCIAL_INSURANCE_RATE * 100) / 100,
-    );
-    expect(calculateSocialInsurance(10_000)).toBe(1_400);
+describe("calculateSocialInsurance — 2026 NOSI rates", () => {
+  it("charges 11% of the salary when between min and max", () => {
+    // 10,000 × 0.11 = 1,100
+    expect(calculateSocialInsurance(10_000)).toBe(1_100);
+    // 5,000 × 0.11 = 550
+    expect(calculateSocialInsurance(5_000)).toBe(550);
   });
 
   it("caps at the MAX_INSURABLE_WAGE for higher salaries", () => {
+    // 20,000 → clamps to 16,700 → × 0.11 = 1,837
     expect(calculateSocialInsurance(20_000)).toBe(
       Math.round(MAX_INSURABLE_WAGE * SOCIAL_INSURANCE_RATE * 100) / 100,
     );
-    expect(calculateSocialInsurance(20_000)).toBe(1_764); // 12,600 × 14%
+    expect(calculateSocialInsurance(20_000)).toBe(1_837);
   });
 
-  it("equals zero for a zero salary", () => {
+  it("applies the MIN_INSURABLE_WAGE floor for very low salaries", () => {
+    // Worker earning 1,500 EGP is below the 2,700 NOSI floor;
+    // SI is still computed on the floor.
+    // 2,700 × 0.11 = 297
+    expect(calculateSocialInsurance(1_500)).toBe(297);
+    expect(calculateSocialInsurance(MIN_INSURABLE_WAGE)).toBe(297);
+  });
+
+  it("equals zero for a zero or negative salary (no contribution if no wage)", () => {
     expect(calculateSocialInsurance(0)).toBe(0);
+    expect(calculateSocialInsurance(-100)).toBe(0);
   });
 
   it("rounds to 2 decimal places (piastres)", () => {
-    // 1234.50 × 0.14 = 172.83 (already 2dp); 1234.55 × 0.14 = 172.837 → 172.84
-    expect(calculateSocialInsurance(1_234.55)).toBe(172.84);
+    // 12,345.55 × 0.11 = 1,358.0105 → 1,358.01
+    expect(calculateSocialInsurance(12_345.55)).toBe(1_358.01);
+  });
+});
+
+describe("calculateEmployerSocialInsurance — 18.75% (NOT deducted from employee)", () => {
+  it("computes 18.75% of the insurable wage", () => {
+    // 10,000 × 0.1875 = 1,875
+    expect(calculateEmployerSocialInsurance(10_000)).toBe(1_875);
+  });
+
+  it("respects the same MAX_INSURABLE_WAGE cap", () => {
+    // 20,000 → 16,700 × 0.1875 = 3,131.25
+    expect(calculateEmployerSocialInsurance(20_000)).toBe(
+      Math.round(MAX_INSURABLE_WAGE * EMPLOYER_SOCIAL_INSURANCE_RATE * 100) /
+        100,
+    );
+    expect(calculateEmployerSocialInsurance(20_000)).toBe(3_131.25);
+  });
+
+  it("respects the MIN_INSURABLE_WAGE floor", () => {
+    // 2,700 × 0.1875 = 506.25
+    expect(calculateEmployerSocialInsurance(1_000)).toBe(506.25);
+  });
+
+  it("equals zero for a zero or negative salary", () => {
+    expect(calculateEmployerSocialInsurance(0)).toBe(0);
+    expect(calculateEmployerSocialInsurance(-1)).toBe(0);
   });
 });
 
@@ -212,7 +285,7 @@ describe("calculatePayroll — full scenarios", () => {
     expect(result.netSalary).toBe(5_000);
   });
 
-  it("opt-in social insurance is applied when enabled", () => {
+  it("opt-in social insurance is applied when enabled (2026: 11%)", () => {
     const result = calculatePayroll(
       {
         basicSalary: 5_000,
@@ -224,12 +297,12 @@ describe("calculatePayroll — full scenarios", () => {
       22,
       { socialInsuranceEnabled: true },
     );
-    // 5000 × 14% = 700
-    expect(result.socialInsurance).toBe(700);
-    expect(result.netSalary).toBe(4_300);
+    // 5,000 (between min 2,700 and max 16,700) × 11% = 550
+    expect(result.socialInsurance).toBe(550);
+    expect(result.netSalary).toBe(4_450);
   });
 
-  it("opt-in income tax stacks on top of social insurance", () => {
+  it("opt-in income tax stacks on top of social insurance (2026 schedule)", () => {
     const result = calculatePayroll(
       {
         basicSalary: 5_000,
@@ -241,15 +314,17 @@ describe("calculatePayroll — full scenarios", () => {
       22,
       { socialInsuranceEnabled: true, incomeTaxEnabled: true },
     );
-    // monthlyBase = 5700; gross (no absence/tardy) = 5700
-    // SI = 5700 × 14% = 798
-    // Taxable = 5700 - 798 = 4902
-    // Annual taxable = 58,824; minus PE 20,000 = 38,824 → 10% bracket entirely
-    // Annual tax = 3,882.40; monthly = 323.5333... → 323.53
-    expect(result.socialInsurance).toBe(798);
-    expect(result.incomeTax).toBe(323.53);
-    expect(result.totalDeductions).toBe(798 + 323.53);
-    expect(result.netSalary).toBeCloseTo(5_700 - 798 - 323.53, 2);
+    // monthlyBase = 5,700; gross (no absence/tardy) = 5,700
+    // SI = 5,700 × 11% = 627  (between min & max)
+    // Taxable = 5,700 − 627 = 5,073
+    // Annual taxable = 60,876; minus PE 20,000 = 40,876
+    //   40,000 @ 0%  =     0
+    //      876 @ 10% =   87.60
+    // Annual tax = 87.60; monthly = 7.30
+    expect(result.socialInsurance).toBe(627);
+    expect(result.incomeTax).toBe(7.30);
+    expect(result.totalDeductions).toBe(627 + 7.30);
+    expect(result.netSalary).toBeCloseTo(5_700 - 627 - 7.30, 2);
   });
 
   it("loan + other deductions show up in totalDeductions and net", () => {
@@ -290,13 +365,16 @@ describe("calculatePayroll — full scenarios", () => {
     expect(result.netSalary).toBe(6_500);
   });
 
-  it("TAX_BRACKETS_2024 is monotonically increasing in upper bound", () => {
+  it("TAX_BRACKETS_2026 is monotonically increasing in upper bound", () => {
     // Catches a typo where a bracket bound was lower than its predecessor —
-    // which would zero out everything past it.
-    let prev = 0;
-    for (const [upper] of TAX_BRACKETS_2024) {
-      expect(upper).toBeGreaterThan(prev);
-      prev = upper;
+    // which would zero out everything past it. Same check on 2024 schedule
+    // for the historical-recompute path.
+    for (const brackets of [TAX_BRACKETS_2026, TAX_BRACKETS_2024]) {
+      let prev = 0;
+      for (const [upper] of brackets) {
+        expect(upper).toBeGreaterThan(prev);
+        prev = upper;
+      }
     }
   });
 });

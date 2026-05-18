@@ -1,31 +1,104 @@
 // Egyptian payroll calculation engine
-// Compliant with Law 12/2003 + 148/2019 + 2024-2025 income tax brackets
-// Sources: ETA (Egyptian Tax Authority) + NOSI (National Organization for Social Insurance)
+// Compliant with Law 12/2003 + 148/2019 + 2026 income tax brackets + 2026
+// social insurance limits.
+//
+// Sources for 2026 values:
+//   - Tax brackets:    Law 175/2023 progressive table (PwC Egypt Tax
+//                      Summaries 2026, KPMG Egypt rate table, Andersen
+//                      Egypt commentary).
+//   - SI rates & caps: NOSI (National Organization for Social Insurance)
+//                      decree effective 1 Jan 2026 — min insurable wage
+//                      EGP 2,700, max EGP 16,700.
+//                      Employee share 11%, employer share 18.75%
+//                      (https://mercans.com/.../insurable-wage-2026).
+//
+// Audit reference: PRODUCTION_READINESS_AUDIT.md §2.1 + §2.2 flagged
+// the previous 2024 values as a 🔴 blocker — moving them here is a
+// payroll-correctness fix, not a feature change.
 
 // ============================================================================
-// CONSTANTS
+// SOCIAL INSURANCE CONSTANTS
 // ============================================================================
-
-/** Social insurance employee contribution rate (الجزء الذي يخصم من الموظف) */
-export const SOCIAL_INSURANCE_RATE = 0.14; // 14%
 
 /**
- * Maximum insurable wage per month (2024-2025).
- * Updated annually by NOSI. Confirm with the latest decree before each
- * fiscal year — but as of 2024 it's around 12,600 EGP.
+ * Employee's share of social insurance (الجزء الذي يخصم من الموظف).
+ *
+ * 11% of the insurable wage. Confirmed against the 2026 NOSI decree.
+ * Was 14% in the codebase until 2026-05-18; the bump to 11% is the
+ * correct rate per Law 148/2019 as currently enforced.
  */
-export const MAX_INSURABLE_WAGE = 12600;
+export const SOCIAL_INSURANCE_RATE = 0.11; // 11% — employee share
 
 /**
- * Personal exemption — first slice of annual income that is fully exempt
- * from income tax. As of 2024 = 20,000 EGP/year (about 1,666 EGP/month).
+ * Employer's share of social insurance. Not deducted from the employee —
+ * it's a separate cost line for the company. Exposed here so future cost-
+ * of-employment reports (Total Employee Cost) can pick it up without
+ * hard-coding the number again.
+ */
+export const EMPLOYER_SOCIAL_INSURANCE_RATE = 0.1875; // 18.75% — employer share
+
+/**
+ * Maximum insurable wage per month (NOSI decree, effective 1 Jan 2026).
+ * Any income above this is NOT subject to social insurance.
+ * Was 12,600 EGP until the 2026 update.
+ */
+export const MAX_INSURABLE_WAGE = 16700;
+
+/**
+ * Minimum insurable wage per month (NOSI decree, effective 1 Jan 2026).
+ * Even if a worker's salary is below this, SI is computed on the floor —
+ * the insurance fund must receive at least the minimum contribution.
+ *
+ * In practice rare in Egypt: the statutory minimum wage for the private
+ * sector is well above 2,700 EGP. We still honor it for correctness.
+ */
+export const MIN_INSURABLE_WAGE = 2700;
+
+// ============================================================================
+// INCOME TAX CONSTANTS
+// ============================================================================
+
+/**
+ * Personal exemption — first slice of annual income fully exempt from
+ * income tax. Egyptian Tax Authority confirms 20,000 EGP/yr for 2026
+ * (unchanged from 2024).
  */
 export const PERSONAL_EXEMPTION = 20000;
 
 /**
- * Egyptian income tax brackets (annual, after personal exemption).
- * Updated 2024 per Law 175 of 2023.
- * Each bracket = [upper bound, rate]. The last bracket has Infinity.
+ * Egyptian income tax brackets for 2026 (annual, after personal exemption).
+ *
+ * Major change from prior years: the FIRST 40k after the personal
+ * exemption is now 0% (was 10% under the 2024 schedule). Subsequent
+ * brackets shifted up so the top rate of 27.5% only applies above
+ * EGP 1,200,000 (was 400,000).
+ *
+ * Each entry = [upper bound, rate]. The last entry has Infinity.
+ *
+ * Worked example for an employee on 100k/year:
+ *   1. After PE: 100,000 − 20,000 = 80,000 taxable
+ *   2. 40,000 in the 0% bracket  → 0 EGP
+ *   3. 15,000 in the 10% bracket → 1,500
+ *   4. 15,000 in the 15% bracket → 2,250
+ *   5. 10,000 in the 20% bracket → 2,000
+ *   → 5,750 EGP annual tax
+ */
+export const TAX_BRACKETS_2026: Array<[number, number]> = [
+  [40_000,   0.0],   //       0 – 40k    → 0%
+  [55_000,   0.10],  //   40k – 55k    → 10%
+  [70_000,   0.15],  //   55k – 70k    → 15%
+  [200_000,  0.20],  //   70k – 200k   → 20%
+  [400_000,  0.225], //  200k – 400k   → 22.5%
+  [1_200_000, 0.25], //  400k – 1.2M   → 25%
+  [Number.POSITIVE_INFINITY, 0.275], // 1.2M+ → 27.5%
+];
+
+/**
+ * Egyptian income tax brackets PRIOR to 2026 (Law 175/2023 first table).
+ * Kept exported so tax certificates for tax years 2024-2025 can still be
+ * recomputed against the historically-correct schedule. Pass explicitly
+ * to `calculateAnnualIncomeTax(income, TAX_BRACKETS_2024)` when doing
+ * back-fills; the default is now TAX_BRACKETS_2026.
  */
 export const TAX_BRACKETS_2024: Array<[number, number]> = [
   [40000, 0.1], // 0 - 40k → 10%
@@ -43,10 +116,14 @@ export const TAX_BRACKETS_2024: Array<[number, number]> = [
 /**
  * Calculate annual income tax based on Egyptian brackets, after personal
  * exemption. Returns the annual tax owed.
+ *
+ * Defaults to the 2026 brackets (Law 175/2023 schedule active from
+ * 2026-01-01). Pass TAX_BRACKETS_2024 explicitly when re-computing
+ * historical tax certificates.
  */
 export function calculateAnnualIncomeTax(
   annualGrossTaxable: number,
-  brackets: Array<[number, number]> = TAX_BRACKETS_2024,
+  brackets: Array<[number, number]> = TAX_BRACKETS_2026,
   personalExemption: number = PERSONAL_EXEMPTION,
 ): number {
   // Subtract personal exemption first
@@ -76,11 +153,40 @@ export function calculateMonthlyIncomeTax(monthlyGrossTaxable: number): number {
 
 /**
  * Employee's share of social insurance on a given monthly wage.
- * Capped at the max insurable wage.
+ *
+ * Applies BOTH the floor (MIN_INSURABLE_WAGE) and the ceiling
+ * (MAX_INSURABLE_WAGE) per the 2026 NOSI decree:
+ *   - Below floor → contribution is still on the floor amount
+ *   - Above ceiling → ignored
+ *   - Zero or negative → no contribution (treats "no salary" as "no SI")
+ *
+ * The min/max are reset every January by NOSI; bump the constants when
+ * the new decree drops.
  */
 export function calculateSocialInsurance(monthlyGross: number): number {
-  const insurableWage = Math.min(monthlyGross, MAX_INSURABLE_WAGE);
+  if (monthlyGross <= 0) return 0;
+  const insurableWage = Math.max(
+    MIN_INSURABLE_WAGE,
+    Math.min(monthlyGross, MAX_INSURABLE_WAGE),
+  );
   return Math.round(insurableWage * SOCIAL_INSURANCE_RATE * 100) / 100;
+}
+
+/**
+ * Employer's social insurance contribution for the same wage. Symmetric
+ * to the employee's: same min/max bounds, different rate.
+ *
+ * Not currently subtracted from anything — this is a separate company
+ * cost. Use it when building "Total Employee Cost" reports or when
+ * exporting NOSI submission files (نموذج 2 المنشأة).
+ */
+export function calculateEmployerSocialInsurance(monthlyGross: number): number {
+  if (monthlyGross <= 0) return 0;
+  const insurableWage = Math.max(
+    MIN_INSURABLE_WAGE,
+    Math.min(monthlyGross, MAX_INSURABLE_WAGE),
+  );
+  return Math.round(insurableWage * EMPLOYER_SOCIAL_INSURANCE_RATE * 100) / 100;
 }
 
 // ============================================================================
