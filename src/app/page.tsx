@@ -618,8 +618,8 @@ function CvReviewMockup() {
       <text x="20" y="20" fontSize="9" fill="#c9a84c" fontWeight="700" fontFamily="sans-serif">✦ AI CV REVIEW</text>
       <text x="20" y="34" fontSize="7" fill="#64748b" fontFamily="sans-serif">Powered by Nidham</text>
 
-      {/* Donut score on the right */}
-      <g transform="translate(330, 110)">
+      {/* Donut score — left column, well clear of the text on the right */}
+      <g transform="translate(70, 115)">
         <circle cx="0" cy="0" r={radius} stroke="#e2e8f0" strokeWidth="8" fill="none" />
         <circle
           cx="0"
@@ -636,25 +636,27 @@ function CvReviewMockup() {
         <text x="0" y="2" fontSize="18" fontWeight="900" fill="#0a1428" textAnchor="middle" fontFamily="sans-serif">{score}</text>
         <text x="0" y="14" fontSize="7" fill="#64748b" textAnchor="middle" fontFamily="sans-serif">/ 100</text>
       </g>
-      <text x="330" y="158" fontSize="9" fill="#0891b2" fontWeight="700" textAnchor="middle" fontFamily="sans-serif">
+      <text x="70" y="170" fontSize="10" fill="#0891b2" fontWeight="700" textAnchor="middle" fontFamily="sans-serif">
         Strong Match
       </text>
 
-      {/* Strengths column */}
-      <text x="380" y="62" fontSize="9" fill="#15803d" fontWeight="700" textAnchor="end" fontFamily="sans-serif">✓ نقاط القوة</text>
-      <text x="380" y="78" fontSize="8" fill="#1e293b" textAnchor="end" fontFamily="sans-serif">· React + TypeScript</text>
-      <text x="380" y="93" fontSize="8" fill="#1e293b" textAnchor="end" fontFamily="sans-serif">· مشاريع B2B Egypt</text>
-      <text x="380" y="108" fontSize="8" fill="#1e293b" textAnchor="end" fontFamily="sans-serif">· Supabase / Postgres</text>
+      {/* Strengths column — right side, anchored to the right edge.
+          Starts at y=60 and uses a 16px line-height so the three
+          bullets clear the donut's vertical center (y=115 ± 28). */}
+      <text x="380" y="62" fontSize="10" fill="#15803d" fontWeight="700" textAnchor="end" fontFamily="sans-serif">✓ نقاط القوة</text>
+      <text x="380" y="78" fontSize="9" fill="#1e293b" textAnchor="end" fontFamily="sans-serif">· React + TypeScript</text>
+      <text x="380" y="94" fontSize="9" fill="#1e293b" textAnchor="end" fontFamily="sans-serif">· مشاريع B2B Egypt</text>
+      <text x="380" y="110" fontSize="9" fill="#1e293b" textAnchor="end" fontFamily="sans-serif">· Supabase / Postgres</text>
 
-      {/* Weaknesses column */}
-      <text x="380" y="132" fontSize="9" fill="#b45309" fontWeight="700" textAnchor="end" fontFamily="sans-serif">⚠ مناطق للتطوير</text>
-      <text x="380" y="148" fontSize="8" fill="#1e293b" textAnchor="end" fontFamily="sans-serif">· مفيش DevOps experience</text>
-      <text x="380" y="163" fontSize="8" fill="#1e293b" textAnchor="end" fontFamily="sans-serif">· مفيش mobile native</text>
-      <text x="380" y="178" fontSize="8" fill="#1e293b" textAnchor="end" fontFamily="sans-serif">· إنجليزي conversational</text>
+      {/* Weaknesses column — right side, below the strengths block. */}
+      <text x="380" y="138" fontSize="10" fill="#b45309" fontWeight="700" textAnchor="end" fontFamily="sans-serif">⚠ مناطق للتطوير</text>
+      <text x="380" y="154" fontSize="9" fill="#1e293b" textAnchor="end" fontFamily="sans-serif">· مفيش DevOps experience</text>
+      <text x="380" y="170" fontSize="9" fill="#1e293b" textAnchor="end" fontFamily="sans-serif">· مفيش mobile native</text>
+      <text x="380" y="186" fontSize="9" fill="#1e293b" textAnchor="end" fontFamily="sans-serif">· إنجليزي conversational</text>
 
       {/* Interview questions CTA */}
-      <rect x="14" y="200" width="372" height="28" rx="8" fill="#0a1428" />
-      <text x="200" y="218" fontSize="11" fill="#22d3ee" fontWeight="900" textAnchor="middle" fontFamily="sans-serif">
+      <rect x="14" y="202" width="372" height="28" rx="8" fill="#0a1428" />
+      <text x="200" y="220" fontSize="11" fill="#22d3ee" fontWeight="900" textAnchor="middle" fontFamily="sans-serif">
         ✦ ٥ أسئلة مقابلة مقترحة بالـ AI
       </text>
     </svg>
