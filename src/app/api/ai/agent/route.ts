@@ -117,14 +117,26 @@ function buildSystemPrompt(companyName: string, userName: string): string {
    الأداة دي مباشرة بدون براميترز ولخّص النتايج. كل توصية فيها reasoning
    تفصيلي بالعربي — استخدمه في الرد.
 
-8. **bulk_import_employees** — أداة تنفيذية لرفع موظفين دفعة واحدة.
+8. **bulk_import_employees** — أداة تنفيذية لرفع موظفين دفعة واحدة،
+   **بـ merge ذكي عند التكرار**.
    لما المستخدم يرفع ملف **(Excel أو PDF)** ويقولك "ضيف الموظفين دول":
    أ) هتلاقي بيانات الملف داخل رسالة المستخدم كـ JSON منظم
    ب) لخّص في الـ chat: "هضيف X موظف، فيهم Y بدون رقم قومي و Z بدون كود.
-      تأكد عايز أضيفهم؟"
+      الموجودين أصلاً هـ-merge عليهم بس الحقول الفاضية (مش هتغيّر اللي
+      موجود). تأكد عايز أضيفهم؟"
    ج) استنى رد إيجابي صريح ("نعم"، "تمام"، "ضيف")
    د) نادي الأداة بـ rows + user_confirmed: true
    ه) ابن الـ rows من البيانات الموجودة في الـ chat، **متخترعش بيانات**
+
+   **عند الرد للمستخدم بعد التنفيذ**، الأداة بترجع 3 أرقام:
+     - inserted_count: موظفين جدد اتضافوا
+     - merged_count: موظفين موجودين أصلاً واتـ-enrich بحقول كانت فاضية
+       (مثلاً موظف موجود من غير كود بصمة → الكود اللي في الـ Excel
+       اتضاف عليه؛ مرتبه كان 0 → اترفع للقيمة الجديدة).
+     - skipped_count: صفوف مفيش فيها أي قيمة جديدة نضيفها / صفوف فيها
+       اسم ناقص / national_id غلط
+   لخّص الـ 3 أرقام للمستخدم بكلام عربي بسيط: مثلاً
+   "اتضاف 25 موظف جديد · 50 موظف موجود اترفعت بياناتهم · 5 صفوف اتجاهلوا".
 
    ⚠️ **خريطة الأعمدة المهمة جداً** (الـ Excel المصري بيستخدم تسميات
    مختلفة لنفس الحقل — لازم تـ-map صح وإلا الـ field هيضيع):
@@ -890,10 +902,16 @@ export async function POST(req: Request) {
     // ----------- Tool 8: bulk_import_employees (destructive) -----------
     bulk_import_employees: tool({
       description:
-        "**أداة تنفيذية** — اضف موظفين جدد دفعة واحدة لقاعدة البيانات. " +
-        "استعملها بس بعد ما المستخدم رفع ملف Excel وقالك صراحة 'ضيف الموظفين دول'. " +
+        "**أداة تنفيذية** — أضف موظفين دفعة واحدة، **مع merge ذكي لو فيه تكرار**. " +
+        "استعملها بعد ما المستخدم رفع ملف Excel وقالك 'ضيف الموظفين دول'. " +
         "كل صف لازم يكون فيه على الأقل full_name. " +
-        "بترجع عدد المضافين + المتجاهلين (بسبب اسم ناقص أو تكرار). " +
+        "**سلوك التكرار (مهم)**: لو الموظف موجود بنفس الـ national_id أو " +
+        "employee_code أو full_name، الأداة **مش بتتجاهله** — بدل كده " +
+        "بتـ-MERGE: تملا بس الحقول اللي فاضية في السجل الحالي بالقيم الجديدة، " +
+        "بدون ما تغيّر القيم الموجودة. بترجع: " +
+        "  - inserted_count: موظفين جدد اتضافوا " +
+        "  - merged_count: موظفين موجودين أصلاً واتـ-enrich بحقول كانت فاضية " +
+        "  - skipped_count: صفوف ما فيش فيها قيم جديدة (كل البيانات موجودة) " +
         "**لا تستعملها بدون موافقة صريحة من المستخدم في الـ chat.**",
       inputSchema: z.object({
         rows: z
@@ -959,8 +977,59 @@ export async function POST(req: Request) {
         }
         const supa = await createClient();
 
+        // Three outcomes per row instead of two:
+        //   - inserted: brand-new employee created
+        //   - merged:   employee existed; we filled empty fields with new data
+        //   - skipped:  row unusable (no name) or nothing to merge
         const inserted: string[] = [];
+        const merged: {
+          id: string;
+          name: string;
+          fields_added: string[];
+        }[] = [];
         const skipped: { row: number; name: string; reason: string }[] = [];
+
+        // Fields that can be back-filled from the import row. Order
+        // matches the schema columns we select below.
+        type MergeField =
+          | "employee_code"
+          | "job_title"
+          | "department"
+          | "phone"
+          | "email"
+          | "hire_date"
+          | "basic_salary"
+          | "housing_allowance"
+          | "transport_allowance"
+          | "other_allowances"
+          | "incentive_allowance"
+          | "national_id"
+          | "pay_frequency";
+        const MERGEABLE_FIELDS: MergeField[] = [
+          "employee_code",
+          "job_title",
+          "department",
+          "phone",
+          "email",
+          "hire_date",
+          "basic_salary",
+          "housing_allowance",
+          "transport_allowance",
+          "other_allowances",
+          "incentive_allowance",
+          "national_id",
+          "pay_frequency",
+        ];
+
+        // Helper: a stored value counts as "empty" when it's null /
+        // undefined / "" / 0. The 0-check matters for salary columns
+        // — an employee row at 0 EGP is almost always a stub that
+        // should be filled from the new import.
+        const isEmpty = (v: unknown): boolean =>
+          v === null ||
+          v === undefined ||
+          (typeof v === "string" && v.trim() === "") ||
+          (typeof v === "number" && v === 0);
 
         for (let i = 0; i < rows.length; i++) {
           const r = rows[i];
@@ -982,40 +1051,94 @@ export async function POST(req: Request) {
             continue;
           }
 
-          // Dedupe by national_id then by employee_code
+          // Look for an existing employee in PRIORITY order:
+          //   1) national_id (strongest identity)
+          //   2) employee_code
+          //   3) exact full_name match
+          // Each query is .maybeSingle() so 0 or 1 rows is fine.
+          type ExistingRow = Partial<
+            Record<MergeField | "id" | "full_name", unknown>
+          > & { id: string };
+          let existing: ExistingRow | null = null;
+          const selectCols =
+            "id, full_name, employee_code, job_title, department, phone, email, hire_date, basic_salary, housing_allowance, transport_allowance, other_allowances, incentive_allowance, national_id, pay_frequency";
+
           if (r.national_id) {
-            const { data: dupe } = await supa
+            const { data } = await supa
               .from("employees")
-              .select("id")
+              .select(selectCols)
               .eq("company_id", profile.company_id)
               .eq("national_id", r.national_id)
-              .maybeSingle();
-            if (dupe) {
-              skipped.push({
-                row: rowIdx,
-                name: r.full_name,
-                reason: "موجود بنفس الرقم القومي",
-              });
-              continue;
-            }
+              .maybeSingle<ExistingRow>();
+            if (data) existing = data;
           }
-          if (r.employee_code) {
-            const { data: dupe } = await supa
+          if (!existing && r.employee_code) {
+            const { data } = await supa
               .from("employees")
-              .select("id")
+              .select(selectCols)
               .eq("company_id", profile.company_id)
               .eq("employee_code", r.employee_code)
-              .maybeSingle();
-            if (dupe) {
+              .maybeSingle<ExistingRow>();
+            if (data) existing = data;
+          }
+          if (!existing) {
+            const { data } = await supa
+              .from("employees")
+              .select(selectCols)
+              .eq("company_id", profile.company_id)
+              .eq("full_name", r.full_name.trim())
+              .maybeSingle<ExistingRow>();
+            if (data) existing = data;
+          }
+
+          // ============= MERGE PATH =============
+          if (existing) {
+            const updates: Partial<Record<MergeField, unknown>> = {};
+            const fieldsAdded: string[] = [];
+            for (const f of MERGEABLE_FIELDS) {
+              const incoming = (r as unknown as Record<string, unknown>)[f];
+              if (incoming === undefined || incoming === null) continue;
+              if (typeof incoming === "string" && incoming.trim() === "")
+                continue;
+              if (isEmpty(existing[f])) {
+                updates[f] = incoming;
+                fieldsAdded.push(f);
+              }
+            }
+
+            if (Object.keys(updates).length === 0) {
               skipped.push({
                 row: rowIdx,
                 name: r.full_name,
-                reason: "موجود بنفس الكود",
+                reason: "موجود بكل البيانات — مفيش حاجة جديدة نضيفها",
               });
               continue;
             }
+
+            const { error: updErr } = await supa
+              .from("employees")
+              .update({
+                ...updates,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", existing.id);
+            if (updErr) {
+              skipped.push({
+                row: rowIdx,
+                name: r.full_name,
+                reason: `merge فشل: ${updErr.message.slice(0, 80)}`,
+              });
+            } else {
+              merged.push({
+                id: existing.id,
+                name: r.full_name,
+                fields_added: fieldsAdded,
+              });
+            }
+            continue;
           }
 
+          // ============= INSERT PATH =============
           const { data, error } = await supa
             .from("employees")
             .insert({
@@ -1053,7 +1176,9 @@ export async function POST(req: Request) {
         return {
           ok: true,
           inserted_count: inserted.length,
+          merged_count: merged.length,
           skipped_count: skipped.length,
+          merged_details: merged.slice(0, 10),
           skipped_details: skipped.slice(0, 10),
           dashboard_url: "/dashboard/employees",
         };
