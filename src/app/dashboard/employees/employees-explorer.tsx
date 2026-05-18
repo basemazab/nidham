@@ -66,7 +66,7 @@ const NO_DEPT_LABEL = "بدون قسم";
 
 type StatusFilter = "all" | EmployeeRow["status"];
 type FreqFilter = "all" | "monthly" | "weekly";
-type ViewMode = "by-dept" | "table";
+type ViewMode = "cards" | "by-dept" | "table";
 
 function totalComp(e: EmployeeRow): number {
   return (
@@ -89,7 +89,34 @@ export function EmployeesExplorer({
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [freqFilter, setFreqFilter] = useState<FreqFilter>("all");
-  const [view, setView] = useState<ViewMode>("by-dept");
+  // Department filter — driven by the right-side sidebar. "" means
+  // "all departments". Setting it to NO_DEPT_LABEL filters down to
+  // employees without a department.
+  const [deptFilter, setDeptFilter] = useState<string>("");
+  // Cards is the default — matches the Odoo-style kanban grid the
+  // operator asked for. by-dept + table stay available via tabs.
+  const [view, setView] = useState<ViewMode>("cards");
+
+  // Department list with counts — drives the sidebar. Computed off
+  // the FULL employee list (not the filtered one) so counts reflect
+  // the underlying truth, not the active search.
+  const departments = useMemo(() => {
+    const m = new Map<string, number>();
+    let unassigned = 0;
+    for (const e of employees) {
+      const d = (e.department && e.department.trim()) || "";
+      if (!d) {
+        unassigned += 1;
+      } else {
+        m.set(d, (m.get(d) ?? 0) + 1);
+      }
+    }
+    const entries = Array.from(m.entries()).sort((a, b) => b[1] - a[1]);
+    if (unassigned > 0) {
+      entries.push([NO_DEPT_LABEL, unassigned]);
+    }
+    return entries;
+  }, [employees]);
 
   const filtered = useMemo(() => {
     const needle = normalize(query.trim());
@@ -98,6 +125,16 @@ export function EmployeesExplorer({
       if (freqFilter !== "all") {
         const f = e.pay_frequency ?? "monthly";
         if (f !== freqFilter) return false;
+      }
+      // Department filter — empty means "all". NO_DEPT_LABEL matches
+      // employees with no department or an empty-string department.
+      if (deptFilter) {
+        const d = (e.department && e.department.trim()) || "";
+        if (deptFilter === NO_DEPT_LABEL) {
+          if (d) return false;
+        } else {
+          if (d !== deptFilter) return false;
+        }
       }
       if (!needle) return true;
       const haystack = normalize(
@@ -111,7 +148,7 @@ export function EmployeesExplorer({
       );
       return haystack.includes(needle);
     });
-  }, [employees, query, statusFilter, freqFilter]);
+  }, [employees, query, statusFilter, freqFilter, deptFilter]);
 
   const counts = useMemo(() => {
     const byStatus = {
@@ -131,12 +168,16 @@ export function EmployeesExplorer({
 
   // Auto-detect empty filter state for the "no results" panel
   const isFiltered =
-    query !== "" || statusFilter !== "all" || freqFilter !== "all";
+    query !== "" ||
+    statusFilter !== "all" ||
+    freqFilter !== "all" ||
+    deptFilter !== "";
 
   const clearFilters = () => {
     setQuery("");
     setStatusFilter("all");
     setFreqFilter("all");
+    setDeptFilter("");
   };
 
   return (
@@ -231,6 +272,12 @@ export function EmployeesExplorer({
         {/* View tabs */}
         <div className="inline-flex rounded-xl bg-slate-100 p-1 shadow-inner">
           <ViewTab
+            active={view === "cards"}
+            onClick={() => setView("cards")}
+            icon="🃏"
+            label="كروت"
+          />
+          <ViewTab
             active={view === "by-dept"}
             onClick={() => setView("by-dept")}
             icon="🏢"
@@ -252,17 +299,223 @@ export function EmployeesExplorer({
           : `${filtered.length} من ${employees.length} موظف${
               query ? ` يطابقوا "${query}"` : ""
             }`}
+        {deptFilter && (
+          <span className="ms-2">
+            · القسم: <strong className="text-slate-700">{deptFilter}</strong>{" "}
+            <button
+              type="button"
+              onClick={() => setDeptFilter("")}
+              className="text-rose-600 hover:text-rose-800 font-bold"
+              title="مسح فلتر القسم"
+            >
+              ✕
+            </button>
+          </span>
+        )}
       </div>
 
-      {/* ===== Body ===== */}
-      {filtered.length === 0 ? (
-        <NoResults onClear={clearFilters} hadFilters={isFiltered} />
-      ) : view === "by-dept" ? (
-        <ByDepartmentView employees={filtered} />
-      ) : (
-        <FlatTableView employees={filtered} />
-      )}
+      {/* ===== Body: sidebar + main ===== */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_220px] gap-4">
+        <div className="min-w-0">
+          {filtered.length === 0 ? (
+            <NoResults onClear={clearFilters} hadFilters={isFiltered} />
+          ) : view === "cards" ? (
+            <CardGridView employees={filtered} />
+          ) : view === "by-dept" ? (
+            <ByDepartmentView employees={filtered} />
+          ) : (
+            <FlatTableView employees={filtered} />
+          )}
+        </div>
+        {/* Department sidebar — Odoo-style. Always rendered (even when
+            employees is empty) so the operator can see the structure.
+            Sticks on desktop so the active department stays in view
+            while scrolling the kanban grid. */}
+        <DepartmentSidebar
+          departments={departments}
+          activeDept={deptFilter}
+          totalCount={employees.length}
+          onSelect={setDeptFilter}
+        />
+      </div>
     </div>
+  );
+}
+
+// ----------------------------------------------------------------------------
+// CardGridView — Odoo-style kanban grid (3 cards per row on desktop,
+// 2 on tablet, 1 on phone). Each card is a Link to the detail page.
+// ----------------------------------------------------------------------------
+function CardGridView({ employees }: { employees: EmployeeRow[] }) {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      {employees.map((e) => (
+        <EmployeeCard key={e.id} employee={e} />
+      ))}
+    </div>
+  );
+}
+
+function EmployeeCard({ employee }: { employee: EmployeeRow }) {
+  const status = STATUS_LABELS[employee.status];
+  const comp = totalComp(employee);
+  // Status dot color — green for active, amber for on-leave, gray for terminated.
+  const dotColor =
+    employee.status === "active"
+      ? "bg-emerald-500"
+      : employee.status === "on_leave"
+        ? "bg-amber-500"
+        : "bg-slate-400";
+
+  return (
+    <Link
+      href={`/dashboard/employees/${employee.id}`}
+      className="group block bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-lg hover:border-brand-cyan/40 hover:-translate-y-0.5 transition-all overflow-hidden"
+    >
+      <div className="p-4 flex gap-3">
+        {/* Avatar block — bigger than the row item so the card has visual weight */}
+        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-brand-cyan to-brand-cyan-dark flex items-center justify-center text-white text-xl font-black shrink-0 relative">
+          {employee.full_name[0]}
+          {/* Status dot in the corner */}
+          <span
+            className={`absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full ${dotColor} ring-2 ring-white`}
+            title={status.text}
+          />
+        </div>
+
+        {/* Right column — name + role + extras */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2 mb-0.5">
+            <h3 className="font-black text-slate-800 font-cairo group-hover:text-brand-cyan-dark transition truncate text-sm">
+              {employee.full_name}
+            </h3>
+            {employee.employee_code && (
+              <span
+                className="shrink-0 text-[9px] text-slate-500 font-mono bg-slate-50 border border-slate-200 px-1.5 py-0.5 rounded"
+                dir="ltr"
+              >
+                #{employee.employee_code}
+              </span>
+            )}
+          </div>
+          <div className="text-xs text-slate-600 font-cairo truncate mb-1">
+            {employee.job_title ?? "—"}
+          </div>
+          {employee.phone && (
+            <div
+              className="text-[11px] text-slate-500 font-mono truncate"
+              dir="ltr"
+            >
+              📞 {employee.phone}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Footer — comp + freq + status chip. Hidden if there's nothing useful. */}
+      {(comp > 0 || employee.department) && (
+        <div className="px-4 py-2.5 bg-slate-50/70 border-t border-slate-100 flex items-center justify-between gap-2 flex-wrap">
+          {employee.department && (
+            <span className="text-[11px] text-slate-600 font-cairo truncate min-w-0">
+              🏢 {employee.department}
+            </span>
+          )}
+          {comp > 0 && (
+            <span
+              className="text-[11px] font-bold text-emerald-700 whitespace-nowrap"
+              dir="ltr"
+            >
+              {formatEGP(comp)}
+            </span>
+          )}
+        </div>
+      )}
+    </Link>
+  );
+}
+
+// ----------------------------------------------------------------------------
+// DepartmentSidebar — Odoo's right-side "filter by department" list.
+// Stays visible while the operator scrolls the kanban grid.
+// ----------------------------------------------------------------------------
+function DepartmentSidebar({
+  departments,
+  activeDept,
+  totalCount,
+  onSelect,
+}: {
+  departments: [string, number][];
+  activeDept: string;
+  totalCount: number;
+  onSelect: (dept: string) => void;
+}) {
+  return (
+    <aside className="bg-white rounded-2xl border border-slate-200 shadow-sm p-3 lg:sticky lg:top-4 lg:self-start">
+      <div className="flex items-center gap-2 mb-2 px-2">
+        <span className="text-base">🏢</span>
+        <h3 className="text-xs font-black text-slate-700 font-cairo">
+          الأقسام
+        </h3>
+      </div>
+      <div className="space-y-0.5">
+        <DeptItem
+          label="الكل"
+          count={totalCount}
+          active={activeDept === ""}
+          onClick={() => onSelect("")}
+          isPrimary
+        />
+        {departments.map(([name, count]) => (
+          <DeptItem
+            key={name}
+            label={name}
+            count={count}
+            active={activeDept === name}
+            onClick={() => onSelect(name)}
+          />
+        ))}
+      </div>
+    </aside>
+  );
+}
+
+function DeptItem({
+  label,
+  count,
+  active,
+  onClick,
+  isPrimary = false,
+}: {
+  label: string;
+  count: number;
+  active: boolean;
+  onClick: () => void;
+  isPrimary?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg text-xs font-cairo transition group ${
+        active
+          ? "bg-brand-cyan/10 text-brand-cyan-dark font-black"
+          : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+      }`}
+    >
+      <span className="truncate text-right flex-1">
+        {isPrimary && !active && <span className="text-slate-400">▸ </span>}
+        {label}
+      </span>
+      <span
+        className={`shrink-0 tabular-nums px-1.5 py-0.5 rounded text-[10px] font-bold ${
+          active
+            ? "bg-brand-cyan-dark text-white"
+            : "bg-slate-100 text-slate-500 group-hover:bg-slate-200"
+        }`}
+      >
+        {count}
+      </span>
+    </button>
   );
 }
 
