@@ -82,9 +82,12 @@ export default async function TaxCertificatePage({
       p_employee_id: employeeId,
       p_year: year,
     }),
+    // Read through employees_with_pii (mig 050) so national_id comes back
+    // decrypted. PostgREST `name:source` aliases `national_id_dec` back
+    // to `national_id` for downstream code.
     supabase
-      .from("employees")
-      .select("full_name, job_title, department, hire_date, national_id, basic_salary")
+      .from("employees_with_pii")
+      .select("full_name, job_title, department, hire_date, national_id:national_id_dec, basic_salary")
       .eq("id", employeeId)
       .single<{
         full_name: string;

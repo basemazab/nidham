@@ -86,12 +86,38 @@ export default async function PrintPayslipPage({ params }: PageProps) {
   const { data: entry } = await supabase
     .from("payroll_entries")
     .select(
-      "*, employees(full_name, employee_code, job_title, department, national_id, social_insurance_number, bank_name, bank_account_number, hire_date), payroll_periods(year, month, frequency, start_date, end_date, working_days, status, paid_at)",
+      // PII fields (national_id, social_insurance_number, bank_*) on the
+      // joined employees row are NULL after mig 050 — fetch them
+      // separately below from the employees_with_pii view.
+      "*, employee_id, employees(full_name, employee_code, job_title, department, hire_date), payroll_periods(year, month, frequency, start_date, end_date, working_days, status, paid_at)",
     )
     .eq("id", entryId)
-    .single<Entry>();
+    .single<Entry & { employee_id: string }>();
 
   if (!entry) notFound();
+
+  // Splice in decrypted PII for the payslip header. One extra round-trip
+  // — acceptable since this is a low-volume print path (one row per print).
+  if (entry.employees && entry.employee_id) {
+    const { data: pii } = await supabase
+      .from("employees_with_pii")
+      .select(
+        "national_id_dec, social_insurance_number_dec, bank_name_dec, bank_account_number_dec",
+      )
+      .eq("id", entry.employee_id)
+      .maybeSingle<{
+        national_id_dec: string | null;
+        social_insurance_number_dec: string | null;
+        bank_name_dec: string | null;
+        bank_account_number_dec: string | null;
+      }>();
+    if (pii) {
+      entry.employees.national_id = pii.national_id_dec;
+      entry.employees.social_insurance_number = pii.social_insurance_number_dec;
+      entry.employees.bank_name = pii.bank_name_dec;
+      entry.employees.bank_account_number = pii.bank_account_number_dec;
+    }
+  }
 
   const { data: profile } = await supabase
     .from("profiles")

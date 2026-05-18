@@ -91,10 +91,14 @@ type Employee = {
   rotation_id: string | null;
   rotation_anchor_date: string | null;
   rotation_anchor_position: number | null;
-  national_id: string | null;
-  social_insurance_number: string | null;
-  bank_name: string | null;
-  bank_account_number: string | null;
+  // Decrypted PII columns from the `employees_with_pii` view (mig 050).
+  // The underlying employees table stores these as encrypted bytea in
+  // *_encrypted columns; the view exposes the cleartext as `*_dec`. We
+  // read from the view so the form pre-fills with the real value.
+  national_id_dec: string | null;
+  social_insurance_number_dec: string | null;
+  bank_name_dec: string | null;
+  bank_account_number_dec: string | null;
   status: "active" | "on_leave" | "terminated";
   notes: string | null;
   avatar_url: string | null;
@@ -114,8 +118,11 @@ export default async function EditEmployeePage({ params, searchParams }: PagePro
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  // Read from the PII view so national_id / bank info come back decrypted
+  // as `*_dec` columns. The raw `employees` table after mig 050 has those
+  // fields encrypted at-rest; the view does the pgp_sym_decrypt server-side.
   const { data: employee } = await supabase
-    .from("employees")
+    .from("employees_with_pii")
     .select("*")
     .eq("id", id)
     .single<Employee>();
@@ -572,7 +579,7 @@ export default async function EditEmployeePage({ params, searchParams }: PagePro
                     type="text"
                     inputMode="numeric"
                     dir="ltr"
-                    defaultValue={employee.national_id ?? ""}
+                    defaultValue={employee.national_id_dec ?? ""}
                     placeholder="14 رقم"
                     className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none transition text-slate-900 text-right font-mono"
                   />
@@ -584,7 +591,7 @@ export default async function EditEmployeePage({ params, searchParams }: PagePro
                     name="social_insurance_number"
                     type="text"
                     dir="ltr"
-                    defaultValue={employee.social_insurance_number ?? ""}
+                    defaultValue={employee.social_insurance_number_dec ?? ""}
                     className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none transition text-slate-900 text-right font-mono"
                   />
                 </div>
@@ -594,7 +601,7 @@ export default async function EditEmployeePage({ params, searchParams }: PagePro
                     id="bank_name"
                     name="bank_name"
                     type="text"
-                    defaultValue={employee.bank_name ?? ""}
+                    defaultValue={employee.bank_name_dec ?? ""}
                     placeholder="مثلًا: CIB"
                     className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none transition text-slate-900"
                   />
@@ -606,7 +613,7 @@ export default async function EditEmployeePage({ params, searchParams }: PagePro
                     name="bank_account_number"
                     type="text"
                     dir="ltr"
-                    defaultValue={employee.bank_account_number ?? ""}
+                    defaultValue={employee.bank_account_number_dec ?? ""}
                     className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none transition text-slate-900 text-right font-mono"
                   />
                 </div>

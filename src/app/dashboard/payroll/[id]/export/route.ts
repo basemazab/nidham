@@ -47,17 +47,27 @@ type EntryRow = {
   net_salary: number;
   eos_gratuity: number;
   notes: string | null;
+  employee_id: string;
+  // The embedded employees relation now returns only the non-PII fields
+  // (PII is fetched separately via the employees_with_pii view — see
+  // the body of GET below). We splice the PII back in before building
+  // PayrollExportRow.
   employees: {
     employee_code: string | null;
     full_name: string;
-    national_id: string | null;
     job_title: string | null;
     department: string | null;
-    bank_name: string | null;
-    bank_account_number: string | null;
     bank_iban: string | null;
     payment_method: "cash" | "bank" | "instapay" | null;
   } | null;
+};
+
+/** Decrypted PII pulled separately from the employees_with_pii view. */
+type EmployeePIIRow = {
+  id: string;
+  national_id_dec: string | null;
+  bank_name_dec: string | null;
+  bank_account_number_dec: string | null;
 };
 
 export async function GET(req: Request, ctx: RouteContext) {
@@ -87,10 +97,14 @@ export async function GET(req: Request, ctx: RouteContext) {
       .select("name")
       .eq("id", profile.company_id)
       .single<{ name: string }>(),
+    // Join to the base `employees` table for non-PII fields (employee_code,
+    // full_name, job_title, etc.). PII fields (national_id, bank_*) on the
+    // raw table are NULL after mig 050's encryption trigger, so we fetch
+    // them separately below via the `employees_with_pii` view.
     supabase
       .from("payroll_entries")
       .select(
-        "id, attended_days, half_day_days, leave_days, absent_days, basic_salary, housing_allowance, transport_allowance, other_allowances, incentive_allowance, bonuses, overtime, gross_salary, absence_deduction, tardiness_deduction, social_insurance, income_tax, loan_deduction, other_deductions, total_deductions, net_salary, eos_gratuity, notes, employees(employee_code, full_name, national_id, job_title, department, bank_name, bank_account_number, bank_iban, payment_method)",
+        "id, employee_id, attended_days, half_day_days, leave_days, absent_days, basic_salary, housing_allowance, transport_allowance, other_allowances, incentive_allowance, bonuses, overtime, gross_salary, absence_deduction, tardiness_deduction, social_insurance, income_tax, loan_deduction, other_deductions, total_deductions, net_salary, eos_gratuity, notes, employees(employee_code, full_name, job_title, department, bank_iban, payment_method)",
       )
       .eq("period_id", periodId)
       .order("employee_id")
@@ -105,14 +119,35 @@ export async function GET(req: Request, ctx: RouteContext) {
   const company = companyRes.data;
   const entries = entriesRes.data ?? [];
 
-  const rows: PayrollExportRow[] = entries.map((e) => ({
+  // Fetch the decrypted PII for everyone in this period in ONE round-trip
+  // through the employees_with_pii view (mig 050). PostgREST doesn't let
+  // us embed the view as a relation off payroll_entries, so we batch-fetch
+  // by employee_id and splice into the rows below.
+  const employeeIds = [
+    ...new Set(entries.map((e) => e.employee_id).filter(Boolean)),
+  ];
+  const piiById = new Map<string, EmployeePIIRow>();
+  if (employeeIds.length > 0) {
+    const { data: piiRows } = await supabase
+      .from("employees_with_pii")
+      .select("id, national_id_dec, bank_name_dec, bank_account_number_dec")
+      .in("id", employeeIds)
+      .returns<EmployeePIIRow[]>();
+    for (const p of piiRows ?? []) {
+      piiById.set(p.id, p);
+    }
+  }
+
+  const rows: PayrollExportRow[] = entries.map((e) => {
+    const pii = piiById.get(e.employee_id);
+    return {
     employee_code: e.employees?.employee_code ?? null,
     full_name: e.employees?.full_name ?? "—",
-    national_id: e.employees?.national_id ?? null,
+    national_id: pii?.national_id_dec ?? null,
     job_title: e.employees?.job_title ?? null,
     department: e.employees?.department ?? null,
-    bank_name: e.employees?.bank_name ?? null,
-    bank_account_number: e.employees?.bank_account_number ?? null,
+    bank_name: pii?.bank_name_dec ?? null,
+    bank_account_number: pii?.bank_account_number_dec ?? null,
     bank_iban: e.employees?.bank_iban ?? null,
     payment_method: e.employees?.payment_method ?? "cash",
     attended_days: Number(e.attended_days),
@@ -137,7 +172,8 @@ export async function GET(req: Request, ctx: RouteContext) {
     eos_gratuity: Number(e.eos_gratuity ?? 0),
     net_salary: Number(e.net_salary),
     notes: e.notes,
-  }));
+    };
+  });
 
   const meta: PeriodMeta = {
     company_name: company?.name ?? "—",

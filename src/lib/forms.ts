@@ -90,14 +90,21 @@ export async function resolveFormContext(opts: {
     }
   }
 
-  // Employee (only if pre-filled mode)
+  // Employee (only if pre-filled mode).
+  //
+  // Read from the PII view (mig 050) so national_id and
+  // social_insurance_number come back decrypted as `*_dec` columns. The
+  // FormEmployee type pre-dates the encryption migration, so we alias
+  // the _dec columns back to the original names PostgREST-side via the
+  // `national_id:national_id_dec` syntax — keeps the downstream form
+  // templates unchanged.
   let employee: FormEmployee | null = null;
   const empId = opts.employeeId?.trim();
   if (empId && /^[0-9a-f-]{36}$/i.test(empId)) {
     const { data } = await supabase
-      .from("employees")
+      .from("employees_with_pii")
       .select(
-        "id, full_name, employee_code, job_title, department, phone, email, hire_date, basic_salary, housing_allowance, transport_allowance, other_allowances, incentive_allowance, national_id, social_insurance_number, pay_frequency",
+        "id, full_name, employee_code, job_title, department, phone, email, hire_date, basic_salary, housing_allowance, transport_allowance, other_allowances, incentive_allowance, pay_frequency, national_id:national_id_dec, social_insurance_number:social_insurance_number_dec",
       )
       .eq("id", empId)
       .maybeSingle<FormEmployee>();

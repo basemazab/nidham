@@ -107,14 +107,18 @@ export default async function BulkPayslipsPrintPage({ params }: PageProps) {
       .select("*")
       .eq("id", periodId)
       .single<Period>(),
+    // PII fields (national_id, social_insurance_number, bank_*) on the
+    // joined employees row come back NULL after mig 050. We batch-fetch
+    // the decrypted versions from employees_with_pii below and splice
+    // them into the entries before rendering.
     supabase
       .from("payroll_entries")
       .select(
-        `*, employees(full_name, employee_code, job_title, department, national_id, social_insurance_number, bank_name, bank_account_number, hire_date)`,
+        `*, employee_id, employees(full_name, employee_code, job_title, department, hire_date)`,
       )
       .eq("period_id", periodId)
       .order("employee_id")
-      .returns<Entry[]>(),
+      .returns<Array<Entry & { employee_id: string }>>(),
     (async () => {
       const { data: profile } = await supabase
         .from("profiles")
@@ -134,6 +138,40 @@ export default async function BulkPayslipsPrintPage({ params }: PageProps) {
   const period = periodRes.data;
   const entries = entriesRes.data ?? [];
   const companyName = companyRes.data?.name ?? "—";
+
+  // Batch-fetch decrypted PII for every employee in this period.
+  // employees_with_pii is a view onto the same underlying RLS — no
+  // cross-tenant leak risk.
+  const employeeIds = [
+    ...new Set(entries.map((e) => e.employee_id).filter(Boolean)),
+  ];
+  if (employeeIds.length > 0) {
+    const { data: piiRows } = await supabase
+      .from("employees_with_pii")
+      .select(
+        "id, national_id_dec, social_insurance_number_dec, bank_name_dec, bank_account_number_dec",
+      )
+      .in("id", employeeIds)
+      .returns<
+        Array<{
+          id: string;
+          national_id_dec: string | null;
+          social_insurance_number_dec: string | null;
+          bank_name_dec: string | null;
+          bank_account_number_dec: string | null;
+        }>
+      >();
+    const piiById = new Map((piiRows ?? []).map((p) => [p.id, p]));
+    for (const e of entries) {
+      const pii = piiById.get(e.employee_id);
+      if (e.employees && pii) {
+        e.employees.national_id = pii.national_id_dec;
+        e.employees.social_insurance_number = pii.social_insurance_number_dec;
+        e.employees.bank_name = pii.bank_name_dec;
+        e.employees.bank_account_number = pii.bank_account_number_dec;
+      }
+    }
+  }
 
   const periodLabel =
     period.start_date && period.end_date
