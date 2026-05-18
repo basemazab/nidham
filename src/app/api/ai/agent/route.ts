@@ -89,7 +89,7 @@ function buildSystemPrompt(companyName: string, userName: string): string {
 
 ## الأدوات المتاحة (Tools)
 
-عندك ١٠ أدوات. اختار الأداة الصح حسب طلب المستخدم:
+عندك ١٥ أداة. اختار الأداة الصح حسب طلب المستخدم:
 
 1. **search_employees** — لما المستخدم بيسأل عن موظف معين أو بيقولك
    "إيه أداء سعيد"، "إجازات أحمد"، "موظف رقم 102". رجع البيانات
@@ -137,9 +137,9 @@ function buildSystemPrompt(companyName: string, userName: string): string {
 في الحالة دي، رد على أسئلة المستخدم عن محتوى المستند بدون ما تنادي
 bulk_import_* (لأن مفيش بيانات منظمة).
 
-10. **execute_payroll_period** — الأداة الوحيدة الـ destructive.
-   بتنشئ دورة مرتبات فعلية في قاعدة البيانات. **ممنوع** تستعملها
-   قبل ما تعمل الخطوات دي:
+10. **execute_payroll_period** — الأداة الوحيدة الـ destructive من النوع
+   الكبير (بتنشئ دورة مرتبات فعلية). **ممنوع** تستعملها قبل ما تعمل
+   الخطوات دي:
 
    أ) تنادي propose_payroll_period الأول
    ب) ترد على المستخدم بإجمالي المرتبات + عدد الموظفين
@@ -149,6 +149,41 @@ bulk_import_* (لأن مفيش بيانات منظمة).
 
    لو المستخدم قاللك "نفذ" أو "موافق" بدون proposal قبلها → ارجع
    اعمل proposal أولاً ولا تستخدم execute مباشرة.
+
+## أدوات تعديل البيانات الفردية (Mutations)
+
+دي ٥ أدوات بتعدّل سجلات فردية. كلها بتشتغل بنفس النمط:
+**preview أولاً → استنى موافقة → نفّذ**.
+
+11. **update_employee** — عدّل حقول موظف موجود (الاسم، المسمى الوظيفي،
+    القسم، الراتب الأساسي، البدلات، تكرار الراتب، الحالة).
+    **flow إجباري:**
+    أ) نادي الأداة بـ user_confirmed=false → ترجع لك القيم الحالية +
+       التعديلات المقترحة.
+    ب) لخّص للمستخدم: "هعدّل [اسم الموظف] — راتبه من X لـ Y. تأكد؟"
+    ج) استنى "نعم" / "موافق" / "تمام" أو ما يشابه.
+    د) نادي الأداة تاني بـ user_confirmed=true ونفس البراميترز.
+
+12. **create_employee** — أضف موظف جديد فردي (للحالات اللي مفيش فيها
+    Excel/PDF — مثلاً المستخدم بيقولك "ضيف أحمد كذا، راتبه كذا").
+    نفس flow الـ user_confirmed. لو ناقص بيانات إجبارية (full_name،
+    basic_salary، pay_frequency) — اسأل المستخدم قبل ما تنادي الأداة.
+
+13. **adjust_payroll_entry** — عدّل entry مرتبات موظف معين في دورة
+    معينة (إضافة bonus، خصم استثنائي، تعديل overtime).
+    flow: preview ← لخّص ← استنى موافقة ← نفّذ.
+
+14. **approve_request** — وافق على طلب إجازة أو سلفة معلق.
+    flow: المستخدم بيقولك "وافق على طلب أحمد" → تستخدم list_pending_requests
+    لو محتاج تشوف الطلبات → تتأكد المستخدم اختار طلب محدد → تنفذ.
+
+15. **record_attendance_entry** — سجّل حضور لموظف في يوم معين
+    (للحالات الفردية مش الجماعية — للجماعي استخدم bulk_import_attendance).
+    flow: preview ← لخّص ← استنى موافقة ← نفّذ.
+
+**قاعدة عامة للـ mutations**: لو المستخدم قال "عدّل، أضف، احذف، نفّذ"
+بدون preview → اعمل preview الأول (user_confirmed: false) واسأله.
+**ممنوع تنفذ أي mutation بدون موافقة صريحة من المستخدم في الـ chat**.
 
 ## قواعد الرد العامة
 
@@ -1311,6 +1346,488 @@ export async function POST(req: Request) {
         };
       },
     }),
+
+    // ============================================================
+    // MUTATION TOOLS — every one uses the preview-then-confirm flow.
+    // The system prompt enforces this; the execute() body double-
+    // checks `user_confirmed` and returns a preview when it's false.
+    // ============================================================
+
+    // ----------- Tool 11: update_employee -----------
+    update_employee: tool({
+      description:
+        "عدّل حقول موظف موجود (الاسم / المسمى / القسم / الراتب / البدلات / " +
+        "تكرار الراتب / الحالة). " +
+        "**flow إجباري**: نادي الأداة بـ user_confirmed=false أولاً علشان " +
+        "ترجع القيم الحالية + المقترح، لخّص للمستخدم، استنى موافقة صريحة، " +
+        "وبعدين نادي تاني بـ user_confirmed=true.",
+      inputSchema: z.object({
+        employee_id: z
+          .string()
+          .uuid()
+          .describe("الـ UUID بتاع الموظف. استخدم search_employees لو محتاج تجيبه."),
+        updates: z
+          .object({
+            full_name: z.string().min(2).optional(),
+            job_title: z.string().optional(),
+            department: z.string().optional(),
+            basic_salary: z.number().nonnegative().optional(),
+            housing_allowance: z.number().nonnegative().optional(),
+            transport_allowance: z.number().nonnegative().optional(),
+            other_allowances: z.number().nonnegative().optional(),
+            incentive_allowance: z.number().nonnegative().optional(),
+            pay_frequency: z.enum(["monthly", "weekly"]).optional(),
+            status: z
+              .enum(["active", "inactive", "terminated", "on_leave"])
+              .optional(),
+            phone: z.string().optional(),
+            email: z.string().email().optional(),
+          })
+          .describe(
+            "الحقول المراد تعديلها. أي حقل مش مذكور = مش هيتغيّر.",
+          ),
+        user_confirmed: z
+          .boolean()
+          .describe(
+            "حطّها true بس بعد ما المستخدم وافق صراحة في الـ chat. " +
+              "الأول دايماً false (preview).",
+          ),
+      }),
+      execute: async ({ employee_id, updates, user_confirmed }) => {
+        const supa = await createClient();
+
+        // Always fetch current state — we use it for the preview AND
+        // for the post-execute summary.
+        const { data: current, error: fetchErr } = await supa
+          .from("employees")
+          .select(
+            "id, full_name, employee_code, job_title, department, basic_salary, housing_allowance, transport_allowance, other_allowances, incentive_allowance, pay_frequency, status, phone, email",
+          )
+          .eq("id", employee_id)
+          .single();
+        if (fetchErr || !current) {
+          return {
+            ok: false,
+            error: `الموظف مش موجود: ${fetchErr?.message ?? "not found"}`,
+          };
+        }
+
+        if (!user_confirmed) {
+          // Build a diff so the model can present it cleanly.
+          const diff: Record<string, { from: unknown; to: unknown }> = {};
+          for (const [key, value] of Object.entries(updates)) {
+            if (value === undefined) continue;
+            const before = (current as Record<string, unknown>)[key];
+            if (before !== value) {
+              diff[key] = { from: before, to: value };
+            }
+          }
+          return {
+            ok: true,
+            preview: true,
+            employee: {
+              id: current.id,
+              code: current.employee_code,
+              name: current.full_name,
+            },
+            changes: diff,
+            changes_count: Object.keys(diff).length,
+            confirmation_prompt:
+              Object.keys(diff).length === 0
+                ? "مفيش تغييرات حقيقية في المقترح — الحقول دي زي ما هي."
+                : "تأكد عايز أعدّل التغييرات دي؟",
+          };
+        }
+
+        // user_confirmed = true → write to DB
+        const { error: updErr } = await supa
+          .from("employees")
+          .update({ ...updates, updated_at: new Date().toISOString() })
+          .eq("id", employee_id);
+        if (updErr) {
+          return { ok: false, error: updErr.message };
+        }
+        return {
+          ok: true,
+          applied: true,
+          employee_id,
+          employee_name: current.full_name,
+          applied_updates: updates,
+        };
+      },
+    }),
+
+    // ----------- Tool 12: create_employee -----------
+    create_employee: tool({
+      description:
+        "أضف موظف جديد فردي (مش للجماعي — للجماعي استخدم bulk_import_employees). " +
+        "**flow إجباري**: نادي بـ user_confirmed=false أولاً للـ preview، " +
+        "لخّص البيانات، استنى موافقة، نادي تاني بـ user_confirmed=true.",
+      inputSchema: z.object({
+        full_name: z
+          .string()
+          .min(2)
+          .describe("اسم الموظف الكامل (إجباري)."),
+        basic_salary: z
+          .number()
+          .nonnegative()
+          .describe("الراتب الأساسي بالجنيه (إجباري)."),
+        pay_frequency: z
+          .enum(["monthly", "weekly"])
+          .describe("شهري أو أسبوعي (إجباري)."),
+        employee_code: z
+          .string()
+          .optional()
+          .describe("كود الموظف الداخلي (لو فاضي، يتولّد تلقائياً)."),
+        job_title: z.string().optional(),
+        department: z.string().optional(),
+        hire_date: z
+          .string()
+          .regex(/^\d{4}-\d{2}-\d{2}$/)
+          .optional()
+          .describe("YYYY-MM-DD. الافتراضي اليوم."),
+        housing_allowance: z.number().nonnegative().optional(),
+        transport_allowance: z.number().nonnegative().optional(),
+        other_allowances: z.number().nonnegative().optional(),
+        phone: z.string().optional(),
+        email: z.string().email().optional(),
+        national_id: z.string().optional(),
+        user_confirmed: z
+          .boolean()
+          .describe("حطّها true فقط بعد موافقة المستخدم الصريحة في الـ chat."),
+      }),
+      execute: async ({ user_confirmed, ...payload }) => {
+        const supa = await createClient();
+
+        if (!user_confirmed) {
+          return {
+            ok: true,
+            preview: true,
+            proposed: payload,
+            confirmation_prompt: `هضيف موظف جديد: ${payload.full_name} براتب ${payload.basic_salary} جنيه (${payload.pay_frequency === "monthly" ? "شهري" : "أسبوعي"}). تأكد؟`,
+          };
+        }
+
+        // Resolve company_id from caller's profile
+        const {
+          data: { user },
+        } = await supa.auth.getUser();
+        if (!user) return { ok: false, error: "Unauthorized" };
+        const { data: prof } = await supa
+          .from("profiles")
+          .select("company_id")
+          .eq("id", user.id)
+          .single<{ company_id: string }>();
+        if (!prof) return { ok: false, error: "Profile not found" };
+
+        const insertRow: Record<string, unknown> = {
+          company_id: prof.company_id,
+          full_name: payload.full_name,
+          basic_salary: payload.basic_salary,
+          pay_frequency: payload.pay_frequency,
+          status: "active",
+          hire_date: payload.hire_date ?? new Date().toISOString().split("T")[0],
+        };
+        if (payload.employee_code) insertRow.employee_code = payload.employee_code;
+        if (payload.job_title) insertRow.job_title = payload.job_title;
+        if (payload.department) insertRow.department = payload.department;
+        if (payload.housing_allowance !== undefined)
+          insertRow.housing_allowance = payload.housing_allowance;
+        if (payload.transport_allowance !== undefined)
+          insertRow.transport_allowance = payload.transport_allowance;
+        if (payload.other_allowances !== undefined)
+          insertRow.other_allowances = payload.other_allowances;
+        if (payload.phone) insertRow.phone = payload.phone;
+        if (payload.email) insertRow.email = payload.email;
+        if (payload.national_id) insertRow.national_id = payload.national_id;
+
+        const { data: created, error } = await supa
+          .from("employees")
+          .insert(insertRow)
+          .select("id, employee_code, full_name")
+          .single();
+        if (error) return { ok: false, error: error.message };
+        return { ok: true, created };
+      },
+    }),
+
+    // ----------- Tool 13: adjust_payroll_entry -----------
+    adjust_payroll_entry: tool({
+      description:
+        "عدّل سطر مرتب لموظف معين في دورة معينة — أضف bonus، أو خصم استثنائي، " +
+        "أو عدّل overtime / other_deductions. الـ net بيتحدث تلقائياً. " +
+        "**flow إجباري**: preview بـ user_confirmed=false → موافقة → execute.",
+      inputSchema: z.object({
+        period_id: z
+          .string()
+          .uuid()
+          .describe("UUID الـ payroll period."),
+        employee_id: z.string().uuid(),
+        adjustments: z
+          .object({
+            bonuses: z.number().nonnegative().optional(),
+            overtime: z.number().nonnegative().optional(),
+            other_deductions: z.number().nonnegative().optional(),
+          })
+          .describe("الحقول اللي عايز تعدّلها. غير المذكور = ما يتغيّرش."),
+        user_confirmed: z.boolean(),
+      }),
+      execute: async ({
+        period_id,
+        employee_id,
+        adjustments,
+        user_confirmed,
+      }) => {
+        const supa = await createClient();
+
+        const { data: entry, error: fetchErr } = await supa
+          .from("payroll_entries")
+          .select(
+            "id, gross_salary, bonuses, overtime, total_deductions, net_salary, other_deductions, social_insurance, income_tax, absence_deduction, tardiness_deduction, loan_deduction, employees(full_name)",
+          )
+          .eq("period_id", period_id)
+          .eq("employee_id", employee_id)
+          .single<{
+            id: string;
+            gross_salary: number;
+            bonuses: number;
+            overtime: number;
+            total_deductions: number;
+            net_salary: number;
+            other_deductions: number;
+            social_insurance: number;
+            income_tax: number;
+            absence_deduction: number;
+            tardiness_deduction: number;
+            loan_deduction: number;
+            employees: { full_name: string } | null;
+          }>();
+        if (fetchErr || !entry) {
+          return {
+            ok: false,
+            error: `سطر المرتب مش موجود: ${fetchErr?.message ?? "not found"}`,
+          };
+        }
+
+        const nextBonuses = adjustments.bonuses ?? entry.bonuses;
+        const nextOvertime = adjustments.overtime ?? entry.overtime;
+        const nextOtherDed =
+          adjustments.other_deductions ?? entry.other_deductions;
+
+        // Net = gross + bonuses + overtime - (social_insurance + income_tax
+        //       + absence_deduction + tardiness_deduction + loan + other)
+        const newTotalDed =
+          entry.social_insurance +
+          entry.income_tax +
+          entry.absence_deduction +
+          entry.tardiness_deduction +
+          entry.loan_deduction +
+          nextOtherDed;
+        const newNet =
+          entry.gross_salary + nextBonuses + nextOvertime - newTotalDed;
+
+        if (!user_confirmed) {
+          return {
+            ok: true,
+            preview: true,
+            employee_name: entry.employees?.full_name,
+            current: {
+              bonuses: entry.bonuses,
+              overtime: entry.overtime,
+              other_deductions: entry.other_deductions,
+              net_salary: entry.net_salary,
+            },
+            after: {
+              bonuses: nextBonuses,
+              overtime: nextOvertime,
+              other_deductions: nextOtherDed,
+              net_salary: Math.round(newNet * 100) / 100,
+            },
+            confirmation_prompt: `الصافي الجديد لـ ${entry.employees?.full_name} هيبقى ${Math.round(newNet).toLocaleString("ar-EG")} جنيه. تأكد؟`,
+          };
+        }
+
+        const { error: updErr } = await supa
+          .from("payroll_entries")
+          .update({
+            bonuses: nextBonuses,
+            overtime: nextOvertime,
+            other_deductions: nextOtherDed,
+            total_deductions: Math.round(newTotalDed * 100) / 100,
+            net_salary: Math.round(newNet * 100) / 100,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", entry.id);
+        if (updErr) return { ok: false, error: updErr.message };
+
+        return {
+          ok: true,
+          applied: true,
+          entry_id: entry.id,
+          new_net: Math.round(newNet * 100) / 100,
+        };
+      },
+    }),
+
+    // ----------- Tool 14: approve_request -----------
+    approve_request: tool({
+      description:
+        "وافق (أو ارفض) طلب إجازة أو سلفة معلق. " +
+        "**flow إجباري**: preview بـ user_confirmed=false (يرجع تفاصيل الطلب) → " +
+        "لخّص للمستخدم → موافقة صريحة → user_confirmed=true.",
+      inputSchema: z.object({
+        request_type: z.enum(["leave", "advance"]),
+        request_id: z.string().uuid(),
+        decision: z.enum(["approved", "rejected"]).default("approved"),
+        notes: z.string().optional(),
+        user_confirmed: z.boolean(),
+      }),
+      execute: async ({
+        request_type,
+        request_id,
+        decision,
+        notes,
+        user_confirmed,
+      }) => {
+        const supa = await createClient();
+        const table =
+          request_type === "leave" ? "leave_requests" : "advance_requests";
+
+        const { data: request, error: fetchErr } = await supa
+          .from(table)
+          .select(
+            request_type === "leave"
+              ? "id, status, leave_type, start_date, end_date, days_count, reason, employees(full_name)"
+              : "id, status, amount, reason, employees(full_name)",
+          )
+          .eq("id", request_id)
+          .single<Record<string, unknown> & { employees: { full_name: string } | null }>();
+        if (fetchErr || !request) {
+          return {
+            ok: false,
+            error: `الطلب مش موجود: ${fetchErr?.message ?? "not found"}`,
+          };
+        }
+        if (request.status !== "pending") {
+          return {
+            ok: false,
+            error: `الطلب ده مش معلق — حالته الحالية: ${request.status}`,
+          };
+        }
+
+        if (!user_confirmed) {
+          return {
+            ok: true,
+            preview: true,
+            request_type,
+            employee_name: request.employees?.full_name,
+            details: request,
+            decision,
+            confirmation_prompt: `${decision === "approved" ? "هوافق" : "هرفض"} ${request_type === "leave" ? "طلب الإجازة" : "طلب السلفة"} لـ ${request.employees?.full_name}. تأكد؟`,
+          };
+        }
+
+        const { error: updErr } = await supa
+          .from(table)
+          .update({
+            status: decision,
+            decided_at: new Date().toISOString(),
+            decision_notes: notes ?? null,
+          })
+          .eq("id", request_id);
+        if (updErr) return { ok: false, error: updErr.message };
+
+        return {
+          ok: true,
+          applied: true,
+          request_id,
+          decision,
+        };
+      },
+    }),
+
+    // ----------- Tool 15: record_attendance_entry -----------
+    record_attendance_entry: tool({
+      description:
+        "سجّل حضور لموظف في يوم معين (الحالات الفردية بس). " +
+        "للجماعي استخدم bulk_import_attendance. " +
+        "**flow إجباري**: preview بـ user_confirmed=false → موافقة → execute.",
+      inputSchema: z.object({
+        employee_id: z.string().uuid(),
+        date: z
+          .string()
+          .regex(/^\d{4}-\d{2}-\d{2}$/)
+          .describe("YYYY-MM-DD"),
+        status: z.enum(["present", "absent", "half_day", "leave"]),
+        check_in: z
+          .string()
+          .regex(/^\d{2}:\d{2}$/)
+          .optional()
+          .describe("HH:MM (24h). للحالات present / half_day بس."),
+        check_out: z
+          .string()
+          .regex(/^\d{2}:\d{2}$/)
+          .optional(),
+        tardiness_minutes: z.number().nonnegative().optional(),
+        early_leave_minutes: z.number().nonnegative().optional(),
+        notes: z.string().optional(),
+        user_confirmed: z.boolean(),
+      }),
+      execute: async ({ user_confirmed, ...payload }) => {
+        const supa = await createClient();
+
+        // Make sure the employee exists + belongs to caller's company (RLS
+        // handles the tenant filter, this is just for the friendly error).
+        const { data: emp } = await supa
+          .from("employees")
+          .select("full_name")
+          .eq("id", payload.employee_id)
+          .single<{ full_name: string }>();
+        if (!emp) return { ok: false, error: "الموظف مش موجود" };
+
+        if (!user_confirmed) {
+          return {
+            ok: true,
+            preview: true,
+            employee_name: emp.full_name,
+            proposed: payload,
+            confirmation_prompt: `هسجّل لـ ${emp.full_name} يوم ${payload.date} (${payload.status}). تأكد؟`,
+          };
+        }
+
+        // Resolve company_id for the insert (RLS already gates, but the
+        // schema requires it explicitly).
+        const {
+          data: { user },
+        } = await supa.auth.getUser();
+        const { data: prof } = await supa
+          .from("profiles")
+          .select("company_id")
+          .eq("id", user!.id)
+          .single<{ company_id: string }>();
+        if (!prof) return { ok: false, error: "Profile not found" };
+
+        const { error: upsertErr } = await supa
+          .from("attendance")
+          .upsert(
+            {
+              company_id: prof.company_id,
+              employee_id: payload.employee_id,
+              date: payload.date,
+              status: payload.status,
+              check_in: payload.check_in ?? null,
+              check_out: payload.check_out ?? null,
+              tardiness_minutes: payload.tardiness_minutes ?? 0,
+              early_leave_minutes: payload.early_leave_minutes ?? 0,
+              notes: payload.notes ?? null,
+            },
+            { onConflict: "employee_id,date" },
+          );
+        if (upsertErr) return { ok: false, error: upsertErr.message };
+
+        return { ok: true, applied: true };
+      },
+    }),
   };
 
   // --------------------------------------------------------------------
@@ -1327,11 +1844,13 @@ export async function POST(req: Request) {
     system: systemPrompt,
     messages,
     tools,
-    // Allow up to 6 steps so the model can: call propose -> see result ->
-    // write a confirmation prompt. The execute call happens on the NEXT
-    // user turn (after they say "نعم"), so 6 covers both turns
-    // generously with headroom for retries.
-    stopWhen: stepCountIs(6),
+    // Allow up to 10 steps. Mutation tools added in this commit need a
+    // two-step flow per call (user_confirmed=false → preview → wait for
+    // user → user_confirmed=true → execute). A single conversation can
+    // chain multiple mutations (e.g. "update Ahmed's salary AND approve
+    // his leave request"), so the extra budget covers compound asks
+    // without truncating mid-flow.
+    stopWhen: stepCountIs(10),
     // Keep temperature low — tool-calling agents are happier with
     // deterministic argument generation.
     temperature: 0.2,
