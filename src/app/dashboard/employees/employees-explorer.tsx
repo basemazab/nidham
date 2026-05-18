@@ -42,6 +42,7 @@ export type EmployeeRow = {
   transport_allowance: number | null;
   other_allowances: number | null;
   incentive_allowance: number | null;
+  avatar_url: string | null;
 };
 
 const STATUS_LABELS: Record<
@@ -373,9 +374,20 @@ function EmployeeCard({ employee }: { employee: EmployeeRow }) {
       className="group block bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-lg hover:border-brand-cyan/40 hover:-translate-y-0.5 transition-all overflow-hidden"
     >
       <div className="p-4 flex gap-3">
-        {/* Avatar block — bigger than the row item so the card has visual weight */}
-        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-brand-cyan to-brand-cyan-dark flex items-center justify-center text-white text-xl font-black shrink-0 relative">
-          {employee.full_name[0]}
+        {/* Avatar block — uses the uploaded photo when present, falls
+            back to the initial-letter tile so brand-new cards still
+            look intentional. Status dot lives in the corner regardless. */}
+        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-brand-cyan to-brand-cyan-dark flex items-center justify-center text-white text-xl font-black shrink-0 relative overflow-hidden">
+          {employee.avatar_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={employee.avatar_url}
+              alt={employee.full_name}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <span>{employee.full_name[0]}</span>
+          )}
           {/* Status dot in the corner */}
           <span
             className={`absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full ${dotColor} ring-2 ring-white`}

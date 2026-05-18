@@ -392,3 +392,314 @@ async function getCurrentCompanyId(
   if (error || !data) throw new Error("Profile not found");
   return data.company_id as string;
 }
+
+
+// ============================================================================
+// FILE-RELATED ACTIONS — avatar + document vault (mig 047)
+// ============================================================================
+
+const FILES_BUCKET = "employee-files";
+const MAX_FILE_BYTES = 10 * 1024 * 1024; // matches the bucket's file_size_limit
+const ALLOWED_AVATAR_MIMES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
+const ALLOWED_DOC_MIMES = [
+  ...ALLOWED_AVATAR_MIMES,
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+];
+
+const ALLOWED_DOC_TYPES = [
+  "contract",
+  "national_id",
+  "cv",
+  "certificate",
+  "photo",
+  "license",
+  "insurance",
+  "bank",
+  "medical",
+  "other",
+] as const;
+type DocType = (typeof ALLOWED_DOC_TYPES)[number];
+
+function fileExtension(mime: string, filename: string): string {
+  // Prefer mime-based extension so we don't trust user-supplied
+  // filenames blindly. Fall back to whatever's after the last dot.
+  if (mime === "image/png") return "png";
+  if (mime === "image/jpeg") return "jpg";
+  if (mime === "image/webp") return "webp";
+  if (mime === "image/gif") return "gif";
+  if (mime === "application/pdf") return "pdf";
+  if (mime === "application/msword") return "doc";
+  if (
+    mime ===
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+  ) {
+    return "docx";
+  }
+  if (mime === "application/vnd.ms-excel") return "xls";
+  if (
+    mime ===
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  ) {
+    return "xlsx";
+  }
+  const dotIdx = filename.lastIndexOf(".");
+  if (dotIdx >= 0 && dotIdx < filename.length - 1) {
+    return filename.slice(dotIdx + 1).toLowerCase();
+  }
+  return "bin";
+}
+
+/**
+ * Upload (or replace) the employee's avatar. Stored at
+ * {company_id}/{employee_id}/avatar/{ts}-photo.{ext} in employee-files.
+ *
+ * The OLD avatar (if any) is left in storage — cheap, easier to rollback
+ * a wrong upload by editing employees.avatar_url back to the prior URL.
+ * A future "storage GC" cron can sweep orphaned objects.
+ */
+export async function uploadEmployeeAvatar(formData: FormData) {
+  const { supabase, profile } = await requireHR();
+
+  const employeeId = String(formData.get("employee_id") ?? "").trim();
+  if (!/^[0-9a-f-]{36}$/i.test(employeeId)) {
+    redirect("/dashboard/employees");
+  }
+
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    redirect(
+      `/dashboard/employees/${employeeId}?error=` +
+        encodeURIComponent("اختار صورة الأول"),
+    );
+  }
+  if (file.size > MAX_FILE_BYTES) {
+    redirect(
+      `/dashboard/employees/${employeeId}?error=` +
+        encodeURIComponent(
+          `الصورة كبيرة (${(file.size / 1024 / 1024).toFixed(1)} MB). الحد 10 MB.`,
+        ),
+    );
+  }
+  if (!ALLOWED_AVATAR_MIMES.includes(file.type)) {
+    redirect(
+      `/dashboard/employees/${employeeId}?error=` +
+        encodeURIComponent(
+          `نوع الصورة مش مدعوم (${file.type}). PNG / JPEG / WebP / GIF فقط.`,
+        ),
+    );
+  }
+
+  try {
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const ext = fileExtension(file.type, file.name);
+    const ts = Date.now();
+    const path = `${profile.company_id}/${employeeId}/avatar/${ts}-photo.${ext}`;
+
+    const { error: upErr } = await supabase.storage
+      .from(FILES_BUCKET)
+      .upload(path, bytes, {
+        contentType: file.type,
+        upsert: false,
+        cacheControl: "31536000",
+      });
+    if (upErr) throw new Error(`Storage upload failed: ${upErr.message}`);
+
+    const { data: pub } = supabase.storage
+      .from(FILES_BUCKET)
+      .getPublicUrl(path);
+
+    const { error: updErr } = await supabase
+      .from("employees")
+      .update({
+        avatar_url: pub.publicUrl,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", employeeId)
+      .eq("company_id", profile.company_id);
+    if (updErr) throw new Error(updErr.message);
+  } catch (err) {
+    redirect(
+      `/dashboard/employees/${employeeId}?error=` +
+        encodeURIComponent(
+          err instanceof Error
+            ? `رفع الصورة فشل: ${err.message.slice(0, 200)}`
+            : "رفع الصورة فشل",
+        ),
+    );
+  }
+
+  revalidatePath(`/dashboard/employees/${employeeId}`);
+  revalidatePath("/dashboard/employees");
+  redirect(`/dashboard/employees/${employeeId}?avatar_updated=1`);
+}
+
+/**
+ * Remove the avatar from an employee. Drops the avatar_url column to NULL
+ * so the Kanban card falls back to the initial-letter avatar. Doesn't
+ * delete the storage object (cheap, supports "oops, restore it").
+ */
+export async function removeEmployeeAvatar(formData: FormData) {
+  const { supabase, profile } = await requireHR();
+  const employeeId = String(formData.get("employee_id") ?? "").trim();
+  if (!/^[0-9a-f-]{36}$/i.test(employeeId)) {
+    redirect("/dashboard/employees");
+  }
+  await supabase
+    .from("employees")
+    .update({ avatar_url: null, updated_at: new Date().toISOString() })
+    .eq("id", employeeId)
+    .eq("company_id", profile.company_id);
+
+  revalidatePath(`/dashboard/employees/${employeeId}`);
+  revalidatePath("/dashboard/employees");
+  redirect(`/dashboard/employees/${employeeId}?avatar_removed=1`);
+}
+
+/**
+ * Upload a document to an employee's vault. Files live at
+ * {company_id}/{employee_id}/docs/{ts}-{safe-filename}.{ext}; a row
+ * lands in employee_documents with the metadata.
+ */
+export async function uploadEmployeeDocument(formData: FormData) {
+  const { supabase, profile } = await requireHR();
+
+  const employeeId = String(formData.get("employee_id") ?? "").trim();
+  if (!/^[0-9a-f-]{36}$/i.test(employeeId)) {
+    redirect("/dashboard/employees");
+  }
+  const docTypeRaw = String(formData.get("doc_type") ?? "other").trim();
+  const docType: DocType = (ALLOWED_DOC_TYPES as readonly string[]).includes(
+    docTypeRaw,
+  )
+    ? (docTypeRaw as DocType)
+    : "other";
+
+  const displayName = String(formData.get("name") ?? "").trim();
+  const expiresAtRaw = String(formData.get("expires_at") ?? "").trim();
+  const expiresAt = expiresAtRaw || null;
+
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    redirect(
+      `/dashboard/employees/${employeeId}?error=` +
+        encodeURIComponent("اختار ملف الأول"),
+    );
+  }
+  if (file.size > MAX_FILE_BYTES) {
+    redirect(
+      `/dashboard/employees/${employeeId}?error=` +
+        encodeURIComponent(
+          `الملف كبير (${(file.size / 1024 / 1024).toFixed(1)} MB). الحد 10 MB.`,
+        ),
+    );
+  }
+  if (!ALLOWED_DOC_MIMES.includes(file.type)) {
+    redirect(
+      `/dashboard/employees/${employeeId}?error=` +
+        encodeURIComponent(`نوع الملف مش مدعوم (${file.type}).`),
+    );
+  }
+
+  try {
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const ext = fileExtension(file.type, file.name);
+    const ts = Date.now();
+    // Sanitize the original filename for the storage path. Keep Arabic /
+    // Latin letters + digits + dash + underscore; everything else
+    // becomes a dash. Cap at 60 chars.
+    const safeName = (displayName || file.name.replace(/\.[^/.]+$/, ""))
+      .replace(/[^\p{L}\p{N}_-]+/gu, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 60) || "doc";
+    const path = `${profile.company_id}/${employeeId}/docs/${ts}-${safeName}.${ext}`;
+
+    const { error: upErr } = await supabase.storage
+      .from(FILES_BUCKET)
+      .upload(path, bytes, {
+        contentType: file.type,
+        upsert: false,
+        cacheControl: "31536000",
+      });
+    if (upErr) throw new Error(`Storage upload failed: ${upErr.message}`);
+
+    const { data: pub } = supabase.storage
+      .from(FILES_BUCKET)
+      .getPublicUrl(path);
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const { error: insErr } = await supabase
+      .from("employee_documents")
+      .insert({
+        company_id: profile.company_id,
+        employee_id: employeeId,
+        doc_type: docType,
+        name: displayName || file.name,
+        file_url: pub.publicUrl,
+        storage_path: path,
+        mime_type: file.type,
+        size_bytes: file.size,
+        expires_at: expiresAt,
+        uploaded_by: user?.id ?? null,
+      });
+    if (insErr) {
+      // Cleanup: remove the uploaded blob if the DB insert failed so we
+      // don't leak orphaned storage objects.
+      await supabase.storage.from(FILES_BUCKET).remove([path]);
+      throw new Error(insErr.message);
+    }
+  } catch (err) {
+    redirect(
+      `/dashboard/employees/${employeeId}?error=` +
+        encodeURIComponent(
+          err instanceof Error
+            ? `رفع المستند فشل: ${err.message.slice(0, 200)}`
+            : "رفع المستند فشل",
+        ),
+    );
+  }
+
+  revalidatePath(`/dashboard/employees/${employeeId}`);
+  redirect(`/dashboard/employees/${employeeId}?doc_uploaded=1`);
+}
+
+/**
+ * Delete a document — DB row + the storage object.
+ */
+export async function deleteEmployeeDocument(formData: FormData) {
+  const { supabase, profile } = await requireHR();
+  const documentId = String(formData.get("document_id") ?? "").trim();
+  const employeeId = String(formData.get("employee_id") ?? "").trim();
+  if (
+    !/^[0-9a-f-]{36}$/i.test(documentId) ||
+    !/^[0-9a-f-]{36}$/i.test(employeeId)
+  ) {
+    redirect("/dashboard/employees");
+  }
+
+  // Fetch the storage path so we can also delete the underlying object.
+  const { data: doc } = await supabase
+    .from("employee_documents")
+    .select("storage_path")
+    .eq("id", documentId)
+    .eq("company_id", profile.company_id)
+    .maybeSingle<{ storage_path: string }>();
+
+  await supabase
+    .from("employee_documents")
+    .delete()
+    .eq("id", documentId)
+    .eq("company_id", profile.company_id);
+
+  if (doc?.storage_path) {
+    await supabase.storage.from(FILES_BUCKET).remove([doc.storage_path]);
+  }
+
+  revalidatePath(`/dashboard/employees/${employeeId}`);
+  redirect(`/dashboard/employees/${employeeId}?doc_deleted=1`);
+}

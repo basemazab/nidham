@@ -7,6 +7,10 @@ import {
   generateEmployeeInvitation,
   previewEOSGratuity,
   terminateEmployee,
+  uploadEmployeeAvatar,
+  removeEmployeeAvatar,
+  uploadEmployeeDocument,
+  deleteEmployeeDocument,
 } from "../actions";
 import { TerminateEmployeeModal } from "@/components/terminate-employee-modal";
 import { getMyProfile } from "@/lib/permissions";
@@ -14,6 +18,8 @@ import { CopyButton } from "@/components/copy-button";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { InvitationQR } from "@/components/invitation-qr";
 import { EmployeeShiftCard } from "@/components/employee-shift-card";
+import { AutoSubmitFileForm } from "@/components/auto-submit-file-form";
+import { FileInputAutoSubmit } from "@/components/file-input-auto-submit";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -21,7 +27,46 @@ type PageProps = {
     error?: string;
     invite_error?: string;
     invite_generated?: string;
+    avatar_updated?: string;
+    avatar_removed?: string;
+    doc_uploaded?: string;
+    doc_deleted?: string;
   }>;
+};
+
+type EmployeeDocument = {
+  id: string;
+  doc_type:
+    | "contract"
+    | "national_id"
+    | "cv"
+    | "certificate"
+    | "photo"
+    | "license"
+    | "insurance"
+    | "bank"
+    | "medical"
+    | "other";
+  name: string;
+  file_url: string;
+  mime_type: string | null;
+  size_bytes: number | null;
+  expires_at: string | null;
+  notes: string | null;
+  created_at: string;
+};
+
+const DOC_TYPE_LABEL: Record<EmployeeDocument["doc_type"], { ar: string; icon: string }> = {
+  contract: { ar: "عقد عمل", icon: "📜" },
+  national_id: { ar: "بطاقة رقم قومي", icon: "🪪" },
+  cv: { ar: "السيرة الذاتية", icon: "📄" },
+  certificate: { ar: "شهادة", icon: "🎓" },
+  photo: { ar: "صورة شخصية", icon: "🖼" },
+  license: { ar: "رخصة / تصريح", icon: "🪪" },
+  insurance: { ar: "استمارة تأمينات", icon: "🏥" },
+  bank: { ar: "مستند بنكي", icon: "🏦" },
+  medical: { ar: "تقرير طبي", icon: "🩺" },
+  other: { ar: "مستند آخر", icon: "📎" },
 };
 
 type Employee = {
@@ -52,6 +97,7 @@ type Employee = {
   bank_account_number: string | null;
   status: "active" | "on_leave" | "terminated";
   notes: string | null;
+  avatar_url: string | null;
   created_at: string;
   user_id: string | null;
   invitation_token: string | null;
@@ -86,7 +132,12 @@ export default async function EditEmployeePage({ params, searchParams }: PagePro
   // shift for the badge. Doing this here keeps the card a pure client
   // component without its own DB call. Scope each list to the caller's
   // company so the picker can't accidentally surface cross-tenant rows.
-  const [{ data: shifts }, { data: rotations }, { data: todaysShiftId }] =
+  const [
+    { data: shifts },
+    { data: rotations },
+    { data: todaysShiftId },
+    { data: documents },
+  ] =
     await Promise.all([
       supabase
         .from("shifts")
@@ -106,7 +157,17 @@ export default async function EditEmployeePage({ params, searchParams }: PagePro
         p_employee_id: id,
         p_date: new Date().toISOString().split("T")[0],
       }),
+      supabase
+        .from("employee_documents")
+        .select(
+          "id, doc_type, name, file_url, mime_type, size_bytes, expires_at, notes, created_at",
+        )
+        .eq("employee_id", id)
+        .eq("company_id", callerCompanyId)
+        .order("created_at", { ascending: false })
+        .returns<EmployeeDocument[]>(),
     ]);
+  const employeeDocs = documents ?? [];
 
   let todaysShiftName: string | null = null;
   if (todaysShiftId && shifts) {
@@ -138,13 +199,33 @@ export default async function EditEmployeePage({ params, searchParams }: PagePro
         </div>
 
         <header className="mb-6 flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h1 className="text-3xl font-black font-cairo text-slate-800 mb-1">
-              تعديل بيانات الموظف
-            </h1>
-            <p className="text-sm text-slate-500">
-              {employee.full_name} · تم إضافته في {new Date(employee.created_at).toLocaleDateString("ar-EG")}
-            </p>
+          <div className="flex items-center gap-4 flex-1 min-w-0">
+            {/* Avatar — clickable to reveal upload + remove controls in
+                the section below. Falls back to a circular initial-letter
+                tile when avatar_url is null. */}
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-brand-cyan to-brand-cyan-dark flex items-center justify-center text-white text-2xl font-black shrink-0 shadow-md overflow-hidden">
+              {employee.avatar_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={employee.avatar_url}
+                  alt={employee.full_name}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <span>{employee.full_name[0]}</span>
+              )}
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-2xl md:text-3xl font-black font-cairo text-slate-800 mb-1 truncate">
+                {employee.full_name}
+              </h1>
+              <p className="text-xs text-slate-500 font-cairo">
+                {employee.job_title ?? "—"}
+                {employee.department ? ` · ${employee.department}` : ""}
+                {" · "}تم إضافته في{" "}
+                {new Date(employee.created_at).toLocaleDateString("ar-EG")}
+              </p>
+            </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             {/* HR forms shortcut — opens the forms hub pre-filled for
@@ -572,6 +653,241 @@ export default async function EditEmployeePage({ params, searchParams }: PagePro
               </Link>
             </div>
           </form>
+
+          {/* ============================================================
+              Photo + Documents (mig 047). Splits into 2 sections inside
+              one card so they share visual rhythm:
+                - Avatar uploader (replace existing photo / remove it)
+                - Documents vault (list + upload form)
+              ============================================================ */}
+          <section className="mt-8 pt-6 border-t border-slate-200 space-y-6">
+            <h2 className="text-xl font-black font-cairo text-slate-800 mb-1">
+              🖼 الصورة والمستندات
+            </h2>
+
+            {/* Avatar uploader */}
+            <div className="bg-white border border-slate-200 rounded-2xl p-5 flex items-center gap-4 flex-wrap">
+              <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center overflow-hidden shrink-0">
+                {employee.avatar_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={employee.avatar_url}
+                    alt={employee.full_name}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <span className="text-3xl font-black text-slate-400">
+                    {employee.full_name[0]}
+                  </span>
+                )}
+              </div>
+              <div className="flex-1 min-w-[200px]">
+                <div className="text-sm font-bold text-slate-800 font-cairo mb-0.5">
+                  صورة شخصية
+                </div>
+                <p className="text-xs text-slate-500 font-cairo mb-3">
+                  PNG / JPEG / WebP · حد أقصى 10 MB · بتظهر في الكروت + التقارير
+                </p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <AutoSubmitFileForm
+                    action={uploadEmployeeAvatar}
+                    hiddenFields={{ employee_id: employee.id }}
+                    accept="image/png,image/jpeg,image/webp,image/gif"
+                    label={
+                      <>
+                        <span>📤</span>
+                        <span>
+                          {employee.avatar_url ? "غيّر الصورة" : "ارفع صورة"}
+                        </span>
+                      </>
+                    }
+                  />
+                  {employee.avatar_url && (
+                    <form action={removeEmployeeAvatar}>
+                      <input
+                        type="hidden"
+                        name="employee_id"
+                        value={employee.id}
+                      />
+                      <ConfirmSubmitButton
+                        label="🗑 حذف"
+                        message="هتشيل الصورة الحالية؟ مفيش بطل لها."
+                        confirmLabel="احذفها"
+                        className="px-3 py-2 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold font-cairo cursor-pointer border border-red-200"
+                      />
+                    </form>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Documents vault */}
+            <div className="bg-white border border-slate-200 rounded-2xl p-5">
+              <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+                <div>
+                  <h3 className="text-sm font-black text-slate-800 font-cairo">
+                    📎 المستندات ({employeeDocs.length})
+                  </h3>
+                  <p className="text-[11px] text-slate-500 font-cairo">
+                    عقد العمل، صور البطاقة، الشهادات، الـ CV، إلخ
+                  </p>
+                </div>
+              </div>
+
+              {/* Upload form */}
+              <form
+                action={uploadEmployeeDocument}
+                encType="multipart/form-data"
+                className="mb-4 p-3 bg-slate-50 rounded-xl border border-slate-200 grid sm:grid-cols-2 gap-2"
+              >
+                <input type="hidden" name="employee_id" value={employee.id} />
+                <div className="sm:col-span-2">
+                  <label className="block text-[11px] font-bold text-slate-600 mb-1 font-cairo">
+                    اسم المستند
+                  </label>
+                  <input
+                    type="text"
+                    name="name"
+                    placeholder="مثلاً: عقد العمل سنة 2026"
+                    className="w-full px-3 py-1.5 rounded-lg border border-slate-200 focus:border-brand-cyan outline-none text-sm font-cairo"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 mb-1 font-cairo">
+                    النوع
+                  </label>
+                  <select
+                    name="doc_type"
+                    defaultValue="other"
+                    className="w-full px-3 py-1.5 rounded-lg border border-slate-200 focus:border-brand-cyan outline-none text-sm font-cairo"
+                  >
+                    {Object.entries(DOC_TYPE_LABEL).map(([k, v]) => (
+                      <option key={k} value={k}>
+                        {v.icon} {v.ar}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 mb-1 font-cairo">
+                    تاريخ الانتهاء (اختياري)
+                  </label>
+                  <input
+                    type="date"
+                    name="expires_at"
+                    className="w-full px-3 py-1.5 rounded-lg border border-slate-200 focus:border-brand-cyan outline-none text-sm font-cairo"
+                  />
+                </div>
+                <div className="sm:col-span-2 flex items-center gap-2 mt-1">
+                  <FileInputAutoSubmit
+                    accept="image/png,image/jpeg,image/webp,image/gif,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    label={
+                      <>
+                        <span>📎</span>
+                        <span>اختار ملف وارفعه</span>
+                      </>
+                    }
+                  />
+                  <span className="text-[10px] text-slate-500 font-cairo">
+                    حد أقصى 10 MB · PDF / Word / Excel / صور
+                  </span>
+                </div>
+              </form>
+
+              {/* Documents list */}
+              {employeeDocs.length === 0 ? (
+                <div className="text-center py-8 text-sm text-slate-400 font-cairo">
+                  مفيش مستندات لسه. ارفع أول مستند من فوق ↑
+                </div>
+              ) : (
+                <ul className="space-y-2">
+                  {employeeDocs.map((doc) => {
+                    const meta = DOC_TYPE_LABEL[doc.doc_type];
+                    const sizeKB = doc.size_bytes
+                      ? Math.round(doc.size_bytes / 1024)
+                      : null;
+                    const isExpired =
+                      doc.expires_at &&
+                      new Date(doc.expires_at) < new Date();
+                    return (
+                      <li
+                        key={doc.id}
+                        className={`flex items-center gap-3 p-3 rounded-xl border transition flex-wrap ${
+                          isExpired
+                            ? "bg-rose-50 border-rose-200"
+                            : "bg-white border-slate-200 hover:border-brand-cyan/40"
+                        }`}
+                      >
+                        <span className="text-2xl shrink-0">{meta.icon}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-bold text-slate-800 text-sm font-cairo truncate">
+                            {doc.name}
+                          </div>
+                          <div className="text-[10px] text-slate-500 font-cairo flex items-center gap-2 flex-wrap">
+                            <span>{meta.ar}</span>
+                            {sizeKB !== null && (
+                              <span>
+                                · {sizeKB.toLocaleString("en")} KB
+                              </span>
+                            )}
+                            <span>
+                              · رفع في{" "}
+                              {new Date(doc.created_at).toLocaleDateString(
+                                "ar-EG",
+                                { dateStyle: "short" },
+                              )}
+                            </span>
+                            {doc.expires_at && (
+                              <span
+                                className={
+                                  isExpired
+                                    ? "text-rose-600 font-bold"
+                                    : "text-amber-700"
+                                }
+                              >
+                                · {isExpired ? "🚨 انتهت" : "⏰ تنتهي"} في{" "}
+                                {new Date(
+                                  doc.expires_at,
+                                ).toLocaleDateString("ar-EG", {
+                                  dateStyle: "short",
+                                })}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <a
+                          href={doc.file_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-3 py-1.5 rounded-lg bg-cyan-50 hover:bg-cyan-100 text-cyan-700 text-xs font-bold font-cairo border border-cyan-200"
+                        >
+                          ⤓ افتح
+                        </a>
+                        <form action={deleteEmployeeDocument}>
+                          <input
+                            type="hidden"
+                            name="document_id"
+                            value={doc.id}
+                          />
+                          <input
+                            type="hidden"
+                            name="employee_id"
+                            value={employee.id}
+                          />
+                          <ConfirmSubmitButton
+                            label="🗑"
+                            message={`هتمسح "${doc.name}". مفيش رجوع.`}
+                            confirmLabel="نعم احذف"
+                            className="px-3 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold cursor-pointer border border-red-200"
+                          />
+                        </form>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          </section>
 
           {/* Delete in separate form to avoid double-action collision */}
           <div className="mt-8 pt-6 border-t border-red-100">

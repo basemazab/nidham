@@ -88,6 +88,7 @@ const NAV_ITEMS: readonly NavItem[] = [
   // Settings
   { href: "/dashboard/settings/office-location", label: "موقع المكتب 📍", icon: "⚙", section: "settings", visibleTo: ["admin"] },
   { href: "/dashboard/settings/leave-rollover", label: "ترحيل الإجازات", icon: "🗓", section: "settings", visibleTo: ["admin"] },
+  { href: "/dashboard/settings/holidays", label: "العطلات الرسمية 📅", icon: "📅", section: "settings", visibleTo: ["admin"] },
 
   // Always-visible help — across every plan, every role, never hidden
   // by per-tenant overrides
