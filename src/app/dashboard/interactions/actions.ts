@@ -77,7 +77,7 @@ export async function logInteraction(formData: FormData) {
 }
 
 export async function updateInteraction(id: string, formData: FormData) {
-  await requireHR();
+  const { profile } = await requireHR();
   const supabase = await createClient();
 
   const employeeId = asText(formData.get("employee_id"));
@@ -92,6 +92,8 @@ export async function updateInteraction(id: string, formData: FormData) {
     );
   }
 
+  // RLS hardening: company_id clamp prevents cross-tenant updates under
+  // super-admin sessions (mig 038).
   const { error } = await supabase
     .from("interactions")
     .update({
@@ -102,7 +104,8 @@ export async function updateInteraction(id: string, formData: FormData) {
       outcome,
       notes: asText(formData.get("notes")),
     })
-    .eq("id", id);
+    .eq("id", id)
+    .eq("company_id", profile.company_id);
 
   if (error) {
     redirect(
@@ -118,9 +121,15 @@ export async function updateInteraction(id: string, formData: FormData) {
 }
 
 export async function deleteInteraction(id: string) {
-  await requireHR();
+  const { profile } = await requireHR();
   const supabase = await createClient();
-  await supabase.from("interactions").delete().eq("id", id);
+  // RLS hardening: company_id clamp prevents cross-tenant deletes under
+  // super-admin sessions (mig 038).
+  await supabase
+    .from("interactions")
+    .delete()
+    .eq("id", id)
+    .eq("company_id", profile.company_id);
   revalidatePath("/dashboard/interactions");
   revalidatePath("/dashboard/reports/bridge");
   bustDashboardCache();

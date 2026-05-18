@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getMyProfile } from "@/lib/permissions";
 import { updatePayrollEntry } from "../../actions";
 import { SubmitButton } from "@/components/submit-button";
 import { formatEGP } from "@/lib/payroll";
@@ -46,12 +47,21 @@ export default async function EditPayrollEntryPage({ params, searchParams }: Pag
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  // RLS hardening: explicit company_id clamp. Without it, a super-admin
+  // session (mig 038's "Super-Admin Read Access Policies") would resolve
+  // an entryId from any tenant. The clamp ensures we only return entries
+  // belonging to the caller's company — super-admins who want cross-tenant
+  // payroll inspection should use /admin instead.
+  const { profile } = await getMyProfile();
+  const callerCompanyId = profile?.company_id ?? "";
+
   const { data: entry } = await supabase
     .from("payroll_entries")
     .select(
       "*, employees(full_name, job_title)",
     )
     .eq("id", entryId)
+    .eq("company_id", callerCompanyId)
     .single<Entry>();
 
   if (!entry) notFound();

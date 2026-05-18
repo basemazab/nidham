@@ -104,7 +104,7 @@ export async function createContract(formData: FormData) {
 }
 
 export async function updateContract(id: string, formData: FormData) {
-  await requireHR();
+  const { profile } = await requireHR();
   const input = parseInput(formData);
   const err = validate(input);
   if (err) {
@@ -112,10 +112,13 @@ export async function updateContract(id: string, formData: FormData) {
   }
 
   const supabase = await createClient();
+  // RLS hardening: company_id clamp prevents cross-tenant updates under
+  // super-admin sessions (mig 038).
   const { error } = await supabase
     .from("contracts")
     .update(input)
-    .eq("id", id);
+    .eq("id", id)
+    .eq("company_id", profile.company_id);
 
   if (error) {
     redirect(
@@ -131,9 +134,15 @@ export async function updateContract(id: string, formData: FormData) {
 }
 
 export async function deleteContract(id: string) {
-  await requireHR();
+  const { profile } = await requireHR();
   const supabase = await createClient();
-  await supabase.from("contracts").delete().eq("id", id);
+  // RLS hardening: company_id clamp prevents cross-tenant deletes under
+  // super-admin sessions (mig 038).
+  await supabase
+    .from("contracts")
+    .delete()
+    .eq("id", id)
+    .eq("company_id", profile.company_id);
   revalidatePath("/dashboard/contracts");
   bustDashboardCache();
 }

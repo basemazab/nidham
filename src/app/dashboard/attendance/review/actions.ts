@@ -22,7 +22,7 @@ const VALID_STATUSES = [
 // the change. Used by the review table's "save row" buttons.
 // ----------------------------------------------------------------------------
 export async function updateAttendanceRow(formData: FormData) {
-  await requireHR();
+  const { profile } = await requireHR();
   const supabase = await createClient();
 
   const id = String(formData.get("attendance_id") ?? "").trim();
@@ -53,6 +53,9 @@ export async function updateAttendanceRow(formData: FormData) {
   const notes = String(formData.get("notes") ?? "").trim() || null;
   const batchId = String(formData.get("batch_id") ?? "").trim();
 
+  // RLS hardening: explicit company_id clamp. Under super-admin sessions
+  // (mig 038), RLS WITH CHECK alone wouldn't stop a forged attendance.id
+  // from hitting another tenant's row.
   const { error } = await supabase
     .from("attendance")
     .update({
@@ -63,7 +66,8 @@ export async function updateAttendanceRow(formData: FormData) {
       check_out,
       notes,
     })
-    .eq("id", id);
+    .eq("id", id)
+    .eq("company_id", profile.company_id);
 
   if (error) {
     redirect(
@@ -85,7 +89,7 @@ export async function updateAttendanceRow(formData: FormData) {
 // to drop misimported records (e.g. weekly worker that slipped through).
 // ----------------------------------------------------------------------------
 export async function deleteAttendanceRow(formData: FormData) {
-  await requireHR();
+  const { profile } = await requireHR();
   const supabase = await createClient();
 
   const id = String(formData.get("attendance_id") ?? "").trim();
@@ -94,7 +98,13 @@ export async function deleteAttendanceRow(formData: FormData) {
     redirect("/dashboard/attendance/review");
   }
 
-  const { error } = await supabase.from("attendance").delete().eq("id", id);
+  // RLS hardening: company_id clamp blocks cross-tenant deletes under
+  // super-admin sessions (mig 038).
+  const { error } = await supabase
+    .from("attendance")
+    .delete()
+    .eq("id", id)
+    .eq("company_id", profile.company_id);
   if (error) {
     redirect(
       `/dashboard/attendance/review?batch=${batchId}&error=` +
@@ -116,7 +126,7 @@ export async function deleteAttendanceRow(formData: FormData) {
 // because reports / payroll already treat imported rows as real.)
 // ----------------------------------------------------------------------------
 export async function confirmAttendanceBatch(formData: FormData) {
-  await requireHR();
+  const { profile } = await requireHR();
   const supabase = await createClient();
   const batchId = String(formData.get("batch_id") ?? "").trim();
   if (!/^[0-9a-f-]{36}$/i.test(batchId)) {
@@ -125,11 +135,15 @@ export async function confirmAttendanceBatch(formData: FormData) {
 
   // Backdate imported_at by 25 hours so count_recent_import_rows()
   // (which checks "last 24 hours") drops this batch from the banner.
+  //
+  // RLS hardening: company_id clamp ensures a super-admin can't confirm
+  // another tenant's batch by guessing its UUID.
   const past = new Date(Date.now() - 25 * 3600 * 1000).toISOString();
   await supabase
     .from("attendance")
     .update({ imported_at: past })
-    .eq("import_batch_id", batchId);
+    .eq("import_batch_id", batchId)
+    .eq("company_id", profile.company_id);
 
   revalidatePath("/dashboard/attendance/review");
   revalidatePath("/dashboard/attendance");
@@ -141,7 +155,7 @@ export async function confirmAttendanceBatch(formData: FormData) {
 // file -- they delete the previous batch to start clean.
 // ----------------------------------------------------------------------------
 export async function deleteAttendanceBatch(formData: FormData) {
-  await requireHR();
+  const { profile } = await requireHR();
   const supabase = await createClient();
   const batchId = String(formData.get("batch_id") ?? "").trim();
   const confirm = String(formData.get("confirm") ?? "").trim();
@@ -156,10 +170,13 @@ export async function deleteAttendanceBatch(formData: FormData) {
     );
   }
 
+  // RLS hardening: company_id clamp prevents cross-tenant batch deletes
+  // under super-admin sessions (mig 038).
   const { count, error } = await supabase
     .from("attendance")
     .delete({ count: "exact" })
-    .eq("import_batch_id", batchId);
+    .eq("import_batch_id", batchId)
+    .eq("company_id", profile.company_id);
 
   if (error) {
     redirect(

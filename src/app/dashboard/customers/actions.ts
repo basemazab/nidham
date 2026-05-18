@@ -77,7 +77,7 @@ export async function createCustomer(formData: FormData) {
 }
 
 export async function updateCustomer(id: string, formData: FormData) {
-  await requireHR();
+  const { profile } = await requireHR();
   const supabase = await createClient();
 
   const fullName = asText(formData.get("full_name"));
@@ -88,6 +88,8 @@ export async function updateCustomer(id: string, formData: FormData) {
     );
   }
 
+  // RLS hardening: company_id clamp prevents cross-tenant updates under
+  // super-admin sessions (mig 038).
   const { error } = await supabase
     .from("customers")
     .update({
@@ -102,7 +104,8 @@ export async function updateCustomer(id: string, formData: FormData) {
       source: asText(formData.get("source")),
       notes: asText(formData.get("notes")),
     })
-    .eq("id", id);
+    .eq("id", id)
+    .eq("company_id", profile.company_id);
 
   if (error) {
     redirect(
@@ -118,9 +121,15 @@ export async function updateCustomer(id: string, formData: FormData) {
 }
 
 export async function deleteCustomer(id: string) {
-  await requireHR();
+  const { profile } = await requireHR();
   const supabase = await createClient();
-  await supabase.from("customers").delete().eq("id", id);
+  // RLS hardening: company_id clamp prevents cross-tenant deletes under
+  // super-admin sessions (mig 038).
+  await supabase
+    .from("customers")
+    .delete()
+    .eq("id", id)
+    .eq("company_id", profile.company_id);
   revalidatePath("/dashboard/customers");
   bustDashboardCache();
 }

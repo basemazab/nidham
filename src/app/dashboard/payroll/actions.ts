@@ -395,6 +395,9 @@ export async function updatePayrollEntry(entryId: string, formData: FormData) {
     },
   );
 
+  // RLS hardening: defensive company_id clamp on the UPDATE. The SELECT
+  // above already filtered by company_id, but a second clamp on the
+  // mutation closes the loop in case the SELECT path is ever refactored.
   await supabase
     .from("payroll_entries")
     .update({
@@ -419,7 +422,8 @@ export async function updatePayrollEntry(entryId: string, formData: FormData) {
       net_salary: result.netSalary,
       notes: asText(formData.get("notes")),
     })
-    .eq("id", entryId);
+    .eq("id", entryId)
+    .eq("company_id", companyId);
 
   revalidatePath(`/dashboard/payroll/${entry.period_id}`);
   redirect(`/dashboard/payroll/${entry.period_id}`);
@@ -434,6 +438,10 @@ export async function approvePayrollPeriod(periodId: string) {
   // Server-side gate — the UI hides the button when status != "draft", but a
   // direct call (e.g., replayed form post) must also be rejected so a
   // "paid" period can never be reverted to "approved".
+  //
+  // RLS hardening: explicit company_id scope. Under super-admin sessions
+  // (mig 038), RLS WITH CHECK alone doesn't stop a forged periodId from
+  // hitting another tenant's row. The .eq("company_id", ...) clamp does.
   const { error } = await supabase
     .from("payroll_periods")
     .update({
@@ -442,6 +450,7 @@ export async function approvePayrollPeriod(periodId: string) {
       approved_by: profile.id,
     })
     .eq("id", periodId)
+    .eq("company_id", profile.company_id)
     .eq("status", "draft");
 
   if (error) {
@@ -455,10 +464,12 @@ export async function approvePayrollPeriod(periodId: string) {
 }
 
 export async function markPayrollAsPaid(periodId: string) {
-  await requireAdmin();
+  const { profile } = await requireAdmin();
   const supabase = await createClient();
 
   // Only an approved period can be marked paid — guards against replay.
+  // company_id clamp protects against cross-tenant writes under super-admin
+  // sessions (mig 038).
   const { error } = await supabase
     .from("payroll_periods")
     .update({
@@ -466,6 +477,7 @@ export async function markPayrollAsPaid(periodId: string) {
       paid_at: new Date().toISOString(),
     })
     .eq("id", periodId)
+    .eq("company_id", profile.company_id)
     .eq("status", "approved");
 
   if (error) {
@@ -479,14 +491,17 @@ export async function markPayrollAsPaid(periodId: string) {
 }
 
 export async function deletePayrollPeriod(periodId: string) {
-  await requireAdmin();
+  const { profile } = await requireAdmin();
   const supabase = await createClient();
 
   // Only draft periods may be deleted; otherwise audit history is lost.
+  // company_id clamp protects against cross-tenant deletes under super-admin
+  // sessions (mig 038).
   await supabase
     .from("payroll_periods")
     .delete()
     .eq("id", periodId)
+    .eq("company_id", profile.company_id)
     .eq("status", "draft");
 
   revalidatePath("/dashboard/payroll");

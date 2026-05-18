@@ -127,7 +127,7 @@ export async function createJob(formData: FormData) {
 }
 
 export async function updateJob(jobId: string, formData: FormData) {
-  await requireHR();
+  const { profile } = await requireHR();
   const supabase = await createClient();
 
   const title = asText(formData.get("title"));
@@ -138,6 +138,8 @@ export async function updateJob(jobId: string, formData: FormData) {
     );
   }
 
+  // RLS hardening: company_id clamp prevents cross-tenant updates under
+  // super-admin sessions (mig 038).
   const { error } = await supabase
     .from("jobs")
     .update({
@@ -155,7 +157,8 @@ export async function updateJob(jobId: string, formData: FormData) {
       status: asText(formData.get("status")) ?? "open",
       is_public: asBool(formData.get("is_public")),
     })
-    .eq("id", jobId);
+    .eq("id", jobId)
+    .eq("company_id", profile.company_id);
 
   if (error) {
     redirect(
@@ -171,21 +174,30 @@ export async function updateJob(jobId: string, formData: FormData) {
 }
 
 export async function deleteJob(jobId: string) {
-  await requireHR();
+  const { profile } = await requireHR();
   const supabase = await createClient();
-  await supabase.from("jobs").delete().eq("id", jobId);
+  // RLS hardening: company_id clamp prevents cross-tenant deletes under
+  // super-admin sessions (mig 038).
+  await supabase
+    .from("jobs")
+    .delete()
+    .eq("id", jobId)
+    .eq("company_id", profile.company_id);
   revalidatePath("/dashboard/jobs");
   bustDashboardCache();
   redirect("/dashboard/jobs");
 }
 
 export async function changeJobStatus(jobId: string, status: string) {
-  await requireHR();
+  const { profile } = await requireHR();
   const supabase = await createClient();
+  // RLS hardening: company_id clamp prevents cross-tenant status flips
+  // under super-admin sessions (mig 038).
   await supabase
     .from("jobs")
     .update({ status, updated_at: new Date().toISOString() })
-    .eq("id", jobId);
+    .eq("id", jobId)
+    .eq("company_id", profile.company_id);
   revalidatePath(`/dashboard/jobs/${jobId}`);
   revalidatePath("/dashboard/jobs");
   bustDashboardCache();
@@ -329,12 +341,14 @@ export async function updateApplicationStatus(
   status: string,
   redirectTo: string,
 ) {
-  await requireHR();
+  const { profile } = await requireHR();
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
+  // RLS hardening: company_id clamp prevents cross-tenant status flips
+  // under super-admin sessions (mig 038).
   await supabase
     .from("applications")
     .update({
@@ -342,7 +356,8 @@ export async function updateApplicationStatus(
       reviewed_at: new Date().toISOString(),
       reviewed_by: user?.id ?? null,
     })
-    .eq("id", applicationId);
+    .eq("id", applicationId)
+    .eq("company_id", profile.company_id);
 
   revalidatePath(redirectTo);
   redirect(redirectTo);
@@ -352,24 +367,29 @@ export async function saveApplicationNotes(
   applicationId: string,
   formData: FormData,
 ) {
-  await requireHR();
+  const { profile } = await requireHR();
   const supabase = await createClient();
   const notes = asText(formData.get("hr_notes"));
   const interviewAt = asText(formData.get("interview_at"));
 
+  // RLS hardening: company_id clamp prevents cross-tenant note edits
+  // under super-admin sessions (mig 038).
   await supabase
     .from("applications")
     .update({
       hr_notes: notes,
       interview_at: interviewAt,
     })
-    .eq("id", applicationId);
+    .eq("id", applicationId)
+    .eq("company_id", profile.company_id);
 
-  // Stay on the same page
+  // Stay on the same page — scope the lookup too so we don't reveal a
+  // job_id belonging to another tenant via the redirect path.
   const { data } = await supabase
     .from("applications")
     .select("job_id")
     .eq("id", applicationId)
+    .eq("company_id", profile.company_id)
     .single();
 
   if (data) {
@@ -378,9 +398,15 @@ export async function saveApplicationNotes(
 }
 
 export async function deleteApplication(applicationId: string, jobId: string) {
-  await requireHR();
+  const { profile } = await requireHR();
   const supabase = await createClient();
-  await supabase.from("applications").delete().eq("id", applicationId);
+  // RLS hardening: company_id clamp prevents cross-tenant deletes under
+  // super-admin sessions (mig 038).
+  await supabase
+    .from("applications")
+    .delete()
+    .eq("id", applicationId)
+    .eq("company_id", profile.company_id);
   revalidatePath(`/dashboard/jobs/${jobId}`);
   redirect(`/dashboard/jobs/${jobId}`);
 }
