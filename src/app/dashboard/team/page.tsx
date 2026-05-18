@@ -1,7 +1,12 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { createInvitation, cancelInvitation, resendInvitation } from "./actions";
+import {
+  createInvitation,
+  cancelInvitation,
+  resendInvitation,
+  removeMember,
+} from "./actions";
 import { SubmitButton } from "@/components/submit-button";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 
@@ -190,33 +195,53 @@ export default async function TeamPage({
             </h2>
           </div>
           <div className="divide-y divide-slate-100">
-            {members.map((m) => (
-              <div key={m.id} className="px-5 py-4 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-brand-cyan to-brand-cyan-dark flex items-center justify-center text-white font-bold">
-                  {(m.full_name ?? "?")[0]?.toUpperCase()}
-                </div>
-                <div className="flex-1">
-                  <div className="font-bold text-slate-800 font-cairo">
-                    {m.full_name ?? "بدون اسم"}
-                    {m.id === user.id && (
-                      <span className="text-xs text-slate-400 font-normal mx-2">(أنت)</span>
-                    )}
+            {members.map((m) => {
+              // Admins can remove anyone EXCEPT themselves. Self-removal
+              // would lock the admin out of their own tenant with no
+              // recovery path — refuse it both client-side (hide the
+              // button) and server-side (action throws).
+              const canRemove = isAdmin && m.id !== user.id;
+              return (
+                <div key={m.id} className="px-5 py-4 flex items-center gap-3 flex-wrap">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-brand-cyan to-brand-cyan-dark flex items-center justify-center text-white font-bold shrink-0">
+                    {(m.full_name ?? "?")[0]?.toUpperCase()}
                   </div>
-                  <div className="text-xs text-slate-500 font-cairo">
-                    {ROLE_LABELS[m.role]} · انضم {new Date(m.created_at).toLocaleDateString("ar-EG")}
+                  <div className="flex-1 min-w-0">
+                    <div className="font-bold text-slate-800 font-cairo">
+                      {m.full_name ?? "بدون اسم"}
+                      {m.id === user.id && (
+                        <span className="text-xs text-slate-400 font-normal mx-2">(أنت)</span>
+                      )}
+                    </div>
+                    <div className="text-xs text-slate-500 font-cairo">
+                      {ROLE_LABELS[m.role]} · انضم {new Date(m.created_at).toLocaleDateString("ar-EG")}
+                    </div>
                   </div>
+                  <span
+                    className={`text-xs px-2.5 py-1 rounded-full border font-cairo ${
+                      m.role === "admin"
+                        ? "bg-amber-50 text-amber-700 border-amber-200"
+                        : m.role === "manager"
+                          ? "bg-cyan-50 text-cyan-700 border-cyan-200"
+                          : "bg-slate-100 text-slate-600 border-slate-200"
+                    }`}
+                  >
+                    {ROLE_LABELS[m.role]}
+                  </span>
+                  {canRemove && (
+                    <form action={removeMember}>
+                      <input type="hidden" name="member_id" value={m.id} />
+                      <ConfirmSubmitButton
+                        label="🗑 حذف"
+                        message={`هتحذف "${m.full_name ?? "العضو"}" من فريق الشركة. مش هيقدر يدخل النظام تاني — لو حابب ترجّعه لازم تبعتله دعوة جديدة.`}
+                        confirmLabel="نعم احذفه"
+                        className="text-xs px-3 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 font-bold font-cairo border border-red-200 cursor-pointer"
+                      />
+                    </form>
+                  )}
                 </div>
-                <span className={`text-xs px-2.5 py-1 rounded-full border font-cairo ${
-                  m.role === "admin"
-                    ? "bg-amber-50 text-amber-700 border-amber-200"
-                    : m.role === "manager"
-                    ? "bg-cyan-50 text-cyan-700 border-cyan-200"
-                    : "bg-slate-100 text-slate-600 border-slate-200"
-                }`}>
-                  {ROLE_LABELS[m.role]}
-                </span>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </section>
 

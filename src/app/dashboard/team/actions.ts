@@ -78,6 +78,75 @@ export async function cancelInvitation(id: string) {
   bustDashboardCache();
 }
 
+/**
+ * Remove an existing tenant member (manager / employee / even an admin
+ * that isn't you). Wipes the profiles row, which is the source of truth
+ * for "is this user inside this company". The auth.users row is left
+ * intact intentionally — if HR ever wants to invite the same person
+ * back, they don't have to recreate an auth account.
+ *
+ * Safety:
+ *   - admin-only (requireAdmin())
+ *   - you can never remove yourself (avoids lockouts)
+ *   - target must be in the same company (defends against a crafted
+ *     member_id pointing at another tenant's user)
+ */
+export async function removeMember(formData: FormData) {
+  const { supabase, profile: actor } = await requireAdmin();
+
+  const memberId = String(formData.get("member_id") ?? "").trim();
+  if (!memberId) {
+    redirect(
+      "/dashboard/team?error=" +
+        encodeURIComponent("معرف العضو مطلوب"),
+    );
+  }
+
+  // Refuse to delete yourself.
+  if (memberId === actor.id) {
+    redirect(
+      "/dashboard/team?error=" +
+        encodeURIComponent("مش تقدر تحذف نفسك من الفريق"),
+    );
+  }
+
+  // Verify target lives inside the same tenant.
+  const { data: target } = await supabase
+    .from("profiles")
+    .select("id, full_name, role, company_id")
+    .eq("id", memberId)
+    .eq("company_id", actor.company_id)
+    .maybeSingle<{
+      id: string;
+      full_name: string | null;
+      role: "admin" | "manager" | "employee";
+      company_id: string;
+    }>();
+
+  if (!target) {
+    redirect(
+      "/dashboard/team?error=" +
+        encodeURIComponent("العضو ده مش موجود في فريقك"),
+    );
+  }
+
+  const { error } = await supabase
+    .from("profiles")
+    .delete()
+    .eq("id", memberId)
+    .eq("company_id", actor.company_id);
+
+  if (error) {
+    redirect(
+      "/dashboard/team?error=" + encodeURIComponent(error.message),
+    );
+  }
+
+  revalidatePath("/dashboard/team");
+  bustDashboardCache();
+  redirect("/dashboard/team?deleted=1");
+}
+
 export async function resendInvitation(id: string) {
   await requireAdmin();
   const supabase = await createClient();
