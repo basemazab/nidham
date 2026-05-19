@@ -189,12 +189,49 @@ function NewPermissionForm({
       Alert.alert("ناقص", "اختار التاريخ");
       return;
     }
+
+    // Normalize + validate the time inputs before they hit the DB.
+    // Postgres time columns reject anything not in HH:MM[:SS] format —
+    // a raw "9" was 404'ing the request server-side. We accept lenient
+    // input ("9", "9:5", "09:30") and produce a canonical "HH:MM",
+    // or null for empty. If parsing fails for a non-empty input we
+    // show an Arabic error and bail out before the network call.
+    let normalizedFrom: string | null = null;
+    let normalizedTo: string | null = null;
+
+    if (showTimes) {
+      if (fromTime.trim()) {
+        const parsed = normalizeTime(fromTime);
+        if (!parsed) {
+          Alert.alert("وقت غلط", "اكتب وقت البدء بصيغة HH:MM — مثلاً 09:00");
+          return;
+        }
+        normalizedFrom = parsed;
+      }
+      if (toTime.trim()) {
+        const parsed = normalizeTime(toTime);
+        if (!parsed) {
+          Alert.alert("وقت غلط", "اكتب وقت الانتهاء بصيغة HH:MM — مثلاً 11:30");
+          return;
+        }
+        normalizedTo = parsed;
+      }
+      // Sanity check: end > start (when both provided)
+      if (normalizedFrom && normalizedTo && normalizedTo <= normalizedFrom) {
+        Alert.alert(
+          "ترتيب غلط",
+          "وقت الانتهاء لازم يكون بعد وقت البدء",
+        );
+        return;
+      }
+    }
+
     setSubmitting(true);
     const r = await createPermissionRequest({
       permissionType: type,
       permissionDate: date,
-      fromTime: showTimes && fromTime ? fromTime : null,
-      toTime: showTimes && toTime ? toTime : null,
+      fromTime: normalizedFrom,
+      toTime: normalizedTo,
       reason: reason.trim() || null,
     });
     setSubmitting(false);
@@ -237,10 +274,17 @@ function NewPermissionForm({
               <TextInput
                 value={fromTime}
                 onChangeText={setFromTime}
+                onBlur={() => {
+                  // Auto-canonicalize on blur so the user SEES "09:00"
+                  // before they submit instead of finding out in an alert.
+                  const norm = normalizeTime(fromTime);
+                  if (norm) setFromTime(norm);
+                }}
                 placeholder="09:00"
                 placeholderTextColor={colors.slate500}
                 style={styles.input}
                 maxLength={5}
+                keyboardType="numbers-and-punctuation"
               />
             </View>
             <View style={styles.timeField}>
@@ -248,10 +292,15 @@ function NewPermissionForm({
               <TextInput
                 value={toTime}
                 onChangeText={setToTime}
+                onBlur={() => {
+                  const norm = normalizeTime(toTime);
+                  if (norm) setToTime(norm);
+                }}
                 placeholder="11:00"
                 placeholderTextColor={colors.slate500}
                 style={styles.input}
                 maxLength={5}
+                keyboardType="numbers-and-punctuation"
               />
             </View>
           </View>
@@ -299,6 +348,49 @@ function formatDate(iso: string): string {
 function trimTime(t: string): string {
   // "09:30:00" -> "09:30"
   return t.slice(0, 5);
+}
+
+/**
+ * Normalize a lenient time string to canonical "HH:MM".
+ *
+ * Accepts:
+ *   "9"      → "09:00"
+ *   "09"     → "09:00"
+ *   "9:5"    → "09:05"
+ *   "09:30"  → "09:30"
+ *   "9:30 ص" → "09:30"          (Arabic AM/PM dropped — assume 24h)
+ *   "  9 "   → "09:00"          (whitespace ignored)
+ *
+ * Returns null for:
+ *   "" / undefined         (empty input — caller decides what to do)
+ *   "25:00" / "09:75"      (out-of-range hour or minute)
+ *   "abc" / "9:5:5:5"      (garbage)
+ *
+ * The Postgres `time` type accepts "HH:MM:SS" or "HH:MM"; we return
+ * "HH:MM" because seconds aren't user-visible anywhere in the product
+ * and adding ":00" would mislead the operator.
+ */
+function normalizeTime(raw: string): string | null {
+  if (!raw) return null;
+  // Strip Arabic AM/PM markers + any non-digit/colon character.
+  const cleaned = raw
+    .trim()
+    .replace(/ص|م|am|pm|AM|PM/gi, "")
+    .trim();
+  if (!cleaned) return null;
+
+  // Split on colon. Allow "9" → ["9"] (hours-only) or "9:30" → ["9","30"].
+  const parts = cleaned.split(":");
+  if (parts.length > 2) return null;
+
+  const h = parseInt(parts[0], 10);
+  const m = parts.length === 2 ? parseInt(parts[1], 10) : 0;
+
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
+  if (h < 0 || h > 23) return null;
+  if (m < 0 || m > 59) return null;
+
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
 const styles = StyleSheet.create({
