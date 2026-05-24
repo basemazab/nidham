@@ -13,6 +13,7 @@
 import { generateObject } from "ai";
 import { z } from "zod";
 import { callWithFallback } from "./ai-models";
+import { fetchPageEvidence } from "./page-fetcher";
 
 // ----------------------------------------------------------------------------
 // 1) PRODUCT ANALYZER
@@ -592,26 +593,46 @@ export async function diagnosePagesIssues(input: {
   website_url?: string | null;
   current_issues?: string | null;
 }): Promise<PageDoctorResponse> {
-  const urls = [
-    input.facebook_url ? `Facebook: ${input.facebook_url}` : "",
-    input.instagram_url ? `Instagram: ${input.instagram_url}` : "",
-    input.website_url ? `Website: ${input.website_url}` : "",
-  ]
-    .filter(Boolean)
-    .join("\n");
+  // Fetch real evidence from each URL the user provided. Parallel so a
+  // slow Facebook crawler doesn't block the Instagram fetch. All three
+  // calls have a 10s ceiling enforced inside fetchPageEvidence, so worst
+  // case the whole evidence-gathering step takes ~10s.
+  const [fbEvidence, igEvidence, webEvidence] = await Promise.all([
+    input.facebook_url ? fetchPageEvidence(input.facebook_url) : null,
+    input.instagram_url ? fetchPageEvidence(input.instagram_url) : null,
+    input.website_url ? fetchPageEvidence(input.website_url) : null,
+  ]);
+
+  const evidenceBlock = buildEvidenceBlock({
+    facebook: fbEvidence,
+    instagram: igEvidence,
+    website: webEvidence,
+  });
 
   const userPrompt = `**المنتج/الخدمة:** ${input.product_summary}
 
-**معلومات الصفحة (اللي قدمها صاحب الشركة):**
+${
+  evidenceBlock
+    ? `**الأدلة الفعلية المستخرجة من الصفحات (مهم: اعتمد عليها أساساً):**
+${evidenceBlock}
+
+`
+    : ""
+}**ما قاله صاحب الشركة عن صفحته:**
 ${input.page_info}
 
-${urls ? `**الروابط:**\n${urls}` : ""}
-
-${input.current_issues ? `**مشاكل لاحظها صاحب الشركة:**\n${input.current_issues}` : ""}
-
-اعمل تشخيص شامل للصفحة من منظور paid ads expert: أين المشاكل اللي
+${input.current_issues ? `**مشاكل لاحظها صاحب الشركة:**\n${input.current_issues}\n\n` : ""}اعمل تشخيص شامل للصفحة من منظور paid ads expert: أين المشاكل اللي
 هتقلل من أداء الإعلانات الممولة، وإزاي يصلحها خطوة بخطوة. الهدف:
-صاحب الشركة يطلع بـ action list يقدر يطبقه قبل ما يطلق أي إعلان جديد.`;
+صاحب الشركة يطلع بـ action list يقدر يطبقه قبل ما يطلق أي إعلان جديد.
+
+**قواعد ملزمة:**
+- لكل issue تذكره، ابدأ الـ problem_description بـ "بناءً على الفحص:"
+  ثم اقتبس البيانة الفعلية اللي شفتها (مثلاً: "title صفحتك = 'بدون عنوان'
+  وطوله 14 حرف").
+- لو الفحص ما رجعش بيانات (fetched=false أو login wall) لـ صفحة معينة،
+  قول صراحة "تعذّر فحص هذه الصفحة" بدل ما تخمن.
+- متطّلعش "issues" generic زي "ضيف صور للمنتج" بدون دليل من الـ evidence.
+- ابني الـ pre_launch_checklist من البيانات الناقصة فعلاً، مش checklist عام.`;
 
   return callWithFallback(async (picked) => {
     const { object } = await generateObject({
@@ -620,10 +641,101 @@ ${input.current_issues ? `**مشاكل لاحظها صاحب الشركة:**\n${
       schema: pageDoctorResponseSchema,
       system: PAGE_DOCTOR_SYSTEM,
       prompt: userPrompt,
-      temperature: 0.4, // diagnostic — lower temperature for consistency
+      temperature: 0.2, // even lower — evidence-bound diagnostics shouldn't drift
     });
     return object;
   });
+}
+
+/**
+ * Build a compact, human-readable evidence block for the AI prompt.
+ * Skips sections with null evidence. Format is plain Arabic-friendly
+ * markdown so the AI doesn't have to parse JSON.
+ */
+function buildEvidenceBlock(input: {
+  facebook: Awaited<ReturnType<typeof fetchPageEvidence>> | null;
+  instagram: Awaited<ReturnType<typeof fetchPageEvidence>> | null;
+  website: Awaited<ReturnType<typeof fetchPageEvidence>> | null;
+}): string {
+  const parts: string[] = [];
+  if (input.facebook) parts.push(renderEvidence("Facebook", input.facebook));
+  if (input.instagram) parts.push(renderEvidence("Instagram", input.instagram));
+  if (input.website) parts.push(renderEvidence("Website", input.website));
+  return parts.join("\n\n");
+}
+
+function renderEvidence(
+  label: string,
+  e: Awaited<ReturnType<typeof fetchPageEvidence>>,
+): string {
+  if (!e.fetched) {
+    return `▼ ${label}:
+  ❌ تعذّر الوصول: ${e.fetch_error ?? "خطأ غير معروف"}`;
+  }
+  const lines: string[] = [`▼ ${label}:`];
+  lines.push(`  • URL النهائي: ${e.final_url ?? "—"}`);
+  lines.push(`  • HTTP status: ${e.status_code ?? "—"}`);
+  if (e.fetch_time_ms !== undefined) {
+    lines.push(`  • وقت التحميل: ${e.fetch_time_ms}ms ${e.fetch_time_ms > 3000 ? "⚠ بطيء" : ""}`);
+  }
+  if (e.page_weight_kb !== undefined) {
+    lines.push(`  • حجم الصفحة: ${e.page_weight_kb} KB`);
+  }
+  lines.push(`  • HTTPS: ${e.is_https ? "نعم ✓" : "❌ HTTP فقط"}`);
+  if (e.hit_login_wall) {
+    lines.push(`  • ⚠ ظهرت شاشة تسجيل دخول (login wall) — الفحص محدود`);
+  }
+  if (e.platform_note) lines.push(`  • ملاحظة المنصة: ${e.platform_note}`);
+
+  // Document metadata
+  lines.push("");
+  lines.push(`  ── Meta tags ──`);
+  lines.push(`  • <title>: ${e.title ? `"${e.title}" (${e.title_length} حرف)` : "❌ مفقود"}`);
+  lines.push(
+    `  • meta description: ${
+      e.meta_description
+        ? `"${e.meta_description}" (${e.meta_description_length} حرف)`
+        : "❌ مفقود"
+    }`,
+  );
+  lines.push(`  • canonical URL: ${e.canonical_url ?? "❌ غير محدد"}`);
+  lines.push(`  • html lang: ${e.html_lang ?? "❌ غير محدد"}`);
+  lines.push(`  • viewport meta: ${e.has_viewport ? "موجود ✓" : "❌ مفقود (مش mobile-friendly)"}`);
+  lines.push(`  • favicon: ${e.has_favicon ? "موجود ✓" : "❌ مفقود"}`);
+
+  // Social cards
+  lines.push("");
+  lines.push(`  ── Open Graph / Twitter ──`);
+  lines.push(`  • og:title: ${e.og_title ?? "❌ مفقود"}`);
+  lines.push(`  • og:description: ${e.og_description ?? "❌ مفقود"}`);
+  lines.push(`  • og:image: ${e.og_image ?? "❌ مفقود (link previews هتطلع بدون صورة)"}`);
+  lines.push(`  • twitter:card: ${e.twitter_card ?? "❌ مفقود"}`);
+  if (e.has_schema_org) {
+    lines.push(`  • schema.org: ${e.schema_org_types?.join(", ") ?? "—"} ✓`);
+  } else {
+    lines.push(`  • schema.org: ❌ غير موجود`);
+  }
+
+  // Content structure
+  lines.push("");
+  lines.push(`  ── Content structure ──`);
+  lines.push(
+    `  • H1 count: ${e.h1_count}${e.h1_count !== 1 ? ` ⚠ (المفضل واحد)` : ""}`,
+  );
+  if (e.first_h1) lines.push(`  • First H1 text: "${e.first_h1}"`);
+  lines.push(`  • Total headings: ${e.total_headings}`);
+  lines.push(
+    `  • Images: ${e.image_count}${
+      e.images_missing_alt && e.images_missing_alt > 0
+        ? ` ⚠ (${e.images_missing_alt} بدون alt text)`
+        : ""
+    }`,
+  );
+  lines.push(`  • Links: ${e.link_count}`);
+  lines.push(`  • External scripts: ${e.external_script_count}`);
+  lines.push(`  • External stylesheets: ${e.external_stylesheet_count}`);
+
+  return lines.join("\n");
 }
 
 // ----------------------------------------------------------------------------
