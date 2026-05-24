@@ -71,13 +71,30 @@ export async function login(formData: FormData) {
 
   const supabase = await createClient();
 
-  const { error } = await supabase.auth.signInWithPassword({
+  const { data: signInData, error } = await supabase.auth.signInWithPassword({
     email,
     password: formData.get("password") as string,
   });
 
   if (error) {
     redirect(`/login?error=${encodeURIComponent(arabicizeAuthError(error.message))}`);
+  }
+
+  // 2FA gate: if the user has enabled TOTP, send them to /login/2fa
+  // BEFORE granting full dashboard access. The session is still active
+  // — the cookie set after a successful TOTP challenge is what
+  // distinguishes a "logged-in + 2FA-cleared" session from a "logged-in
+  // but TOTP pending" one.
+  if (signInData.user) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("two_factor_enabled")
+      .eq("id", signInData.user.id)
+      .single<{ two_factor_enabled: boolean | null }>();
+    if (profile?.two_factor_enabled === true) {
+      revalidatePath("/", "layout");
+      redirect("/login/2fa");
+    }
   }
 
   revalidatePath("/", "layout");

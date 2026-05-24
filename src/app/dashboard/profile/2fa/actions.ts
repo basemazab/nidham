@@ -84,8 +84,14 @@ export async function confirm2faSetup(formData: FormData) {
     );
   }
 
-  revalidatePath("/dashboard/profile");
-  redirect("/dashboard/profile?two_factor=enabled");
+  // Force a re-login so the next session goes through the 2FA challenge
+  // and gets the 2FA-passed cookie. Without this, the existing session
+  // would keep working forever without ever being asked for the code —
+  // an indefinite bypass for anyone who held a session token from
+  // before 2FA was turned on.
+  await supabase.auth.signOut();
+  revalidatePath("/", "layout");
+  redirect("/login?two_factor=enabled");
 }
 
 export async function disable2fa() {
