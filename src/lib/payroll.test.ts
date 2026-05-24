@@ -20,6 +20,8 @@ import {
   calculateSocialInsurance,
   calculateEmployerSocialInsurance,
   calculatePayroll,
+  calculateDailyWage,
+  calculateHourlyWage,
   SOCIAL_INSURANCE_RATE,
   EMPLOYER_SOCIAL_INSURANCE_RATE,
   MAX_INSURABLE_WAGE,
@@ -184,6 +186,138 @@ describe("calculateEmployerSocialInsurance — 18.75% (NOT deducted from employe
   it("equals zero for a zero or negative salary", () => {
     expect(calculateEmployerSocialInsurance(0)).toBe(0);
     expect(calculateEmployerSocialInsurance(-1)).toBe(0);
+  });
+});
+
+// ============================================================================
+// Egyptian divisor: ÷26 is the standard for monthly salaried employees.
+// 30-day month minus ~4 Fridays = 26 working days. The codebase previously
+// defaulted to ÷22 which under-counted the daily rate by ~18% — every
+// absence deduction was over-stated by roughly that fraction.
+// ============================================================================
+describe("calculatePayroll — Egyptian ÷26 default", () => {
+  it("uses 26 working days when the caller omits the parameter", () => {
+    // Salary 5,200 with 2 absent days. dailyRate = 5200/26 = 200.
+    // Deduction = 2 × 200 = 400. Net = 4,800.
+    const result = calculatePayroll(
+      {
+        basicSalary: 5_200,
+        housingAllowance: 0,
+        transportAllowance: 0,
+        otherAllowances: 0,
+      },
+      { attended: 24, halfDay: 0, leave: 0, absent: 2 },
+      // no workingDays passed -> defaults to 26
+    );
+    expect(result.absenceDeduction).toBe(400);
+    expect(result.netSalary).toBe(4_800);
+  });
+
+  it("matches the worked example from the Egyptian HR reference docs", () => {
+    // The reference: 5,200 EGP/mo, dailyRate = 200, 2 days absent → 4,800 net
+    // This test pins that exact example so a future regression flags
+    // immediately.
+    const result = calculatePayroll(
+      {
+        basicSalary: 5_200,
+        housingAllowance: 0,
+        transportAllowance: 0,
+        otherAllowances: 0,
+      },
+      { attended: 24, halfDay: 0, leave: 0, absent: 2 },
+    );
+    expect(Math.round((5_200 / 26) * 100) / 100).toBe(200);
+    expect(result.netSalary).toBe(4_800);
+  });
+
+  it("still accepts an explicit override (e.g. 25 for a 5-Friday month)", () => {
+    // Some months have 5 Fridays → 25 working days.
+    const result = calculatePayroll(
+      {
+        basicSalary: 5_000,
+        housingAllowance: 0,
+        transportAllowance: 0,
+        otherAllowances: 0,
+      },
+      { attended: 24, halfDay: 0, leave: 0, absent: 1 },
+      25,
+    );
+    // dailyRate = 5000/25 = 200; deduction = 200.
+    expect(result.absenceDeduction).toBe(200);
+    expect(result.netSalary).toBe(4_800);
+  });
+});
+
+describe("calculateDailyWage — daily-paid workers", () => {
+  it("multiplies daily rate by attended days", () => {
+    // 250 × 24 days = 6,000
+    expect(calculateDailyWage(250, 24)).toBe(6_000);
+  });
+
+  it("counts half-days as 0.5", () => {
+    // 250 × (22 + 2*0.5) = 250 × 23 = 5,750
+    expect(calculateDailyWage(250, 22, 2)).toBe(5_750);
+  });
+
+  it("returns 0 when no attendance (no salary to fall back on)", () => {
+    expect(calculateDailyWage(250, 0)).toBe(0);
+  });
+
+  it("rounds to 2 decimal places", () => {
+    // 123.45 × 7 = 864.15
+    expect(calculateDailyWage(123.45, 7)).toBe(864.15);
+  });
+});
+
+describe("calculateHourlyWage — hourly + conditional transport", () => {
+  it("pays per actual hours worked, no allowance when none configured", () => {
+    const r = calculateHourlyWage({
+      hourlyRate: 30,
+      hoursWorked: 160,
+      daysWorked: 20,
+    });
+    expect(r.baseWage).toBe(4_800);
+    expect(r.transportTotal).toBe(0);
+    expect(r.total).toBe(4_800);
+  });
+
+  it("pays transport every worked day when no threshold is set", () => {
+    const r = calculateHourlyWage({
+      hourlyRate: 30,
+      hoursWorked: 160,
+      daysWorked: 20,
+      transportAllowance: 25,
+      // transportThresholdHours: undefined → always pay
+    });
+    expect(r.transportTotal).toBe(500); // 25 × 20
+    expect(r.total).toBe(5_300); // 4,800 + 500
+  });
+
+  it("pays transport ONLY on eligible days when a threshold is set", () => {
+    // Worker had 20 attended days but only 15 had >= 4 hours.
+    const r = calculateHourlyWage({
+      hourlyRate: 30,
+      hoursWorked: 110, // mixed short + full shifts
+      daysWorked: 20,
+      transportAllowance: 25,
+      transportThresholdHours: 4,
+      eligibleDays: 15,
+    });
+    expect(r.baseWage).toBe(3_300); // 30 × 110
+    expect(r.transportTotal).toBe(375); // 25 × 15
+    expect(r.total).toBe(3_675);
+  });
+
+  it("falls back to 0 eligible days if the caller forgot to compute them", () => {
+    const r = calculateHourlyWage({
+      hourlyRate: 30,
+      hoursWorked: 100,
+      daysWorked: 20,
+      transportAllowance: 25,
+      transportThresholdHours: 4,
+      // eligibleDays missing -> treated as 0 (safe default)
+    });
+    expect(r.transportTotal).toBe(0);
   });
 });
 

@@ -104,7 +104,10 @@ export async function generatePayrollPeriod(formData: FormData) {
   }
 
   const workingDays = parseInt(
-    asText(formData.get("working_days")) ?? "22",
+    // Egyptian-standard default: 26 working days per month
+    // (30 days minus ~4 Fridays). See payroll.ts:calculatePayroll for
+    // the full reasoning.
+    asText(formData.get("working_days")) ?? "26",
     10,
   );
 
@@ -688,7 +691,10 @@ export async function regeneratePeriodEntries(formData: FormData) {
         loanDeduction,
       },
       breakdown,
-      period.working_days ?? 22,
+      // Fallback to the Egyptian-standard 26-day month if the period
+      // was created without an explicit working_days (e.g. legacy rows
+      // from before the divisor fix).
+      period.working_days ?? 26,
       payrollSettings,
     );
 
@@ -1008,7 +1014,10 @@ export async function applyBulkBonus(formData: FormData) {
           leave: Number(e.leave_days ?? 0),
           absent: Number(e.absent_days ?? 0),
         },
-        period.working_days ?? 22,
+        // Fallback to the Egyptian-standard 26-day month if the period
+      // was created without an explicit working_days (e.g. legacy rows
+      // from before the divisor fix).
+      period.working_days ?? 26,
         settings,
       );
       const { error } = await supabase

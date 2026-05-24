@@ -37,8 +37,10 @@ export function NewPayrollForm({
   const [frequency, setFrequency] = useState<Frequency>(initialFrequency);
   const [startDate, setStartDate] = useState(initialStartDate);
   const [endDate, setEndDate] = useState(initialEndDate);
+  // Egyptian standard: 26 working days/month for monthly employees
+  // (30 days minus ~4 Fridays). Weekly stays at 6 (one cycle = one week).
   const [workingDays, setWorkingDays] = useState(
-    initialFrequency === "weekly" ? "6" : "22",
+    initialFrequency === "weekly" ? "6" : "26",
   );
   const [isPending, startTransition] = useTransition();
 
@@ -50,7 +52,7 @@ export function NewPayrollForm({
     const suggested = suggestCycle(next, monthlyStartDay, weeklyStartDow);
     setStartDate(suggested.startDate);
     setEndDate(suggested.endDate);
-    setWorkingDays(next === "weekly" ? "6" : "22");
+    setWorkingDays(next === "weekly" ? "6" : "26");
   }
 
   // When the user manually edits start_date, recompute end_date from

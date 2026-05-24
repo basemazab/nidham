@@ -190,6 +190,79 @@ export function calculateEmployerSocialInsurance(monthlyGross: number): number {
 }
 
 // ============================================================================
+// EMPLOYEE-CATEGORY-SPECIFIC HELPERS
+// ============================================================================
+//
+// Egyptian SMBs run four payment models side-by-side. The flat
+// calculatePayroll() at the bottom of this file handles monthly + weekly
+// + daily (with `workingDays` as the divisor / multiplier knob). Hourly
+// is structurally different — it pays per actual hour and gates a
+// conditional transport allowance on a min-hours-per-day threshold — so
+// it gets its own dedicated entry point.
+
+/**
+ * Daily wage for a daily-paid worker. The "salary" concept doesn't apply
+ * here — they get `daily_rate × attended_days`, period. No deductions for
+ * absent days (because there's no base salary to deduct from).
+ *
+ * Returns just the wage; the caller adds allowances, taxes, etc.
+ */
+export function calculateDailyWage(
+  dailyRate: number,
+  attendedDays: number,
+  halfDays: number = 0,
+): number {
+  const effectiveDays = attendedDays + halfDays * 0.5;
+  return Math.round(dailyRate * effectiveDays * 100) / 100;
+}
+
+/**
+ * Hourly wage with conditional transport allowance.
+ *
+ * `transportAllowance` is paid PER DAY if the worker hit
+ * `transportThresholdHours` on that day (typical at Al-Ittihad: 4-6 hours).
+ * If `transportThresholdHours` is undefined, the allowance is paid
+ * unconditionally for every day the worker showed up.
+ *
+ * Inputs:
+ *   hourlyRate          — wage per hour
+ *   hoursWorked         — total hours across the period
+ *   daysWorked          — count of distinct days the worker showed up
+ *   transportAllowance  — daily transport allowance amount
+ *   transportThresholdHours? — min hours/day to earn the allowance
+ *   eligibleDays?       — count of days the worker hit the threshold
+ *                         (caller computes this from the attendance log)
+ */
+export function calculateHourlyWage(input: {
+  hourlyRate: number;
+  hoursWorked: number;
+  daysWorked: number;
+  transportAllowance?: number;
+  transportThresholdHours?: number;
+  eligibleDays?: number;
+}): { baseWage: number; transportTotal: number; total: number } {
+  const baseWage =
+    Math.round(input.hourlyRate * input.hoursWorked * 100) / 100;
+
+  const transport = input.transportAllowance ?? 0;
+  // If a threshold is set, use the eligibleDays count the caller supplied;
+  // otherwise pay transport for every day worked.
+  const transportDays =
+    input.transportThresholdHours === undefined
+      ? input.daysWorked
+      : (input.eligibleDays ?? 0);
+  const transportTotal =
+    Math.round(transport * transportDays * 100) / 100;
+
+  return {
+    baseWage,
+    transportTotal,
+    total: Math.round((baseWage + transportTotal) * 100) / 100,
+  };
+}
+
+
+// ============================================================================
 // FULL PAYROLL CALCULATION
 // ============================================================================
 
@@ -263,10 +336,26 @@ export type PayrollResult = {
   netSalary: number;
 };
 
+/**
+ * Calculate monthly payroll for an Egyptian employee.
+ *
+ * `workingDays` defaults to **26** — the Egyptian standard for monthly
+ * salaried employees. The reasoning: a 30-day month has ~4 Fridays
+ * (weekly rest day), so 30 − 4 = 26 working days. The daily rate is
+ * therefore `monthly_salary / 26`, NOT `monthly_salary / 30` and NOT
+ * `monthly_salary / 22` (which was an earlier mistake that under-paid
+ * the daily rate by ~18% — every absence deduction was over-stated by
+ * roughly that fraction).
+ *
+ * Override `workingDays` per period when:
+ *   - The month genuinely has 5 Fridays (some Septembers) → pass 25
+ *   - Weekly-paid employees → pass 6
+ *   - Daily-rate workers → pass the actual attendance days
+ */
 export function calculatePayroll(
   salary: SalaryStructure,
   attendance: AttendanceBreakdown,
-  workingDays = 22,
+  workingDays = 26,
   settings: PayrollSettings = {},
 ): PayrollResult {
   // 1. Effective attended days (paid days)
