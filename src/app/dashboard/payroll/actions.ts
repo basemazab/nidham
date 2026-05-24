@@ -364,6 +364,14 @@ export async function updatePayrollEntry(entryId: string, formData: FormData) {
   const other = asNumber(formData.get("other_allowances"));
   const incentive = asNumber(formData.get("incentive_allowance"));
   const bonuses = asNumber(formData.get("bonuses"));
+  // Egyptian Labor Law Art. 85 overtime: hours per category. When any of
+  // these is > 0, the engine computes the pay using legally-mandated
+  // multipliers (1.35 / 1.7 / 2.0). The raw `overtime` money field is
+  // kept as a fallback so legacy entries without the breakdown still work
+  // — HR can also use it for "manual override" cases.
+  const otHoursDay = asNumber(formData.get("overtime_hours_day"));
+  const otHoursNight = asNumber(formData.get("overtime_hours_night"));
+  const otHoursRest = asNumber(formData.get("overtime_hours_rest"));
   const overtime = asNumber(formData.get("overtime"));
   const loan = asNumber(formData.get("loan_deduction"));
   const otherDed = asNumber(formData.get("other_deductions"));
@@ -387,11 +395,15 @@ export async function updatePayrollEntry(entryId: string, formData: FormData) {
       incentiveAllowance: incentive,
       bonuses,
       overtime,
+      overtimeHoursDay: otHoursDay,
+      overtimeHoursNight: otHoursNight,
+      overtimeHoursRest: otHoursRest,
       loanDeduction: loan,
       otherDeductions: otherDed,
     },
     { attended, halfDay, leave, absent },
-    period.working_days ?? 22,
+    // Egyptian standard: 26 working days (30 - ~4 Fridays). See payroll.ts.
+    period.working_days ?? 26,
     {
       socialInsuranceEnabled: companyRow?.social_insurance_enabled === true,
       incomeTaxEnabled: companyRow?.income_tax_enabled === true,
@@ -414,7 +426,14 @@ export async function updatePayrollEntry(entryId: string, formData: FormData) {
       other_allowances: other,
       incentive_allowance: incentive,
       bonuses,
-      overtime,
+      // Persist BOTH the per-category hour breakdown AND the computed
+      // money total. The hour columns are the audit trail; the money
+      // column is what the rest of the payroll pipeline (exports,
+      // payslip) keeps reading.
+      overtime: result.overtime,
+      overtime_hours_day: otHoursDay,
+      overtime_hours_night: otHoursNight,
+      overtime_hours_rest: otHoursRest,
       gross_salary: result.grossSalary,
       absence_deduction: result.absenceDeduction,
       social_insurance: result.socialInsurance,

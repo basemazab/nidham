@@ -190,6 +190,68 @@ export function calculateEmployerSocialInsurance(monthlyGross: number): number {
 }
 
 // ============================================================================
+// OVERTIME — Egyptian Labor Law Article 85
+// ============================================================================
+//
+// Three legally-mandated overtime multipliers:
+//
+//   Daytime           ×1.35  (+35% premium)
+//   Nighttime         ×1.70  (+70% premium)   defined as 7pm–7am
+//   Rest day / holiday ×2.00 (+100% premium)
+//
+// These apply to the NORMAL hourly wage, which for a monthly-salaried
+// employee = basic_salary / 26 / 8 hours = basic_salary / 208.
+
+export const OVERTIME_RATE_DAY = 1.35;
+export const OVERTIME_RATE_NIGHT = 1.7;
+export const OVERTIME_RATE_REST = 2.0;
+
+/**
+ * Compute the normal hourly wage for a monthly-salaried employee.
+ *
+ * basic_salary / (workingDays × workdayHours)
+ *
+ * Defaults to 26 working days × 8 hours = 208 hours/month (Egyptian
+ * Labour Code office-work assumption).
+ */
+export function calculateHourlyRate(
+  basicSalary: number,
+  workingDays: number = 26,
+  workdayHours: number = 8,
+): number {
+  if (basicSalary <= 0 || workingDays <= 0 || workdayHours <= 0) return 0;
+  return (
+    Math.round((basicSalary / workingDays / workdayHours) * 10000) / 10000
+  );
+}
+
+/**
+ * Total overtime pay for one payroll cycle, given the hours worked in
+ * each category. The caller passes the employee's normal hourly wage —
+ * we don't recompute it here because the source depends on the worker's
+ * pay frequency (monthly → basic/208, hourly → hourly_rate, daily →
+ * daily_rate/8).
+ *
+ * Returns the additional pay (already multiplied), rounded to piastres.
+ */
+export function calculateOvertimePay(
+  hourlyRate: number,
+  hours: {
+    day?: number;
+    night?: number;
+    rest?: number;
+  },
+): number {
+  if (hourlyRate <= 0) return 0;
+  const dayPay = (hours.day ?? 0) * hourlyRate * OVERTIME_RATE_DAY;
+  const nightPay = (hours.night ?? 0) * hourlyRate * OVERTIME_RATE_NIGHT;
+  const restPay = (hours.rest ?? 0) * hourlyRate * OVERTIME_RATE_REST;
+  const total = dayPay + nightPay + restPay;
+  return Math.round(total * 100) / 100;
+}
+
+
+// ============================================================================
 // EMPLOYEE-CATEGORY-SPECIFIC HELPERS
 // ============================================================================
 //
@@ -291,7 +353,21 @@ export type SalaryStructure = {
   otherAllowances: number;
   incentiveAllowance?: number; // حافز -- recurring monthly incentive
   bonuses?: number;            // مكافآت لمرة واحدة (هذا الشهر)
-  overtime?: number;           // قيمة الـ overtime
+  /**
+   * Raw overtime amount in EGP. Used as a FALLBACK when the per-hour
+   * breakdown below isn't populated (e.g. legacy entries from before
+   * migration 052, or HR manually overriding the calculation).
+   */
+  overtime?: number;
+  /**
+   * Egyptian Labor Law Art. 85 overtime hours, broken down by category.
+   * When ANY of these is non-zero, calculatePayroll computes the overtime
+   * pay using the legally-mandated multipliers (1.35 / 1.7 / 2.0) and
+   * IGNORES the raw `overtime` field.
+   */
+  overtimeHoursDay?: number;
+  overtimeHoursNight?: number;
+  overtimeHoursRest?: number;
   loanDeduction?: number;      // قسط قرض
   otherDeductions?: number;    // خصومات إضافية
 };
@@ -391,8 +467,26 @@ export function calculatePayroll(
     Math.round((tardyMins * (dailyRate / WORKDAY_MINUTES)) * 100) / 100;
 
   // 5. Gross = base + bonuses + overtime - absence - tardiness
+  //
+  // Overtime resolution order:
+  //   a) If any of overtimeHours{Day,Night,Rest} is set → compute from
+  //      hours using Egyptian Labor Law Art. 85 multipliers (×1.35, ×1.7,
+  //      ×2.0) on the hourly wage derived from basicSalary.
+  //   b) Otherwise fall back to the raw `overtime` money amount (legacy
+  //      path — kept so entries created before migration 052 still work).
   const bonuses = salary.bonuses ?? 0;
-  const overtime = salary.overtime ?? 0;
+  const otHours = {
+    day: salary.overtimeHoursDay ?? 0,
+    night: salary.overtimeHoursNight ?? 0,
+    rest: salary.overtimeHoursRest ?? 0,
+  };
+  const hasHourBreakdown = otHours.day > 0 || otHours.night > 0 || otHours.rest > 0;
+  const overtime = hasHourBreakdown
+    ? calculateOvertimePay(
+        calculateHourlyRate(salary.basicSalary, workingDays),
+        otHours,
+      )
+    : (salary.overtime ?? 0);
   const grossSalary =
     monthlyBase + bonuses + overtime - absenceDeduction - tardinessDeduction;
 

@@ -25,6 +25,11 @@ type Entry = {
   other_allowances: number;
   bonuses: number;
   overtime: number;
+  // Egyptian Labor Law Art. 85 overtime breakdown — multipliers applied
+  // by the payroll engine (×1.35 day, ×1.7 night, ×2.0 rest).
+  overtime_hours_day: number;
+  overtime_hours_night: number;
+  overtime_hours_rest: number;
   gross_salary: number;
   absence_deduction: number;
   social_insurance: number;
@@ -141,8 +146,79 @@ export default async function EditPayrollEntryPage({ params, searchParams }: Pag
                 <input type="number" name="bonuses" step="0.01" min="0" defaultValue={entry.bonuses} className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none text-slate-900 font-cairo" />
               </div>
               <div>
-                <label className="block text-xs text-slate-600 mb-1 font-cairo">أوفر تايم</label>
-                <input type="number" name="overtime" step="0.01" min="0" defaultValue={entry.overtime} className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none text-slate-900 font-cairo" />
+                <label className="block text-xs text-slate-600 mb-1 font-cairo">
+                  أوفر تايم (مبلغ يدوي — اتركه فارغ لو هتدخل الساعات تحت)
+                </label>
+                <input
+                  type="number"
+                  name="overtime"
+                  step="0.01"
+                  min="0"
+                  defaultValue={entry.overtime}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none text-slate-900 font-cairo"
+                />
+              </div>
+            </div>
+
+            {/* Egyptian Labor Law Art. 85 overtime — preferred path:
+                3 hour inputs, system computes the money at the correct
+                multiplier (×1.35 / ×1.7 / ×2.0). Overrides the "manual
+                amount" field above whenever ANY of these is > 0. */}
+            <div className="mt-5 pt-5 border-t border-slate-100">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-bold font-cairo text-slate-700">
+                  ⏰ ساعات إضافية (قانون العمل المادة 85)
+                </h3>
+                <span className="text-[10px] text-slate-500 font-cairo">
+                  لو حطيت ساعات هنا، النظام بيحسب المبلغ تلقائياً
+                </span>
+              </div>
+              <div className="grid md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs text-slate-600 mb-1 font-cairo">
+                    نهاري (×1.35)
+                  </label>
+                  <input
+                    type="number"
+                    name="overtime_hours_day"
+                    step="0.25"
+                    min="0"
+                    max="744"
+                    defaultValue={entry.overtime_hours_day ?? 0}
+                    placeholder="ساعات"
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none text-slate-900 font-cairo"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-600 mb-1 font-cairo">
+                    ليلي 7م-7ص (×1.7)
+                  </label>
+                  <input
+                    type="number"
+                    name="overtime_hours_night"
+                    step="0.25"
+                    min="0"
+                    max="744"
+                    defaultValue={entry.overtime_hours_night ?? 0}
+                    placeholder="ساعات"
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none text-slate-900 font-cairo"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-600 mb-1 font-cairo">
+                    عطلة / راحة (×2.0)
+                  </label>
+                  <input
+                    type="number"
+                    name="overtime_hours_rest"
+                    step="0.25"
+                    min="0"
+                    max="744"
+                    defaultValue={entry.overtime_hours_rest ?? 0}
+                    placeholder="ساعات"
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none text-slate-900 font-cairo"
+                  />
+                </div>
               </div>
             </div>
           </section>

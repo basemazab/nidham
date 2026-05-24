@@ -22,6 +22,11 @@ import {
   calculatePayroll,
   calculateDailyWage,
   calculateHourlyWage,
+  calculateHourlyRate,
+  calculateOvertimePay,
+  OVERTIME_RATE_DAY,
+  OVERTIME_RATE_NIGHT,
+  OVERTIME_RATE_REST,
   SOCIAL_INSURANCE_RATE,
   EMPLOYER_SOCIAL_INSURANCE_RATE,
   MAX_INSURABLE_WAGE,
@@ -266,6 +271,97 @@ describe("calculateDailyWage — daily-paid workers", () => {
   it("rounds to 2 decimal places", () => {
     // 123.45 × 7 = 864.15
     expect(calculateDailyWage(123.45, 7)).toBe(864.15);
+  });
+});
+
+describe("Egyptian overtime (Labor Law Art. 85) — 1.35 / 1.7 / 2.0", () => {
+  it("exposes the three statutory multipliers as constants", () => {
+    expect(OVERTIME_RATE_DAY).toBe(1.35);
+    expect(OVERTIME_RATE_NIGHT).toBe(1.7);
+    expect(OVERTIME_RATE_REST).toBe(2.0);
+  });
+
+  it("calculateHourlyRate divides basic salary by 26 × 8 = 208 by default", () => {
+    // 5,200 / 208 = 25
+    expect(calculateHourlyRate(5_200)).toBe(25);
+    // 10,400 / 208 = 50
+    expect(calculateHourlyRate(10_400)).toBe(50);
+  });
+
+  it("calculateHourlyRate accepts custom working-day + workday-hour overrides", () => {
+    // For a 25-day month with 6-hr workdays: 4,500 / (25 × 6) = 30
+    expect(calculateHourlyRate(4_500, 25, 6)).toBe(30);
+  });
+
+  it("returns 0 for zero/negative inputs", () => {
+    expect(calculateHourlyRate(0)).toBe(0);
+    expect(calculateHourlyRate(-100)).toBe(0);
+    expect(calculateHourlyRate(5_000, 0)).toBe(0);
+  });
+
+  it("calculateOvertimePay applies 1.35× for day hours", () => {
+    // 10 day hours × 25 EGP/hr × 1.35 = 337.50
+    expect(calculateOvertimePay(25, { day: 10 })).toBe(337.5);
+  });
+
+  it("applies 1.7× for night hours", () => {
+    // 8 night hrs × 25 × 1.7 = 340
+    expect(calculateOvertimePay(25, { night: 8 })).toBe(340);
+  });
+
+  it("applies 2.0× for rest-day / holiday hours", () => {
+    // 4 rest hrs × 25 × 2.0 = 200
+    expect(calculateOvertimePay(25, { rest: 4 })).toBe(200);
+  });
+
+  it("sums all three categories in one cycle", () => {
+    // 10×1.35 + 6×1.7 + 2×2.0 = 13.5 + 10.2 + 4 = 27.7 hours-equivalent
+    // × 25 EGP/hr = 692.50
+    const r = calculateOvertimePay(25, { day: 10, night: 6, rest: 2 });
+    expect(r).toBe(692.5);
+  });
+
+  it("returns 0 when no hours are provided", () => {
+    expect(calculateOvertimePay(25, {})).toBe(0);
+  });
+
+  it("returns 0 for an invalid hourly rate", () => {
+    expect(calculateOvertimePay(0, { day: 10, night: 5 })).toBe(0);
+    expect(calculateOvertimePay(-5, { day: 10 })).toBe(0);
+  });
+
+  it("calculatePayroll uses the hour breakdown when ANY category is set", () => {
+    // Basic 5,200 → hourly = 25. 10 day OT hours → 337.50 added to gross.
+    const result = calculatePayroll(
+      {
+        basicSalary: 5_200,
+        housingAllowance: 0,
+        transportAllowance: 0,
+        otherAllowances: 0,
+        overtime: 9999, // should be IGNORED because hour breakdown wins
+        overtimeHoursDay: 10,
+      },
+      { attended: 26, halfDay: 0, leave: 0, absent: 0 },
+    );
+    // 5,200 + 337.50 OT = 5,537.50
+    expect(result.overtime).toBe(337.5);
+    expect(result.netSalary).toBe(5_537.5);
+  });
+
+  it("calculatePayroll falls back to raw `overtime` when no hour breakdown", () => {
+    const result = calculatePayroll(
+      {
+        basicSalary: 5_200,
+        housingAllowance: 0,
+        transportAllowance: 0,
+        otherAllowances: 0,
+        overtime: 500,
+        // No overtimeHoursDay/Night/Rest → legacy path
+      },
+      { attended: 26, halfDay: 0, leave: 0, absent: 0 },
+    );
+    expect(result.overtime).toBe(500);
+    expect(result.netSalary).toBe(5_700);
   });
 });
 
