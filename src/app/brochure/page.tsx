@@ -59,7 +59,10 @@ export default function BrochurePage() {
               </span>
             </div>
             <div>
-              <div className="text-4xl font-black font-display bg-gradient-to-r from-brand-cyan-dark via-brand-cyan to-brand-navy bg-clip-text text-transparent">
+              {/* Solid color (not gradient-clip-text) — html2canvas-pro
+                  can't render the bg-clip-text trick into the PDF, the
+                  text shows up blank. Solid color survives the capture. */}
+              <div className="text-4xl font-black font-display text-brand-cyan-dark">
                 نِظام
               </div>
               <div className="text-xs tracking-[0.3em] text-amber-600 font-bold mt-0.5">
@@ -75,9 +78,8 @@ export default function BrochurePage() {
             </div>
             <h1 className="text-5xl md:text-6xl font-black font-cairo text-slate-900 leading-tight mb-4">
               نظام HR + AI<br />
-              <span className="bg-gradient-to-r from-brand-cyan-dark to-brand-navy bg-clip-text text-transparent">
-                للشركات المصرية
-              </span>
+              {/* Solid brand-cyan-dark — see header note above */}
+              <span className="text-brand-cyan-dark">للشركات المصرية</span>
             </h1>
             <p className="text-xl text-slate-600 font-cairo leading-relaxed max-w-2xl">
               مرتبات بقانون 2026، نماذج تأمينات تلقائية، AI بينفّذ، وحضور
