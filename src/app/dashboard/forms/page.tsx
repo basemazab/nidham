@@ -149,6 +149,31 @@ const FORMS: FormCard[] = [
     icon: "💰",
     category: "certificate",
   },
+  // Official NOSI forms — added after the audit's §7 gap analysis. Other
+  // SaaS competitors expect HR to fill these by hand on the gov portal;
+  // pre-filling them from the employee record cuts that down to a
+  // copy/paste step.
+  {
+    href: "/dashboard/forms/nosi-form-1",
+    title: "نموذج 1 تأمينات — تسجيل عامل",
+    description: "تُسلم لمكتب التأمينات خلال 7 أيام من التحاق الموظف",
+    icon: "🆕",
+    category: "official",
+  },
+  {
+    href: "/dashboard/forms/nosi-form-2",
+    title: "نموذج 2 تأمينات — تعديل أجر",
+    description: "عند الترقية أو زيادة المرتب — تُسلم خلال 14 يوم",
+    icon: "📈",
+    category: "official",
+  },
+  {
+    href: "/dashboard/forms/nosi-form-6",
+    title: "نموذج 6 تأمينات — ترك الخدمة",
+    description: "إخطار بانتهاء عمل الموظف — تُسلم خلال 7 أيام من آخر يوم",
+    icon: "👋",
+    category: "official",
+  },
 ];
 
 export default async function FormsHubPage({
