@@ -190,6 +190,92 @@ export function calculateEmployerSocialInsurance(monthlyGross: number): number {
 }
 
 // ============================================================================
+// MID-CYCLE PRO-RATION — hires + terminations
+// ============================================================================
+//
+// If an employee was hired (or terminated) inside a payroll cycle, they
+// shouldn't get the full monthly salary — only the fraction of the cycle
+// they were actually employed.
+//
+// The factor is computed in CALENDAR days, not working days, because
+// the salary covers calendar days (Fridays included in the monthly
+// figure). Working-day math comes later when applying absence deductions.
+//
+// Edge cases handled:
+//   - Hired AFTER period end           → factor 0 (no salary)
+//   - Terminated BEFORE period start    → factor 0
+//   - Hire on period.start              → factor 1 (full cycle)
+//   - Termination on period.end         → factor 1 (also full cycle —
+//                                          last day is worked)
+//   - Hired AND terminated inside       → days between (inclusive)
+
+/**
+ * Compute the pro-ration factor (0..1) for an employee against a payroll
+ * cycle. The caller multiplies the monthly base by this factor when the
+ * factor is less than 1 (typical case: mid-month hire or termination).
+ *
+ * All dates are ISO `YYYY-MM-DD` strings. The function is timezone-safe
+ * because it parses dates at midnight UTC.
+ */
+export function calculateProRationFactor(input: {
+  periodStart: string;            // ISO date, e.g. "2026-01-01"
+  periodEnd: string;               // ISO date, e.g. "2026-01-31"
+  hireDate?: string | null;        // ISO date or null/undefined
+  terminationDate?: string | null; // ISO date or null/undefined
+}): number {
+  const startMs = parseIsoDay(input.periodStart);
+  const endMs = parseIsoDay(input.periodEnd);
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs < startMs) {
+    return 0;
+  }
+
+  const hireMs = input.hireDate ? parseIsoDay(input.hireDate) : null;
+  const termMs = input.terminationDate
+    ? parseIsoDay(input.terminationDate)
+    : null;
+
+  // Outside the period entirely → no salary
+  if (hireMs !== null && hireMs > endMs) return 0;
+  if (termMs !== null && termMs < startMs) return 0;
+
+  // Effective employment window inside the period
+  const effectiveStart = hireMs !== null && hireMs > startMs ? hireMs : startMs;
+  const effectiveEnd = termMs !== null && termMs < endMs ? termMs : endMs;
+
+  if (effectiveEnd < effectiveStart) return 0;
+
+  // +1 because both endpoints are inclusive (a hire on the period start
+  // gets the full period; a hire on day 15 of a 30-day month gets 16
+  // days = 16/30 of salary).
+  const DAY_MS = 86_400_000;
+  const periodDays = Math.round((endMs - startMs) / DAY_MS) + 1;
+  const effectiveDays = Math.round((effectiveEnd - effectiveStart) / DAY_MS) + 1;
+
+  if (periodDays <= 0) return 0;
+  // Clamp to [0, 1] defensively.
+  return Math.max(0, Math.min(1, effectiveDays / periodDays));
+}
+
+function clampProRationFactor(factor: number | undefined): number {
+  if (factor === undefined || factor === null || !Number.isFinite(factor)) {
+    return 1;
+  }
+  if (factor < 0) return 0;
+  if (factor > 1) return 1;
+  return factor;
+}
+
+function parseIsoDay(iso: string): number {
+  // "2026-01-15" → ms at UTC midnight. We avoid `new Date(iso)` because
+  // it interprets bare YYYY-MM-DD as UTC in modern engines but locally
+  // in older ones — explicit parse keeps it deterministic.
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return NaN;
+  return Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+}
+
+
+// ============================================================================
 // OVERTIME — Egyptian Labor Law Article 85
 // ============================================================================
 //
@@ -380,6 +466,15 @@ export type SalaryStructure = {
 export type PayrollSettings = {
   socialInsuranceEnabled?: boolean;
   incomeTaxEnabled?: boolean;
+  /**
+   * Pro-ration factor in (0, 1]. Set to < 1 when the employee was hired
+   * or terminated inside the payroll cycle so only that fraction of the
+   * monthly base is paid. Default 1.0 (full salary).
+   *
+   * Use `calculateProRationFactor(...)` to derive this from hire_date,
+   * termination_date, and the period dates.
+   */
+  proRationFactor?: number;
 };
 
 export type PayrollResult = {
@@ -440,14 +535,20 @@ export function calculatePayroll(
     attendance.halfDay * 0.5 +
     attendance.leave; // paid leave counts as worked
 
-  // 2. Base monthly compensation (before attendance adjustment)
+  // 2. Base monthly compensation (before attendance adjustment).
+  //    Apply pro-ration first so subsequent absence / tardy deductions
+  //    work on the pro-rated base — an employee who started mid-month
+  //    AND missed a day shouldn't get double-clipped.
   const incentiveAllowance = salary.incentiveAllowance ?? 0;
-  const monthlyBase =
+  const proRationFactor = clampProRationFactor(settings.proRationFactor);
+  const fullMonthlyBase =
     salary.basicSalary +
     salary.housingAllowance +
     salary.transportAllowance +
     salary.otherAllowances +
     incentiveAllowance;
+  const monthlyBase =
+    Math.round(fullMonthlyBase * proRationFactor * 100) / 100;
 
   // 3. Daily rate
   const dailyRate = monthlyBase / workingDays;

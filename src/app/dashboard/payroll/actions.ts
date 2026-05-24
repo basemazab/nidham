@@ -3,7 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { calculatePayroll, type AttendanceBreakdown } from "@/lib/payroll";
+import {
+  calculatePayroll,
+  calculateProRationFactor,
+  type AttendanceBreakdown,
+} from "@/lib/payroll";
 import { requireAdmin, requireHR } from "@/lib/permissions";
 import { arabicizeDbError } from "@/lib/i18n";
 import { bustDashboardCache } from "@/lib/cache";
@@ -48,6 +52,11 @@ type EmployeeRow = {
   other_allowances: number | null;
   incentive_allowance: number | null;
   pay_frequency: "monthly" | "weekly";
+  // Dates that trigger pro-ration when the employee was hired or
+  // terminated inside the cycle. Both nullable — legacy employees
+  // imported without these dates get factor 1 (full salary).
+  hire_date: string | null;
+  termination_date: string | null;
 };
 
 type AttendanceRecord = {
@@ -162,14 +171,14 @@ export async function generatePayrollPeriod(formData: FormData) {
       ? supabase
           .from("employees")
           .select(
-            "id, full_name, basic_salary, housing_allowance, transport_allowance, other_allowances, incentive_allowance, pay_frequency",
+            "id, full_name, basic_salary, housing_allowance, transport_allowance, other_allowances, incentive_allowance, pay_frequency, hire_date, termination_date",
           )
           .eq("status", "active")
           .or("pay_frequency.eq.monthly,pay_frequency.is.null")
       : supabase
           .from("employees")
           .select(
-            "id, full_name, basic_salary, housing_allowance, transport_allowance, other_allowances, incentive_allowance, pay_frequency",
+            "id, full_name, basic_salary, housing_allowance, transport_allowance, other_allowances, incentive_allowance, pay_frequency, hire_date, termination_date",
           )
           .eq("status", "active")
           .eq("pay_frequency", "weekly");
@@ -259,6 +268,16 @@ export async function generatePayrollPeriod(formData: FormData) {
     };
     const loanDeduction = advanceDeductions.get(emp.id) ?? 0;
 
+    // Pro-rate the monthly base if the employee was hired or
+    // terminated inside this cycle. Returns 1.0 when they were employed
+    // for the full window — the common case.
+    const proRationFactor = calculateProRationFactor({
+      periodStart: startDate,
+      periodEnd: endDate,
+      hireDate: emp.hire_date,
+      terminationDate: emp.termination_date,
+    });
+
     const result = calculatePayroll(
       {
         basicSalary: emp.basic_salary ?? 0,
@@ -270,7 +289,7 @@ export async function generatePayrollPeriod(formData: FormData) {
       },
       breakdown,
       workingDays,
-      payrollSettings,
+      { ...payrollSettings, proRationFactor },
     );
 
     return {
@@ -281,6 +300,10 @@ export async function generatePayrollPeriod(formData: FormData) {
       half_day_days: breakdown.halfDay,
       leave_days: breakdown.leave,
       absent_days: breakdown.absent,
+      // Snapshot the FULL salary structure on the entry; the pro-ration
+      // is reflected in gross_salary / net_salary below. We deliberately
+      // keep the raw basic/allowances so a later "what was the contract
+      // salary on this date" audit still works.
       basic_salary: emp.basic_salary ?? 0,
       housing_allowance: emp.housing_allowance ?? 0,
       transport_allowance: emp.transport_allowance ?? 0,
@@ -596,14 +619,14 @@ export async function regeneratePeriodEntries(formData: FormData) {
       ? supabase
           .from("employees")
           .select(
-            "id, full_name, basic_salary, housing_allowance, transport_allowance, other_allowances, incentive_allowance, pay_frequency",
+            "id, full_name, basic_salary, housing_allowance, transport_allowance, other_allowances, incentive_allowance, pay_frequency, hire_date, termination_date",
           )
           .eq("status", "active")
           .or("pay_frequency.eq.monthly,pay_frequency.is.null")
       : supabase
           .from("employees")
           .select(
-            "id, full_name, basic_salary, housing_allowance, transport_allowance, other_allowances, incentive_allowance, pay_frequency",
+            "id, full_name, basic_salary, housing_allowance, transport_allowance, other_allowances, incentive_allowance, pay_frequency, hire_date, termination_date",
           )
           .eq("status", "active")
           .eq("pay_frequency", "weekly");
@@ -700,6 +723,15 @@ export async function regeneratePeriodEntries(formData: FormData) {
     };
     const loanDeduction = advanceDeductions.get(emp.id) ?? 0;
 
+    // Pro-rate for mid-cycle hire / termination (same as the initial
+    // generate flow).
+    const proRationFactor = calculateProRationFactor({
+      periodStart: period.start_date ?? "",
+      periodEnd: period.end_date ?? "",
+      hireDate: emp.hire_date,
+      terminationDate: emp.termination_date,
+    });
+
     const result = calculatePayroll(
       {
         basicSalary: emp.basic_salary ?? 0,
@@ -714,7 +746,7 @@ export async function regeneratePeriodEntries(formData: FormData) {
       // was created without an explicit working_days (e.g. legacy rows
       // from before the divisor fix).
       period.working_days ?? 26,
-      payrollSettings,
+      { ...payrollSettings, proRationFactor },
     );
 
     return {

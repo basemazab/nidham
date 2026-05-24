@@ -24,6 +24,7 @@ import {
   calculateHourlyWage,
   calculateHourlyRate,
   calculateOvertimePay,
+  calculateProRationFactor,
   OVERTIME_RATE_DAY,
   OVERTIME_RATE_NIGHT,
   OVERTIME_RATE_REST,
@@ -271,6 +272,130 @@ describe("calculateDailyWage — daily-paid workers", () => {
   it("rounds to 2 decimal places", () => {
     // 123.45 × 7 = 864.15
     expect(calculateDailyWage(123.45, 7)).toBe(864.15);
+  });
+});
+
+describe("Mid-cycle pro-ration (hire + termination)", () => {
+  const periodStart = "2026-01-01";
+  const periodEnd = "2026-01-31"; // 31 days
+
+  it("returns 1.0 when no hire/termination dates are inside the period", () => {
+    expect(
+      calculateProRationFactor({ periodStart, periodEnd }),
+    ).toBe(1);
+    expect(
+      calculateProRationFactor({
+        periodStart,
+        periodEnd,
+        hireDate: "2024-06-01",       // long before period
+        terminationDate: "2030-01-01", // long after period
+      }),
+    ).toBe(1);
+  });
+
+  it("hired on first day of cycle → factor 1.0", () => {
+    expect(
+      calculateProRationFactor({
+        periodStart,
+        periodEnd,
+        hireDate: periodStart,
+      }),
+    ).toBe(1);
+  });
+
+  it("hired mid-cycle → fractional factor (days from hire to end)", () => {
+    // Hired on Jan 16 of a 31-day month → 16 days remaining (incl. day 16)
+    // factor = 16/31
+    const f = calculateProRationFactor({
+      periodStart,
+      periodEnd,
+      hireDate: "2026-01-16",
+    });
+    expect(f).toBeCloseTo(16 / 31, 5);
+  });
+
+  it("hired AFTER period end → factor 0", () => {
+    expect(
+      calculateProRationFactor({
+        periodStart,
+        periodEnd,
+        hireDate: "2026-02-01",
+      }),
+    ).toBe(0);
+  });
+
+  it("terminated on last day of cycle → factor 1.0", () => {
+    expect(
+      calculateProRationFactor({
+        periodStart,
+        periodEnd,
+        terminationDate: periodEnd,
+      }),
+    ).toBe(1);
+  });
+
+  it("terminated mid-cycle → fractional factor", () => {
+    // Terminated Jan 10 → 10 days worked → 10/31
+    const f = calculateProRationFactor({
+      periodStart,
+      periodEnd,
+      terminationDate: "2026-01-10",
+    });
+    expect(f).toBeCloseTo(10 / 31, 5);
+  });
+
+  it("terminated BEFORE period start → factor 0", () => {
+    expect(
+      calculateProRationFactor({
+        periodStart,
+        periodEnd,
+        terminationDate: "2025-12-30",
+      }),
+    ).toBe(0);
+  });
+
+  it("hired AND terminated inside the same cycle → days-between factor", () => {
+    // Jan 5 through Jan 20 inclusive = 16 days → 16/31
+    const f = calculateProRationFactor({
+      periodStart,
+      periodEnd,
+      hireDate: "2026-01-05",
+      terminationDate: "2026-01-20",
+    });
+    expect(f).toBeCloseTo(16 / 31, 5);
+  });
+
+  it("clamps invalid factors to [0, 1] inside calculatePayroll", () => {
+    // factor below 0 → 0 (no salary)
+    const r1 = calculatePayroll(
+      { basicSalary: 5_200, housingAllowance: 0, transportAllowance: 0, otherAllowances: 0 },
+      { attended: 26, halfDay: 0, leave: 0, absent: 0 },
+      26,
+      { proRationFactor: -0.5 },
+    );
+    expect(r1.netSalary).toBe(0);
+
+    // factor above 1 → 1 (full salary, not amplified)
+    const r2 = calculatePayroll(
+      { basicSalary: 5_200, housingAllowance: 0, transportAllowance: 0, otherAllowances: 0 },
+      { attended: 26, halfDay: 0, leave: 0, absent: 0 },
+      26,
+      { proRationFactor: 2.0 },
+    );
+    expect(r2.netSalary).toBe(5_200);
+  });
+
+  it("calculatePayroll applies pro-ration to the monthly base", () => {
+    // Employee earns 5,200/mo, hired mid-month → factor ~ 16/31
+    const factor = 16 / 31;
+    const r = calculatePayroll(
+      { basicSalary: 5_200, housingAllowance: 0, transportAllowance: 0, otherAllowances: 0 },
+      { attended: 16, halfDay: 0, leave: 0, absent: 0 },
+      16, // working days = 16 (the partial cycle)
+      { proRationFactor: factor },
+    );
+    // Expected: 5200 * (16/31) ≈ 2,683.87
+    expect(r.netSalary).toBeCloseTo(5_200 * factor, 1);
   });
 });
 
