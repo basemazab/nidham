@@ -1,0 +1,131 @@
+// ============================================================================
+// capture-social-assets.ts
+// ============================================================================
+//
+// One-off Playwright script that opens the five marketing pages on the
+// live nidhamhr.com deployment, scrolls to the fixed-size visual frame,
+// and clips a 1:1 PNG of just that frame — so Basem doesn't have to
+// fight Snipping Tool zoom alignment.
+//
+// Outputs land in scripts/.social-assets/ as:
+//   nidham-profile-pic.png   (1080x1080)
+//   nidham-cover.png         (1640x859)
+//   nidham-ad-pain.png       (1080x1080)
+//   nidham-ad-roi.png        (1080x1080)
+//   nidham-ad-compliance.png (1080x1080)
+//
+// Run from repo root:
+//   npx tsx scripts/capture-social-assets.ts
+//
+// Why we clip a specific element instead of full-page screenshot:
+// the page wraps the visual in instruction text + a slate background;
+// the actual creative is one fixed-size <div>. element.screenshot()
+// gives us pixel-perfect output at the design size without browser
+// chrome, scrollbars, or the instruction box bleeding in.
+
+import { chromium } from "playwright";
+import { mkdir } from "node:fs/promises";
+import { join } from "node:path";
+
+// Base URL — override with env var if testing against a preview deploy.
+const BASE_URL =
+  process.env.NIDHAM_BASE_URL?.replace(/\/$/, "") ?? "https://nidhamhr.com";
+
+// Output directory under scripts/ — gitignored so we don't bloat the repo
+// with binary PNGs. Basem zips this folder and uploads to Drive.
+const OUT_DIR = join(process.cwd(), "scripts", ".social-assets");
+
+// The five assets to capture. selector targets the fixed-size visual
+// frame inside each page; we ignore the surrounding instruction UI.
+type Asset = {
+  url: string;
+  filename: string;
+  width: number;
+  height: number;
+};
+
+const ASSETS: Asset[] = [
+  {
+    url: "/social/profile-pic",
+    filename: "nidham-profile-pic.png",
+    width: 1080,
+    height: 1080,
+  },
+  {
+    url: "/social/cover",
+    filename: "nidham-cover.png",
+    width: 1640,
+    height: 859,
+  },
+  {
+    url: "/ads/pain",
+    filename: "nidham-ad-pain.png",
+    width: 1080,
+    height: 1080,
+  },
+  {
+    url: "/ads/roi",
+    filename: "nidham-ad-roi.png",
+    width: 1080,
+    height: 1080,
+  },
+  {
+    url: "/ads/compliance",
+    filename: "nidham-ad-compliance.png",
+    width: 1080,
+    height: 1080,
+  },
+];
+
+async function main() {
+  console.log(`📸 Capturing social assets from ${BASE_URL}`);
+  await mkdir(OUT_DIR, { recursive: true });
+
+  // Launch a headless Chromium at the largest viewport so even the 1640px
+  // cover banner renders without horizontal scrollbars eating into the
+  // capture.
+  const browser = await chromium.launch({ headless: true });
+  const context = await browser.newContext({
+    viewport: { width: 1920, height: 1200 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+
+  for (const asset of ASSETS) {
+    const url = `${BASE_URL}${asset.url}`;
+    console.log(`  → ${asset.url}`);
+
+    await page.goto(url, { waitUntil: "networkidle" });
+
+    // The page wraps the visual in an outer scroll container; the
+    // capturable frame is the first div with the exact pixel dimensions
+    // we want. React serialises style={{ width: "1080px" }} as
+    // `width:1080px` with NO spaces, so the selector has to match that
+    // serialised form exactly — the CSS attribute selector is literal,
+    // it doesn't normalise whitespace inside the matched value.
+    const target = await page.locator(
+      `div[style*="width:${asset.width}px"][style*="height:${asset.height}px"]`,
+    ).first();
+    await target.waitFor({ state: "visible", timeout: 10_000 });
+
+    // Give fonts and gradients a beat to settle. networkidle covers
+    // resource loads but the next-font subsetting can still swap mid-
+    // render on first paint.
+    await page.waitForTimeout(800);
+
+    const outPath = join(OUT_DIR, asset.filename);
+    await target.screenshot({ path: outPath, omitBackground: false });
+    console.log(`    ✓ ${asset.filename} (${asset.width}x${asset.height})`);
+  }
+
+  await browser.close();
+  console.log(`\n✅ Done. Assets saved to: ${OUT_DIR}`);
+  console.log(
+    `\nNext: zip the folder + upload to Drive, or run the upload script.`,
+  );
+}
+
+main().catch((err) => {
+  console.error("❌ Capture failed:", err);
+  process.exit(1);
+});

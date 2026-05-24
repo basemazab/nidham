@@ -52,3 +52,6 @@ playwright-report/
 .claude/
 
 .vercel
+
+# Generated marketing/social asset captures — outputs of scripts/capture-social-assets.ts
+scripts/.social-assets/
