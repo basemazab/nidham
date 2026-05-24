@@ -53,6 +53,7 @@ const NAV_ITEMS: readonly NavItem[] = [
   { href: "/dashboard/employees", label: "الموظفين", icon: "👥", section: "main", feature: "employees" },
   { href: "/dashboard/org-chart", label: "الهيكل التنظيمي 🌳", icon: "🌳", section: "main", feature: "employees" },
   { href: "/dashboard/team-calendar", label: "تقويم الإجازات 📅", icon: "📅", section: "main", feature: "requests" },
+  { href: "/dashboard/assets", label: "إدارة الأصول 📦", icon: "📦", section: "main", feature: "employees" },
   { href: "/dashboard/attendance", label: "الحضور", icon: "⏰", section: "main", feature: "attendance" },
   { href: "/dashboard/shifts", label: "الورديات", icon: "🕒", section: "main", feature: "shifts_rotations" },
   { href: "/dashboard/payroll", label: "الرواتب", icon: "💰", section: "main", feature: "payroll" },
