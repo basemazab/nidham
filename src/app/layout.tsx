@@ -5,6 +5,7 @@ import { Toaster } from "sonner";
 import "./globals.css";
 import { UrlToasts } from "@/components/url-toasts";
 import { ThemeProvider } from "@/components/theme-provider";
+import { MetaPixel } from "@/components/meta-pixel";
 
 const tajawal = Tajawal({
   variable: "--font-tajawal",
@@ -105,6 +106,10 @@ export default function RootLayout({
           <Suspense fallback={null}>
             <UrlToasts />
           </Suspense>
+          {/* Meta Pixel — no-ops until NEXT_PUBLIC_META_PIXEL_ID is set in
+              Vercel env. Lives outside ThemeProvider so theme transitions
+              don't trigger spurious PageView re-fires. */}
+          <MetaPixel />
         </ThemeProvider>
       </body>
     </html>
