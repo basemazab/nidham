@@ -81,6 +81,57 @@ export function checkRateLimit(
 }
 
 // ----------------------------------------------------------------------------
+// Sensitive-action limiter — for endpoints other than /login that are
+// still attractive to abuse but have different access patterns.
+//
+// Currently used by:
+//   - acceptInvitation   → 8 tries / hour / IP    (invitation token brute force)
+//   - requestPasswordReset → 5 sends / hour / email + 20 / hour / IP
+//                            (email enumeration + spam relay)
+//   - updatePassword     → 10 attempts / 15min / IP (after-reset abuse)
+//
+// All buckets are in-memory like login — same Upstash migration path
+// applies when scale demands it.
+// ----------------------------------------------------------------------------
+export function checkInvitationClaimRateLimit(ip: string): RateLimitResult {
+  // 8 attempts per hour per IP. Tighter than login because the token
+  // space is huge — there's no legitimate reason an honest user retries
+  // claim that many times.
+  return checkRateLimit(`invite:ip:${ip}`, 8, 60 * 60_000);
+}
+
+export function checkPasswordResetRateLimit(
+  ip: string,
+  email: string | null | undefined,
+): RateLimitResult {
+  // IP-side: 20 reset-emails per hour per IP. Stops a script from
+  // bombing every email it scraped.
+  const ipResult = checkRateLimit(`reset:ip:${ip}`, 20, 60 * 60_000);
+  if (!ipResult.ok) return ipResult;
+
+  // Email-side: 5 reset-emails per hour per address. Stops a user from
+  // accidentally clicking "forgot" 50 times AND stops a targeted attack
+  // bombing one victim's inbox.
+  if (email && email.trim()) {
+    const emailResult = checkRateLimit(
+      `reset:email:${email.trim().toLowerCase()}`,
+      5,
+      60 * 60_000,
+    );
+    if (!emailResult.ok) return emailResult;
+  }
+  return ipResult;
+}
+
+export function checkPasswordUpdateRateLimit(ip: string): RateLimitResult {
+  // Post-reset password setting: 10 attempts per 15min per IP. Catches
+  // a session-token attacker mashing the update endpoint after
+  // intercepting the email link.
+  return checkRateLimit(`pwupdate:ip:${ip}`, 10, 15 * 60_000);
+}
+
+
+// ----------------------------------------------------------------------------
 // Login-attempt limiter — narrower, more aggressive defaults.
 //
 // We check the same attempt against TWO buckets:
