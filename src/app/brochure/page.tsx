@@ -39,9 +39,15 @@ export default function BrochurePage() {
       <style dangerouslySetInnerHTML={{ __html: PRINT_STYLES }} />
 
       <main className="min-h-screen bg-white text-slate-900 print:bg-white">
-        {/* Print toolbar lives in a client component — onClick={window.print}
-            can't run from a server component. */}
+        {/* Toolbar lives in a client component — onClick={window.print}
+            can't run from a server component. The toolbar has its own
+            .no-print + .pdf-hide so it doesn't appear in the downloaded
+            PDF either. */}
         <PrintButton />
+
+        {/* Everything inside #brochure-content is what the Download PDF
+            button captures via html2canvas. */}
+        <div id="brochure-content">
 
         {/* PAGE 1 — Cover */}
         <section className="max-w-4xl mx-auto px-8 pt-12 pb-16 page-break-after">
@@ -368,6 +374,8 @@ export default function BrochurePage() {
             <p>صدر هذا الـ Brochure من HR BASEM AZAB · مبني في دمياط، مصر · v1.0 · 2026</p>
           </div>
         </section>
+
+        </div>{/* /#brochure-content */}
       </main>
     </>
   );
