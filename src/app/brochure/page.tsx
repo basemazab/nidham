@@ -12,6 +12,7 @@
 //   - Final CTA + contact info is on every printed page
 
 import Link from "next/link";
+import { PrintButton } from "./print-button";
 
 export const metadata = {
   title: "نِظام — نظام HR + AI مصري | Brochure",
@@ -19,24 +20,28 @@ export const metadata = {
     "نظام HR + Payroll + AI مصري بقانون 2026. شغّال عند 200+ موظف. بربع تكلفة Bayzat. ابدأ مجاناً.",
 };
 
+// Print-only CSS injected via a plain <style> tag. styled-jsx's
+// `<style jsx global>` requires a Client Component, but we keep this
+// page as a Server Component so the `metadata` export can do its job.
+const PRINT_STYLES = `
+  @page { size: A4; margin: 15mm; }
+  @media print {
+    .no-print { display: none !important; }
+    .page-break-after { page-break-after: always; }
+    html, body { background: white !important; }
+    a { color: inherit !important; text-decoration: none !important; }
+  }
+`;
+
 export default function BrochurePage() {
   return (
     <>
+      <style dangerouslySetInnerHTML={{ __html: PRINT_STYLES }} />
+
       <main className="min-h-screen bg-white text-slate-900 print:bg-white">
-        {/* Print toolbar — hidden when printing */}
-        <div className="no-print sticky top-0 z-50 bg-gradient-to-r from-brand-cyan to-brand-cyan-dark text-white py-3 px-6 shadow-lg">
-          <div className="max-w-5xl mx-auto flex items-center justify-between gap-3 flex-wrap">
-            <div className="text-sm font-cairo font-bold">
-              📄 الـ Brochure ده مخصص للطباعة + المشاركة
-            </div>
-            <button
-              onClick={() => window.print()}
-              className="px-4 py-1.5 rounded-lg bg-white text-brand-cyan-dark font-cairo font-black text-sm hover:bg-cyan-50 transition"
-            >
-              💾 احفظ كـ PDF (Ctrl+P)
-            </button>
-          </div>
-        </div>
+        {/* Print toolbar lives in a client component — onClick={window.print}
+            can't run from a server component. */}
+        <PrintButton />
 
         {/* PAGE 1 — Cover */}
         <section className="max-w-4xl mx-auto px-8 pt-12 pb-16 page-break-after">
@@ -364,29 +369,6 @@ export default function BrochurePage() {
           </div>
         </section>
       </main>
-
-      {/* Print CSS */}
-      <style jsx global>{`
-        @page {
-          size: A4;
-          margin: 15mm;
-        }
-        @media print {
-          .no-print {
-            display: none !important;
-          }
-          .page-break-after {
-            page-break-after: always;
-          }
-          html, body {
-            background: white !important;
-          }
-          a {
-            color: inherit !important;
-            text-decoration: none !important;
-          }
-        }
-      `}</style>
     </>
   );
 }
