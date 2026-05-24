@@ -133,7 +133,7 @@ export function buildAppMenu(getWindow: () => BrowserWindow | null): Menu {
       submenu: [
         {
           label: "موقع نِظام",
-          click: () => shell.openExternal("https://nidham-seven.vercel.app"),
+          click: () => shell.openExternal("https://nidhamhr.com"),
         },
         {
           label: "تواصل مع الدعم (واتساب)",

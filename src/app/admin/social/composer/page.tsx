@@ -151,7 +151,7 @@ export default async function SocialComposer({
               <input
                 type="url"
                 name="reference_url"
-                placeholder="https://nidham-seven.vercel.app/p/..."
+                placeholder="https://nidhamhr.com/p/..."
                 className={inputCls}
                 dir="ltr"
               />

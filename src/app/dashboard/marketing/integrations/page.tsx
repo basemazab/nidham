@@ -124,7 +124,7 @@ export default async function IntegrationsPage({
     h.get("x-forwarded-host") ??
     h.get("host") ??
     process.env.NEXT_PUBLIC_APP_URL?.replace(/^https?:\/\//, "") ??
-    "nidham-seven.vercel.app";
+    "nidhamhr.com";
   const webhookUrl = `${proto}://${host}/api/webhooks/meta-leads`;
 
   // Check env-var readiness server-side so we can warn upfront instead

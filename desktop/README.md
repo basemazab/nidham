@@ -68,7 +68,7 @@ to `src/renderer/*` reload instantly; changes to `src/main/*` need a
 1. App launches → checks `settings.serverUrl`.
 2. Empty → renders `src/renderer/index.html` (the setup form).
 3. User types `http://192.168.1.10:3001` (their Enterprise box) or
-   `https://nidham-seven.vercel.app` (cloud).
+   `https://nidhamhr.com` (cloud).
 4. "اختبر الاتصال" pings `<url>/login` through Electron's `net.request`
    to verify reachability.
 5. "احفظ وادخل" persists the URL to `electron-store` and closes the

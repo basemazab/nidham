@@ -28,7 +28,7 @@ dotenv.config({ path: ".env.local" });
 
 const BASE_URL =
   process.env.NIDHAM_BASE_URL?.replace(/\/$/, "") ??
-  "https://nidham-seven.vercel.app";
+  "https://nidhamhr.com";
 const EMAIL = process.env.NIDHAM_EMAIL;
 const PASSWORD = process.env.NIDHAM_PASSWORD;
 

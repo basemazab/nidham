@@ -347,7 +347,7 @@ export default function BrochurePage() {
                 💬 احجز Beta عبر WhatsApp
               </a>
               <a
-                href="https://nidham-seven.vercel.app/signup"
+                href="https://nidhamhr.com/signup"
                 className="px-6 py-4 rounded-2xl bg-brand-cyan hover:bg-brand-cyan-dark text-white font-black font-cairo text-lg transition"
               >
                 🚀 ابدأ مجاناً دلوقتي
@@ -381,11 +381,11 @@ export default function BrochurePage() {
               <div>
                 <div className="text-amber-300 font-bold mb-1">🌐 الموقع</div>
                 <a
-                  href="https://nidham-seven.vercel.app"
+                  href="https://nidhamhr.com"
                   className="font-mono hover:text-amber-200 text-xs"
                   dir="ltr"
                 >
-                  nidham-seven.vercel.app
+                  nidhamhr.com
                 </a>
               </div>
             </div>

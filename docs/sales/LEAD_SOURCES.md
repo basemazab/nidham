@@ -200,7 +200,7 @@ Subject: تخفيف على فريق HR شركة [اسم الشركة] في 30 ي
 
 [الاسم]
 +20 155 364 1615
-nidham-seven.vercel.app
+nidhamhr.com
 ```
 
 **Expected:** Open rate 25%، Reply rate 3%، Demo rate 1%.

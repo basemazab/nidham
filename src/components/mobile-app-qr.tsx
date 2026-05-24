@@ -94,7 +94,7 @@ export function MobileAppQR({ variant = "card", href }: Props) {
 // host. The qrcode.react component re-renders on hydration with the
 // real origin, so anyone who actually scans the QR gets the right
 // URL whether dev / preview / prod.
-const FALLBACK_HOST = "https://nidham-seven.vercel.app";
+const FALLBACK_HOST = "https://nidhamhr.com";
 
 function absoluteUrl(path: string): string {
   if (path.startsWith("http")) return path;

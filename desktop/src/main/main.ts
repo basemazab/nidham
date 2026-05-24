@@ -327,10 +327,10 @@ function renderErrorPage(opts: {
       <div><b>الرابط:</b> <code>${escapeHtml(attemptedUrl)}</code></div>
     </div>
     <div class="actions">
-      <a class="primary" href="${escapeHtml(serverUrl || "https://nidham-seven.vercel.app")}/login">
+      <a class="primary" href="${escapeHtml(serverUrl || "https://nidhamhr.com")}/login">
         ↻ حاول تاني — صفحة الدخول
       </a>
-      <a class="secondary" href="${escapeHtml(serverUrl || "https://nidham-seven.vercel.app")}">
+      <a class="secondary" href="${escapeHtml(serverUrl || "https://nidhamhr.com")}">
         🏠 الصفحة الرئيسية
       </a>
     </div>

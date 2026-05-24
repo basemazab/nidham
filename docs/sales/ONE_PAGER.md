@@ -88,8 +88,8 @@
 
 📱 **WhatsApp:** +20 155 364 1615  
 📧 **Email:** nidhamhr@proton.me  
-🌐 **الموقع:** nidham-seven.vercel.app  
-📅 **احجز demo:** nidham-seven.vercel.app/pricing
+🌐 **الموقع:** nidhamhr.com  
+📅 **احجز demo:** nidhamhr.com/pricing
 
 ---
 

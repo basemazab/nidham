@@ -122,7 +122,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     excerpt:
       "خطوة بخطوة من تسجيل الشركة لحد ما الموظف الأول يثبّت حضوره من الموبايل.",
     body: `## ١. سجّل الشركة (٣٠ ثانية)
-روح **nidham-seven.vercel.app/signup** → ادخل:
+روح **nidhamhr.com/signup** → ادخل:
 - اسمك الكامل
 - إيميل (هيبقى صاحب الحساب الـ admin)
 - كلمة سر
@@ -534,7 +534,7 @@ Dashboard → الموظفين → استيراد → **رفع PDF**
 
 ### النتيجة
 هتاخد **رابط عام** زي:
-\`https://nidham-seven.vercel.app/p/abc123-pvc-summer\`
+\`https://nidhamhr.com/p/abc123-pvc-summer\`
 
 ### النشر في إعلاناتك
 انسخ الـ link → حطه في:

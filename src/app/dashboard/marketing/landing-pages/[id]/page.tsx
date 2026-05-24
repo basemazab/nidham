@@ -149,7 +149,7 @@ export default async function LandingPageEditPage({
           <div className="mb-5 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 font-cairo text-sm">
             ✅ الصفحة جاهزة. شارك الرابط في إعلاناتك:
             <div className="mt-2 bg-white border border-emerald-300 rounded-lg p-2 font-mono text-xs" dir="ltr">
-              https://nidham-seven.vercel.app{publicUrl}
+              https://nidhamhr.com{publicUrl}
             </div>
           </div>
         )}

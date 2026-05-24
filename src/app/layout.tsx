@@ -28,7 +28,7 @@ const reemKufi = Reem_Kufi({
 // is read at build time on Vercel; fall back to the canonical Cloud URL if it's
 // missing (e.g. local dev) so social-link unfurls still work in staging.
 const siteUrl =
-  process.env.NEXT_PUBLIC_SITE_URL ?? "https://nidham-seven.vercel.app";
+  process.env.NEXT_PUBLIC_SITE_URL ?? "https://nidhamhr.com";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
