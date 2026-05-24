@@ -61,9 +61,17 @@ type EmployeeRow = {
 
 type AttendanceRecord = {
   employee_id: string;
+  date: string;
   status: string;
   tardiness_minutes: number | null;
   early_leave_minutes: number | null;
+  /**
+   * NULL for non-leave rows. Set on rows with status='leave' to express:
+   *   'paid'   — annual / casual / public-holiday leave (counted as worked)
+   *   'unpaid' — إجازة بدون مرتب (deducted from salary)
+   *   'sick'   — Art. 71/72 partial-pay (handled in payroll engine later)
+   */
+  leave_type: string | null;
 };
 
 /**
@@ -183,12 +191,12 @@ export async function generatePayrollPeriod(formData: FormData) {
           .eq("status", "active")
           .eq("pay_frequency", "weekly");
 
-  const [employeesRes, attendanceRes, companyRes] = await Promise.all([
+  const [employeesRes, attendanceRes, companyRes, holidaysRes] = await Promise.all([
     employeesQuery.returns<EmployeeRow[]>(),
     supabase
       .from("attendance")
       .select(
-        "employee_id, status, tardiness_minutes, early_leave_minutes",
+        "employee_id, date, status, tardiness_minutes, early_leave_minutes, leave_type",
       )
       .gte("date", startDate)
       .lte("date", endDate)
@@ -201,6 +209,18 @@ export async function generatePayrollPeriod(formData: FormData) {
         social_insurance_enabled: boolean | null;
         income_tax_enabled: boolean | null;
       }>(),
+    // Public holidays inside the period — both global rows (company_id
+    // IS NULL) and any tenant-specific overrides. We use these to
+    // re-classify "absent" days that happen to fall on a holiday as
+    // "leave" (paid). An employee who missed a check-in on 25 Jan
+    // shouldn't see a salary deduction for the national holiday.
+    supabase
+      .from("public_holidays")
+      .select("date, is_paid, company_id")
+      .gte("date", startDate)
+      .lte("date", endDate)
+      .or(`company_id.eq.${companyId},company_id.is.null`)
+      .returns<{ date: string; is_paid: boolean; company_id: string | null }[]>(),
   ]);
 
   const payrollSettings = {
@@ -210,6 +230,28 @@ export async function generatePayrollPeriod(formData: FormData) {
 
   const employees = employeesRes.data ?? [];
   const attendance = attendanceRes.data ?? [];
+
+  // Build the set of paid-holiday dates in this period. Tenant-specific
+  // rows override global rows on the same date (the per-tenant value
+  // wins for both 'is_paid' and existence). Unpaid holidays drop out —
+  // they should still trigger an absence deduction.
+  const paidHolidayDates = new Set<string>();
+  const holidayMap = new Map<string, boolean>(); // date → is_paid
+  for (const h of holidaysRes.data ?? []) {
+    // Tenant-specific overrides take precedence — process them last
+    // by sorting (NULL company_id first).
+  }
+  const sortedHolidays = (holidaysRes.data ?? []).slice().sort((a, b) => {
+    if (a.company_id === null && b.company_id !== null) return -1;
+    if (a.company_id !== null && b.company_id === null) return 1;
+    return 0;
+  });
+  for (const h of sortedHolidays) {
+    holidayMap.set(h.date, h.is_paid);
+  }
+  for (const [date, isPaid] of holidayMap) {
+    if (isPaid) paidHolidayDates.add(date);
+  }
 
   // Auto-link advances: for each employee, ask the DB how much of their
   // open advances should be deducted from this specific cycle window.
@@ -235,18 +277,43 @@ export async function generatePayrollPeriod(formData: FormData) {
 
   // Compute & insert entry per employee.
   // Buckets:
-  //   attended: explicit "present"
-  //   halfDay : explicit "half_day"
-  //   absent  : explicit "absent"  → only kind that triggers a deduction
-  //   leave   : everything else paid-but-not-worked (leave/holiday/weekend/
-  //             sick_leave/...) — derived as the remainder so a new status
-  //             added later never silently disappears from the math.
+  //   attended    : explicit "present"
+  //   halfDay     : explicit "half_day"
+  //   absent      : explicit "absent" — UNLESS the date is a paid public
+  //                 holiday, in which case the day is RECLASSIFIED as
+  //                 leave (paid) so the employee isn't penalised for not
+  //                 clocking in on 25 Jan / Eid / etc.
+  //   unpaidLeave : status="leave" AND leave_type="unpaid" → deducted
+  //                 like an absence, but tracked separately for audit.
+  //   leave       : everything else paid-but-not-worked (paid leave,
+  //                 holiday, weekend, sick_leave, ...) — derived as the
+  //                 remainder so a new status added later never silently
+  //                 disappears from the math.
   const entries = employees.map((emp) => {
     const empAttendance = attendance.filter((a) => a.employee_id === emp.id);
     const attended = empAttendance.filter((a) => a.status === "present").length;
     const halfDay = empAttendance.filter((a) => a.status === "half_day").length;
-    const absent = empAttendance.filter((a) => a.status === "absent").length;
-    const leave = Math.max(0, empAttendance.length - attended - halfDay - absent);
+    // "absent" rows that fall on a paid public holiday are reclassified
+    // as leave (no deduction). HR will see them as 'leave' in the
+    // breakdown rather than as absences — which is the right semantic
+    // ("the employee was on holiday that day, not absent").
+    const absentRows = empAttendance.filter((a) => a.status === "absent");
+    const absentOnHoliday = absentRows.filter((a) =>
+      paidHolidayDates.has(a.date),
+    ).length;
+    const absent = absentRows.length - absentOnHoliday;
+    // Unpaid leave: status='leave' with explicit leave_type='unpaid'.
+    const unpaidLeave = empAttendance.filter(
+      (a) => a.status === "leave" && a.leave_type === "unpaid",
+    ).length;
+    // Everything that isn't present/half_day/unaccounted-absent/unpaid-
+    // leave falls into the paid leave bucket (annual + casual + sick +
+    // public holiday + weekend + the absent-on-holiday rows we
+    // reclassified above).
+    const leave = Math.max(
+      0,
+      empAttendance.length - attended - halfDay - absent - unpaidLeave,
+    );
 
     // Sum tardiness + early-leave minutes across only workday rows
     // (present + half_day). A "weekend" or "leave" row carrying a stray
@@ -263,6 +330,7 @@ export async function generatePayrollPeriod(formData: FormData) {
       halfDay,
       leave,
       absent,
+      unpaidLeave,
       tardinessMinutes,
       earlyLeaveMinutes,
     };
@@ -636,7 +704,7 @@ export async function regeneratePeriodEntries(formData: FormData) {
     supabase
       .from("attendance")
       .select(
-        "employee_id, status, tardiness_minutes, early_leave_minutes",
+        "employee_id, date, status, tardiness_minutes, early_leave_minutes, leave_type",
       )
       .gte("date", period.start_date)
       .lte("date", period.end_date)

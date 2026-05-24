@@ -625,6 +625,38 @@ describe("calculatePayroll — full scenarios", () => {
     expect(result.netSalary).toBe(5_000);
   });
 
+  it("unpaid leave is deducted just like an unexcused absence", () => {
+    // 5,200/mo, 26 working days → daily 200
+    // 24 attended + 2 unpaid leave → 2 × 200 = 400 deducted → net 4,800
+    const result = calculatePayroll(
+      {
+        basicSalary: 5_200,
+        housingAllowance: 0,
+        transportAllowance: 0,
+        otherAllowances: 0,
+      },
+      { attended: 24, halfDay: 0, leave: 0, absent: 0, unpaidLeave: 2 },
+    );
+    expect(result.absenceDeduction).toBe(400);
+    expect(result.netSalary).toBe(4_800);
+  });
+
+  it("paid leave + unpaid leave can coexist on the same period", () => {
+    // 5,200/mo, 26 working days → daily 200
+    // 22 attended + 2 paid leave (no deduction) + 2 unpaid (deducted)
+    const result = calculatePayroll(
+      {
+        basicSalary: 5_200,
+        housingAllowance: 0,
+        transportAllowance: 0,
+        otherAllowances: 0,
+      },
+      { attended: 22, halfDay: 0, leave: 2, absent: 0, unpaidLeave: 2 },
+    );
+    expect(result.absenceDeduction).toBe(400);
+    expect(result.netSalary).toBe(4_800);
+  });
+
   it("paid leave counts as worked (no deduction)", () => {
     const result = calculatePayroll(
       {

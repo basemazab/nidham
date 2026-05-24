@@ -417,8 +417,14 @@ export function calculateHourlyWage(input: {
 export type AttendanceBreakdown = {
   attended: number;   // أيام حضور كاملة
   halfDay: number;    // أيام نصف يوم
-  leave: number;      // أيام إجازة (مدفوعة الأجر)
-  absent: number;     // أيام غياب بدون أجر
+  leave: number;      // أيام إجازة مدفوعة (annual / casual / public holiday)
+  absent: number;     // أيام غياب بدون عذر
+  /**
+   * إجازة بدون مرتب — counted as days NOT paid, just like `absent`.
+   * Kept in its own bucket so reports + audits can distinguish a
+   * deliberate unpaid leave (approved by HR) from a no-show absence.
+   */
+  unpaidLeave?: number;
   /** Sum of tardiness_minutes across the period. Default 0. */
   tardinessMinutes?: number;
   /** Sum of early_leave_minutes across the period. Default 0. */
@@ -553,9 +559,15 @@ export function calculatePayroll(
   // 3. Daily rate
   const dailyRate = monthlyBase / workingDays;
 
-  // 4a. Absence deduction (only for unpaid absences)
+  // 4a. Absence deduction. Two buckets contribute:
+  //       absent       — unexcused no-show
+  //       unpaidLeave  — pre-approved إجازة بدون مرتب
+  //     Both get deducted at the daily rate. (Paid leave + sick leave
+  //     don't show up here — they're counted as worked in `leave`.)
+  const unpaidLeave = attendance.unpaidLeave ?? 0;
+  const unpaidDays = attendance.absent + unpaidLeave;
   const absenceDeduction =
-    Math.round(attendance.absent * dailyRate * 100) / 100;
+    Math.round(unpaidDays * dailyRate * 100) / 100;
 
   // 4b. Tardiness + early-leave deduction. The minutes captured in
   //     attendance.tardiness_minutes / early_leave_minutes get converted
