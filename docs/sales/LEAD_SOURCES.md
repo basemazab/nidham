@@ -199,8 +199,8 @@ Subject: تخفيف على فريق HR شركة [اسم الشركة] في 30 ي
 عندك 20 دقيقة الأسبوع الجاي لـ demo؟
 
 [الاسم]
-+20 100 000 0000
-nidham.app
++20 155 364 1615
+nidham-seven.vercel.app
 ```
 
 **Expected:** Open rate 25%، Reply rate 3%، Demo rate 1%.

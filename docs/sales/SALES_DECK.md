@@ -309,9 +309,9 @@
 > *Button: "ابعتلي المواد"*
 
 ### 📞 Contact
-- **WhatsApp:** +20 100 000 0000
-- **Email:** basem@nidham.app
-- **الموقع:** nidham.app
+- **WhatsApp:** +20 155 364 1615
+- **Email:** nidhamhr@proton.me
+- **الموقع:** nidham-seven.vercel.app
 
 ### 🤝 Final Quote
 > *"أنا مش بس بيع لك سيستم. أنا بشتغل HR في شركتين تاركك تشوف نفسك إيه اللي عملته. لو ساعدك، استمر معايا. لو لأ، رد بياناتك واطلع."*

@@ -86,10 +86,10 @@
 
 ## 📞 تواصل النهاردة
 
-📱 **WhatsApp:** +20 100 000 0000  
-📧 **Email:** basem@nidham.app  
-🌐 **الموقع:** nidham.app  
-📅 **احجز demo:** nidham.app/demo
+📱 **WhatsApp:** +20 155 364 1615  
+📧 **Email:** nidhamhr@proton.me  
+🌐 **الموقع:** nidham-seven.vercel.app  
+📅 **احجز demo:** nidham-seven.vercel.app/pricing
 
 ---
 

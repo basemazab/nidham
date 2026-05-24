@@ -352,19 +352,39 @@ export default function BrochurePage() {
               </a>
             </div>
 
-            {/* Contact info */}
+            {/* Contact info — pulled from the live landing page footer
+                so it stays in sync. Update both places together if any
+                of these changes. */}
             <div className="grid md:grid-cols-3 gap-4 pt-6 border-t border-white/20 text-sm font-cairo">
               <div>
                 <div className="text-amber-300 font-bold mb-1">📱 واتساب</div>
-                <div className="font-mono" dir="ltr">+20 155 364 1615</div>
+                <a
+                  href="https://wa.me/201553641615"
+                  className="font-mono hover:text-amber-200"
+                  dir="ltr"
+                >
+                  +20 155 364 1615
+                </a>
               </div>
               <div>
                 <div className="text-amber-300 font-bold mb-1">📧 إيميل</div>
-                <div className="font-mono" dir="ltr">basem@nidham.app</div>
+                <a
+                  href="mailto:nidhamhr@proton.me"
+                  className="font-mono hover:text-amber-200"
+                  dir="ltr"
+                >
+                  nidhamhr@proton.me
+                </a>
               </div>
               <div>
                 <div className="text-amber-300 font-bold mb-1">🌐 الموقع</div>
-                <div className="font-mono" dir="ltr">nidham.app</div>
+                <a
+                  href="https://nidham-seven.vercel.app"
+                  className="font-mono hover:text-amber-200 text-xs"
+                  dir="ltr"
+                >
+                  nidham-seven.vercel.app
+                </a>
               </div>
             </div>
           </div>

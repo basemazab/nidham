@@ -27,7 +27,7 @@
 **الوقت المتوقع: 2 ساعة**
 
 - [ ] افتح Supabase + Vercel + GitHub في tabs
-- [ ] افتح nidham.app + sign up لـ "مجموعة الاتحاد للإنشاءات المعدنية"
+- [ ] افتح nidham-seven.vercel.app + sign up لـ "مجموعة الاتحاد للإنشاءات المعدنية"
   - الإيميل: استخدم email الـ HR الرسمي (hr@al-ittihad.eg أو شبهه)
   - كلمة سر قوية + احفظها في 1Password
 - [ ] فعّل 2FA على حسابك (`/dashboard/profile/2fa`)
