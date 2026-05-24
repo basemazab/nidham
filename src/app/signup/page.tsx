@@ -96,17 +96,23 @@ export default async function SignupPage({
                 htmlFor="password"
                 className="block text-sm font-medium text-slate-700 mb-2 font-cairo"
               >
-                كلمة السر <span className="text-slate-400 text-xs">(8 حروف على الأقل)</span>
+                كلمة السر
               </label>
               <input
                 id="password"
                 name="password"
                 type="password"
                 required
-                minLength={8}
+                minLength={12}
                 autoComplete="new-password"
                 className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none transition text-slate-900"
               />
+              <ul className="mt-2 text-[11px] text-slate-500 font-cairo space-y-0.5 list-disc pr-5">
+                <li>12 حرف على الأقل</li>
+                <li>حرف كابيتال + حرف صغير (A-Z + a-z)</li>
+                <li>رقم واحد على الأقل (0-9)</li>
+                <li>رمز واحد على الأقل (مثل @ # ! % &amp;)</li>
+              </ul>
             </div>
 
             {/* PDPL 151/2020 Article 12 — explicit, recorded consent. The

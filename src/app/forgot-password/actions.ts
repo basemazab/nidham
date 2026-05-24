@@ -3,6 +3,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { validatePassword } from "@/lib/password";
 
 export async function requestPasswordReset(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim();
@@ -35,11 +36,10 @@ export async function requestPasswordReset(formData: FormData) {
 export async function updatePassword(formData: FormData) {
   const password = String(formData.get("password") ?? "");
 
-  if (!password || password.length < 6) {
-    redirect(
-      "/update-password?error=" +
-        encodeURIComponent("كلمة السر لازم تبقى 6 حروف على الأقل"),
-    );
+  // Centralised password policy (12+ chars + complexity rules).
+  const pw = validatePassword(password);
+  if (!pw.ok) {
+    redirect("/update-password?error=" + encodeURIComponent(pw.reason));
   }
 
   const supabase = await createClient();

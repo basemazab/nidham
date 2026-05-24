@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireAdmin } from "@/lib/permissions";
+import { validatePassword } from "@/lib/password";
 
 export async function updateMyProfile(formData: FormData) {
   const supabase = await createClient();
@@ -49,11 +50,10 @@ export async function changeMyPassword(formData: FormData) {
         encodeURIComponent("كلمة السر الحالية مطلوبة"),
     );
   }
-  if (!password || password.length < 8) {
-    redirect(
-      "/dashboard/profile?error=" +
-        encodeURIComponent("كلمة السر الجديدة لازم تكون 8 حروف على الأقل"),
-    );
+  // Centralised password policy (12+ chars + complexity rules).
+  const pw = validatePassword(password);
+  if (!pw.ok) {
+    redirect("/dashboard/profile?error=" + encodeURIComponent(pw.reason));
   }
   if (password === currentPassword) {
     redirect(

@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { checkLoginRateLimit } from "@/lib/rate-limit";
+import { validatePassword } from "@/lib/password";
 
 // Map Supabase auth error codes / messages to Arabic strings the user
 // can act on, without leaking enumeration oracles (e.g. "this email is
@@ -86,13 +87,13 @@ export async function login(formData: FormData) {
 export async function signup(formData: FormData) {
   const supabase = await createClient();
 
-  const password = formData.get("password") as string;
-  // Bump the floor from Supabase's default 6 -- HR product, weak
-  // password = back-door into the whole company.
-  if (!password || password.length < 8) {
-    redirect(
-      `/signup?error=${encodeURIComponent("كلمة السر لازم تكون 8 حروف على الأقل")}`,
-    );
+  // Centralised password policy (12+ chars, upper, lower, digit, symbol).
+  // Replaces three different floors that used to live across signup /
+  // claim / profile / forgot — see src/lib/password.ts.
+  const password = formData.get("password");
+  const pw = validatePassword(password);
+  if (!pw.ok) {
+    redirect(`/signup?error=${encodeURIComponent(pw.reason)}`);
   }
 
   // PDPL Article 12: lawful basis = consent. The signup form has a
@@ -111,7 +112,7 @@ export async function signup(formData: FormData) {
 
   const { data, error } = await supabase.auth.signUp({
     email: formData.get("email") as string,
-    password,
+    password: password as string,
     options: {
       data: {
         company_name: formData.get("company_name") as string,

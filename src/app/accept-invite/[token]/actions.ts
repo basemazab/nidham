@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { validatePassword } from "@/lib/password";
 
 export async function acceptInvitation(token: string, formData: FormData) {
   const supabase = await createClient();
@@ -32,11 +33,12 @@ export async function acceptInvitation(token: string, formData: FormData) {
     );
   }
 
+  // Centralised password policy (12+ chars + complexity rules).
   const password = String(formData.get("password") ?? "");
-  if (!password || password.length < 6) {
+  const pw = validatePassword(password);
+  if (!pw.ok) {
     redirect(
-      `/accept-invite/${token}?error=` +
-        encodeURIComponent("كلمة السر لازم 6 حروف على الأقل"),
+      `/accept-invite/${token}?error=` + encodeURIComponent(pw.reason),
     );
   }
 
