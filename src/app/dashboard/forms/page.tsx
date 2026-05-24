@@ -18,7 +18,14 @@ type FormCard = {
   title: string;
   description: string;
   icon: string;
-  category: "letter" | "contract" | "evaluation" | "application" | "internal";
+  category:
+    | "letter"
+    | "contract"
+    | "evaluation"
+    | "application"
+    | "internal"
+    | "certificate"
+    | "official";
 };
 
 const CATEGORIES: Record<
@@ -44,6 +51,14 @@ const CATEGORIES: Record<
   internal: {
     label: "داخلي",
     classes: "bg-rose-50 text-rose-700 border-rose-200",
+  },
+  certificate: {
+    label: "شهادات",
+    classes: "bg-indigo-50 text-indigo-700 border-indigo-200",
+  },
+  official: {
+    label: "تأمينات ومكتب عمل",
+    classes: "bg-slate-100 text-slate-800 border-slate-300",
   },
 };
 
@@ -110,6 +125,29 @@ const FORMS: FormCard[] = [
     description: "للعمال والفنيين: الحرفة، الخبرة العملية، الحالة الصحية",
     icon: "🔧",
     category: "application",
+  },
+  // Employee certificates — added with mig-053 push. Distinct from the
+  // hr-letter (general purpose) in formality + use case.
+  {
+    href: "/dashboard/forms/employment-certificate",
+    title: "شهادة عمل",
+    description: "للموظفين الحاليين — تأكيد إنه على رأس العمل بمنصبه",
+    icon: "🆔",
+    category: "certificate",
+  },
+  {
+    href: "/dashboard/forms/experience-certificate",
+    title: "شهادة خبرة",
+    description: "للموظفين بعد ترك الخدمة — فترة العمل والمنصب الذي شغله",
+    icon: "🎓",
+    category: "certificate",
+  },
+  {
+    href: "/dashboard/forms/salary-certificate",
+    title: "شهادة راتب",
+    description: "للبنوك والسفارات — تفصيل الراتب الشهري في جدول رسمي",
+    icon: "💰",
+    category: "certificate",
   },
 ];
 
