@@ -75,6 +75,21 @@ const ASSETS: Asset[] = [
     width: 1080,
     height: 1080,
   },
+  // Seasonal — Eid Al-Adha 1447H / May 2026. Add new seasonal cards above
+  // this comment as we run more holiday campaigns (Eid Al-Fitr, Mother's
+  // Day, Black Friday, etc.).
+  {
+    url: "/social/eid",
+    filename: "nidham-eid-post.png",
+    width: 1080,
+    height: 1080,
+  },
+  {
+    url: "/social/eid-story",
+    filename: "nidham-eid-story.png",
+    width: 1080,
+    height: 1920,
+  },
 ];
 
 async function main() {
