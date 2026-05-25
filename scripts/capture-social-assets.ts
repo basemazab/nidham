@@ -105,12 +105,15 @@ async function main() {
   console.log(`📸 Capturing social assets from ${BASE_URL}`);
   await mkdir(OUT_DIR, { recursive: true });
 
-  // Launch a headless Chromium at the largest viewport so even the 1640px
-  // cover banner renders without horizontal scrollbars eating into the
-  // capture.
+  // Launch a headless Chromium at a viewport big enough to fit any of
+  // the creatives without scroll. The 1080x1920 story is the tallest;
+  // the 1640x859 cover is the widest. 2000x2100 covers both with breathing
+  // room. waitFor({ state: "visible" }) checks whether the element is in
+  // the viewport, so an undersized viewport silently fails on tall ads
+  // like /ads/compare (1080x1350) even though the DOM is correct.
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({
-    viewport: { width: 1920, height: 1200 },
+    viewport: { width: 2000, height: 2100 },
     deviceScaleFactor: 1,
   });
   const page = await context.newPage();
