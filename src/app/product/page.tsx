@@ -259,21 +259,20 @@ function FeatureBlock({
   );
 }
 
-// Screenshot frame — shows real PNG if available, falls back to a CSS
-// mockup that *looks like* the dashboard. Both options end up with the
-// same browser-chrome frame so the layout doesn't shift.
+// Screenshot frame — wraps a CSS mockup in fake browser chrome so the
+// frame *looks* like a real product screenshot. Once Basem runs
+// scripts/capture-screenshots.ts to produce real PNGs, the mockup
+// component for that feature can be swapped for an <img> pointing at
+// /marketing/screenshots/desktop/{name}.png. Keeping it CSS-only for
+// now means the page is a Server Component (no `use client` overhead)
+// and the build doesn't trip on event handlers.
 function ScreenshotFrame({
-  name,
+  name: _name,
   mockup,
 }: {
   name: string;
   mockup: Feature["mockup"];
 }) {
-  // Try the real screenshot first. <img> tag with onError fallback would
-  // need client component; instead we use a CSS background-image with
-  // url() and rely on visual fallback to the mockup behind it.
-  const screenshotUrl = `/marketing/screenshots/desktop/${name}.png`;
-
   return (
     <div className="rounded-2xl bg-slate-100 border border-slate-200 shadow-2xl overflow-hidden">
       {/* Browser chrome */}
@@ -288,26 +287,10 @@ function ScreenshotFrame({
         </div>
       </div>
 
-      {/* The screenshot itself — uses real PNG if it exists, mockup as fallback */}
-      <div className="relative" style={{ minHeight: "320px" }}>
-        {/* Real screenshot (will silently 404 if not generated yet — sits
-            on top of the mockup below). The onerror trick keeps it
-            invisible if missing. */}
-        <img
-          src={screenshotUrl}
-          alt={`Nidham ${name}`}
-          className="absolute inset-0 w-full h-auto"
-          // eslint-disable-next-line @next/next/no-img-element
-          onError={(e) => {
-            (e.currentTarget as HTMLImageElement).style.display = "none";
-          }}
-        />
-
-        {/* CSS mockup behind the img — shows through if the real screenshot
-            isn't there yet. */}
-        <div className="relative">
-          <MockupRenderer type={mockup} />
-        </div>
+      {/* The mockup itself — pure CSS, no images. Swap to <img> when real
+          screenshots are captured. */}
+      <div className="relative">
+        <MockupRenderer type={mockup} />
       </div>
     </div>
   );
