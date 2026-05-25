@@ -6,6 +6,152 @@ import { createClient } from "@/lib/supabase/server";
 import { requireHR, requireAdmin } from "@/lib/permissions";
 import { bustDashboardCache } from "@/lib/cache";
 
+// ─── Quick-action helpers ───────────────────────────────────────────────
+// Two HR shortcuts that turn the daily roll-call from minutes into
+// seconds: "mark everyone present for this day" and "copy yesterday's
+// attendance forward". Both insert via upsert so re-running them never
+// creates duplicates.
+
+export async function markAllPresent(formData: FormData) {
+  const { supabase, profile } = await requireHR();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const date = String(formData.get("date") ?? "");
+  if (!date) {
+    redirect("/dashboard/attendance?error=" + encodeURIComponent("التاريخ مطلوب"));
+  }
+
+  // Pull every active employee in the caller's company. We skip terminated
+  // / on-leave employees by design — marking those "present" would silently
+  // override the leave status and trip a payroll bug.
+  const { data: employees } = await supabase
+    .from("employees")
+    .select("id")
+    .eq("company_id", profile.company_id)
+    .eq("status", "active")
+    .returns<Array<{ id: string }>>();
+
+  const list = employees ?? [];
+  if (list.length === 0) {
+    redirect(
+      `/dashboard/attendance?date=${encodeURIComponent(date)}&error=` +
+        encodeURIComponent("مفيش موظفين نشطين"),
+    );
+  }
+
+  const rows = list.map((e) => ({
+    company_id: profile.company_id,
+    employee_id: e.id,
+    date,
+    status: "present",
+    tardiness_minutes: 0,
+    early_leave_minutes: 0,
+    created_by: user.id,
+  }));
+
+  // Upsert so re-running the action a second time today doesn't create
+  // duplicates — Postgres unique on (company_id, employee_id, date)
+  // already guarantees this but onConflict makes the intent explicit.
+  const { error, count } = await supabase
+    .from("attendance")
+    .upsert(rows, {
+      onConflict: "company_id,employee_id,date",
+      count: "exact",
+    });
+
+  if (error) {
+    redirect(
+      `/dashboard/attendance?date=${encodeURIComponent(date)}&error=` +
+        encodeURIComponent(error.message),
+    );
+  }
+
+  revalidatePath("/dashboard/attendance");
+  bustDashboardCache();
+  redirect(
+    `/dashboard/attendance?date=${encodeURIComponent(date)}&saved=` +
+      String(count ?? rows.length),
+  );
+}
+
+export async function copyFromYesterday(formData: FormData) {
+  const { supabase, profile } = await requireHR();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const date = String(formData.get("date") ?? "");
+  if (!date) {
+    redirect("/dashboard/attendance?error=" + encodeURIComponent("التاريخ مطلوب"));
+  }
+
+  // Yesterday in ISO date form. `new Date(date)` parses the YYYY-MM-DD
+  // string as UTC midnight which is fine for date arithmetic — we only
+  // care about the calendar day, not the wall-clock time.
+  const dt = new Date(date + "T00:00:00");
+  dt.setDate(dt.getDate() - 1);
+  const yesterday = dt.toISOString().split("T")[0];
+
+  const { data: prior } = await supabase
+    .from("attendance")
+    .select("employee_id, status, tardiness_minutes, early_leave_minutes")
+    .eq("company_id", profile.company_id)
+    .eq("date", yesterday)
+    .returns<
+      Array<{
+        employee_id: string;
+        status: string;
+        tardiness_minutes: number | null;
+        early_leave_minutes: number | null;
+      }>
+    >();
+
+  const list = prior ?? [];
+  if (list.length === 0) {
+    redirect(
+      `/dashboard/attendance?date=${encodeURIComponent(date)}&error=` +
+        encodeURIComponent("مفيش حضور مسجّل امبارح للنسخ منه"),
+    );
+  }
+
+  const rows = list.map((p) => ({
+    company_id: profile.company_id,
+    employee_id: p.employee_id,
+    date,
+    status: p.status,
+    tardiness_minutes: p.tardiness_minutes ?? 0,
+    early_leave_minutes: p.early_leave_minutes ?? 0,
+    created_by: user.id,
+  }));
+
+  const { error, count } = await supabase
+    .from("attendance")
+    .upsert(rows, {
+      onConflict: "company_id,employee_id,date",
+      count: "exact",
+    });
+
+  if (error) {
+    redirect(
+      `/dashboard/attendance?date=${encodeURIComponent(date)}&error=` +
+        encodeURIComponent(error.message),
+    );
+  }
+
+  revalidatePath("/dashboard/attendance");
+  bustDashboardCache();
+  redirect(
+    `/dashboard/attendance?date=${encodeURIComponent(date)}&saved=` +
+      String(count ?? rows.length),
+  );
+}
+
 const VALID_STATUSES = [
   "present",
   "absent",
