@@ -1624,10 +1624,32 @@ function Footer() {
       </div>
 
       <div className="max-w-6xl mx-auto mt-10 pt-6 border-t border-slate-800 flex flex-col gap-4 text-xs">
-        {/* Legal + support links — required for paid SaaS trust signals.
-            Stacked above the copyright so they're easy to scan even on
-            mobile. */}
+        {/* Trust + transparency links — buyer-journey order: who built
+            it → who uses it → how secure → what does it connect to →
+            then the legal + support stuff. Two rows so the layout stays
+            scannable on mobile. */}
         <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 font-cairo">
+          <Link href="/about" className="hover:text-white transition">
+            مين إحنا
+          </Link>
+          <span className="text-slate-700">·</span>
+          <Link href="/customers" className="hover:text-white transition">
+            عملاؤنا
+          </Link>
+          <span className="text-slate-700">·</span>
+          <Link href="/security" className="hover:text-white transition">
+            الأمان
+          </Link>
+          <span className="text-slate-700">·</span>
+          <Link href="/integrations" className="hover:text-white transition">
+            التكاملات
+          </Link>
+          <span className="text-slate-700">·</span>
+          <Link href="/api-docs" className="hover:text-white transition">
+            API
+          </Link>
+        </div>
+        <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 font-cairo border-t border-slate-800/50 pt-3">
           <Link href="/privacy" className="hover:text-white transition">
             سياسة الخصوصية
           </Link>
