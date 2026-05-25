@@ -3,14 +3,28 @@ import { signup } from "../login/actions";
 import { SubmitButton } from "@/components/submit-button";
 import { POLICY_VERSION } from "../privacy/page";
 
-type SearchParams = Promise<{ error?: string }>;
+// `plan` rides along when the user clicks a CTA on /pricing — we capture
+// it here as a hidden input so the server action can save which tier the
+// user intended (lets the dashboard show "you picked Pro" in the welcome
+// flow). The signup action whitelists allowed values, so a forged query
+// can't write arbitrary text into the company record.
+type SearchParams = Promise<{ error?: string; plan?: string }>;
+
+const PLAN_LABEL: Record<string, string> = {
+  free: "مجاني (5 موظفين)",
+  starter: "Starter (25 موظف · 500 ج/شهر)",
+  pro: "Pro (100 موظف · 1,500 ج/شهر)",
+  business: "Business (500 موظف · 3,500 ج/شهر)",
+  enterprise: "Enterprise (تواصل لتسعير خاص)",
+};
 
 export default async function SignupPage({
   searchParams,
 }: {
   searchParams: SearchParams;
 }) {
-  const { error } = await searchParams;
+  const { error, plan } = await searchParams;
+  const planChoice = plan && PLAN_LABEL[plan] ? plan : "";
 
   return (
     <main className="flex-1 flex items-center justify-center px-6 py-12 bg-gradient-to-b from-slate-50 via-white to-cyan-50/30">
@@ -38,7 +52,24 @@ export default async function SignupPage({
             </div>
           )}
 
+          {/* If they arrived from /pricing with a plan in the query, show
+              a confirmation chip so the choice doesn't feel forgotten
+              between pages. The hidden input below carries it through to
+              the server action. */}
+          {planChoice && (
+            <div className="mb-4 p-3 rounded-lg bg-cyan-50 border border-cyan-200 text-cyan-900 text-sm font-cairo flex items-center gap-2">
+              <span>✓</span>
+              <span>
+                اخترت <strong>{PLAN_LABEL[planChoice]}</strong> — هتبدأ بـ trial
+                مجاني، تقدر تأكد الباقة من dashboard في أي وقت.
+              </span>
+            </div>
+          )}
+
           <form action={signup} className="space-y-4">
+            {/* Carries the pricing-page plan choice into the signup action
+                so the dashboard's welcome flow can pre-select it. */}
+            {planChoice && <input type="hidden" name="plan" value={planChoice} />}
             <div>
               <label
                 htmlFor="company_name"

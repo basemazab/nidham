@@ -17,7 +17,30 @@ type Profile = {
 // from server actions or import flows take minutes to appear.
 export const dynamic = "force-dynamic";
 
-export default async function DashboardPage() {
+// `?welcome=1&plan=<tier>` is set by the signup server action so the
+// first-ever visit lands on a friendlier "you're in" screen instead of
+// the bare dashboard. Both params are sticky for one render only — the
+// banner has a dismiss button (or just navigate anywhere else and the
+// query drops off).
+type DashboardSearchParams = Promise<{ welcome?: string; plan?: string }>;
+
+const PLAN_LABEL_AR: Record<string, string> = {
+  free: "Free (5 موظفين)",
+  starter: "Starter (25 موظف)",
+  pro: "Pro (100 موظف)",
+  business: "Business (500 موظف)",
+  enterprise: "Enterprise",
+};
+
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: DashboardSearchParams;
+}) {
+  const { welcome, plan } = await searchParams;
+  const isFirstVisit = welcome === "1";
+  const intendedPlan = plan && PLAN_LABEL_AR[plan] ? plan : "";
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -133,6 +156,86 @@ export default async function DashboardPage() {
             >
               عرض التفاصيل ↗
             </Link>
+          </div>
+        )}
+
+        {/* First-visit welcome banner — fires on ?welcome=1 set by the
+            signup server action. Stays sticky until the user clicks
+            anywhere off the dashboard (the query drops on navigation). */}
+        {isFirstVisit && (
+          <div className="bg-gradient-to-br from-emerald-500 via-emerald-600 to-cyan-600 text-white rounded-3xl p-8 mb-6 shadow-2xl shadow-emerald-500/20 relative overflow-hidden">
+            {/* Decorative orbs for visual interest */}
+            <div
+              className="absolute rounded-full bg-amber-400/20 blur-3xl"
+              style={{ width: "300px", height: "300px", top: "-100px", right: "-100px" }}
+            />
+            <div
+              className="absolute rounded-full bg-white/10 blur-3xl"
+              style={{ width: "200px", height: "200px", bottom: "-50px", left: "-50px" }}
+            />
+
+            <div className="relative">
+              <div className="text-5xl mb-3">🎉</div>
+              <h2 className="text-3xl md:text-4xl font-black font-cairo mb-2">
+                أهلاً بيك في Nidham يا {profile?.full_name?.split(" ")[0] ?? "صديقي"}!
+              </h2>
+              <p className="text-emerald-50 font-cairo text-lg mb-5">
+                حسابك جاهز.{" "}
+                {intendedPlan ? (
+                  <>
+                    اخترت <strong>{PLAN_LABEL_AR[intendedPlan]}</strong> — بدأت بـ trial
+                    مجاني 14 يوم.{" "}
+                  </>
+                ) : (
+                  <>بدأت بـ trial مجاني 14 يوم. </>
+                )}
+                خلّيني أرشدك في أول خطوة 👇
+              </p>
+
+              <div className="grid md:grid-cols-3 gap-3 mb-5">
+                <FirstStepCard
+                  num="1"
+                  emoji="👥"
+                  title="ضيف أول موظف"
+                  href="/dashboard/employees/new"
+                />
+                <FirstStepCard
+                  num="2"
+                  emoji="📱"
+                  title="ابعت دعوة للموبايل"
+                  href="/dashboard/employees"
+                />
+                <FirstStepCard
+                  num="3"
+                  emoji="💰"
+                  title="جرّب دورة مرتبات"
+                  href="/dashboard/payroll"
+                />
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3 text-sm">
+                <Link
+                  href="/help"
+                  className="px-4 py-2 rounded-xl bg-white/10 border border-white/20 hover:bg-white/20 font-bold font-cairo transition"
+                >
+                  📚 مركز المساعدة
+                </Link>
+                <a
+                  href="https://wa.me/201055356622?text=أهلاً، عملت حساب جديد على Nidham وعايز مساعدة"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-4 py-2 rounded-xl bg-white/10 border border-white/20 hover:bg-white/20 font-bold font-cairo transition"
+                >
+                  💬 كلّم باسم على واتساب
+                </a>
+                <Link
+                  href="/dashboard"
+                  className="px-4 py-2 rounded-xl bg-white text-emerald-700 hover:bg-emerald-50 font-bold font-cairo transition mr-auto"
+                >
+                  ابدأ بنفسي ←
+                </Link>
+              </div>
+            </div>
           </div>
         )}
 
@@ -466,5 +569,40 @@ export default async function DashboardPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+// First-visit welcome banner step card. Rendered inside the green hero
+// shown on ?welcome=1. Kept tiny + self-contained so we don't pull a
+// shared component file in for a one-off.
+function FirstStepCard({
+  num,
+  emoji,
+  title,
+  href,
+}: {
+  num: string;
+  emoji: string;
+  title: string;
+  href: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="block p-4 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/20 transition group"
+    >
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center font-black text-lg">
+          {num}
+        </div>
+        <div className="flex-1">
+          <div className="text-2xl mb-0.5">{emoji}</div>
+          <div className="font-bold font-cairo text-sm">{title}</div>
+        </div>
+        <div className="text-xl opacity-70 group-hover:translate-x-1 transition">
+          ←
+        </div>
+      </div>
+    </Link>
   );
 }

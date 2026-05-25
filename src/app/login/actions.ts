@@ -158,8 +158,25 @@ export async function signup(formData: FormData) {
       .eq("id", data.user.id);
   }
 
+  // Capture the marketing-funnel signal (which pricing tier did they click
+  // before signing up?) so we can a) tailor the welcome modal to that tier,
+  // and b) show "you selected Pro" UX during the trial. The pricing page
+  // CTAs send /signup?plan=pro|starter|business; signup form forwards it
+  // as a hidden input. Whitelist values so a forged query can't write
+  // arbitrary strings into the company record.
+  const planChoice = (formData.get("plan") as string | null)?.toLowerCase() ?? "";
+  const VALID_PLAN_CHOICES = ["free", "starter", "pro", "business", "enterprise"] as const;
+  const planSignal = (VALID_PLAN_CHOICES as readonly string[]).includes(planChoice)
+    ? planChoice
+    : "";
+
+  // Redirect to dashboard with welcome + plan hint so the dashboard can
+  // render a first-run UX (welcome modal + "we noticed you picked Pro,
+  // your trial expires in 14 days — upgrade anytime").
   revalidatePath("/", "layout");
-  redirect("/dashboard");
+  const params = new URLSearchParams({ welcome: "1" });
+  if (planSignal) params.set("plan", planSignal);
+  redirect(`/dashboard?${params.toString()}`);
 }
 
 export async function logout() {
