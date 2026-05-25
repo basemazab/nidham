@@ -132,6 +132,14 @@ export default async function SignupPage({
               <span>
                 أوافق على{" "}
                 <Link
+                  href="/terms"
+                  target="_blank"
+                  className="text-brand-cyan-dark font-bold hover:underline"
+                >
+                  الشروط والأحكام
+                </Link>
+                {" "}و{" "}
+                <Link
                   href="/privacy"
                   target="_blank"
                   className="text-brand-cyan-dark font-bold hover:underline"

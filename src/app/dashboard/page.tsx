@@ -88,9 +88,17 @@ export default async function DashboardPage() {
     employee: "موظف",
   };
 
-  // Onboarding: show wizard if any module is empty
-  const onboardingDone = empCount > 0 && custCount > 0 && intCount > 0;
-  const completedSteps = (empCount > 0 ? 1 : 0) + (custCount > 0 ? 1 : 0) + (intCount > 0 ? 1 : 0);
+  // Onboarding: HR is the core product; customers + interactions are CRM
+  // bonus features the HR-only ICP (Egyptian SMB) will never touch. Gating
+  // wizard completion on customers/interactions left the amber wizard
+  // stuck on screen forever for the target customer. Now the wizard is
+  // considered DONE once the company has at least one employee — the CRM
+  // steps stay visible as optional next steps but no longer block "done".
+  const onboardingDone = empCount > 0;
+  const completedSteps =
+    (empCount > 0 ? 1 : 0) +
+    (custCount > 0 ? 1 : 0) +
+    (intCount > 0 ? 1 : 0);
 
   const isEnterprise = subscription?.plan === "enterprise";
 

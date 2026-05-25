@@ -1623,15 +1623,40 @@ function Footer() {
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto mt-10 pt-6 border-t border-slate-800 flex flex-col md:flex-row justify-between items-center gap-3 text-xs">
-        <p className="font-cairo">© 2026 Nidham. كل الحقوق محفوظة.</p>
-        <div className="flex items-center gap-4 font-cairo">
+      <div className="max-w-6xl mx-auto mt-10 pt-6 border-t border-slate-800 flex flex-col gap-4 text-xs">
+        {/* Legal + support links — required for paid SaaS trust signals.
+            Stacked above the copyright so they're easy to scan even on
+            mobile. */}
+        <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 font-cairo">
           <Link href="/privacy" className="hover:text-white transition">
             سياسة الخصوصية
           </Link>
           <span className="text-slate-700">·</span>
+          <Link href="/terms" className="hover:text-white transition">
+            الشروط والأحكام
+          </Link>
+          <span className="text-slate-700">·</span>
+          <Link href="/refund" className="hover:text-white transition">
+            سياسة الاسترداد
+          </Link>
+          <span className="text-slate-700">·</span>
+          <Link href="/beta-terms" className="hover:text-white transition">
+            شروط Beta
+          </Link>
+          <span className="text-slate-700">·</span>
+          <Link href="/help" className="hover:text-white transition">
+            مركز المساعدة
+          </Link>
+          <span className="text-slate-700">·</span>
+          <Link href="/contact" className="hover:text-white transition">
+            تواصل معانا
+          </Link>
+        </div>
+
+        <div className="flex flex-col md:flex-row justify-between items-center gap-3 pt-2 border-t border-slate-800/50">
+          <p className="font-cairo">© 2026 Nidham. كل الحقوق محفوظة.</p>
           <span className="font-mono tracking-wider text-slate-500">
-            BETA · v0.1 · BUILT IN DAMIETTA, EGYPT
+            v1.0 · BUILT IN DAMIETTA, EGYPT
           </span>
         </div>
       </div>

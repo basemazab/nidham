@@ -146,13 +146,16 @@ export default async function AcceptInvitePage({ params, searchParams }: PagePro
 
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2 font-cairo">
-                    اختار كلمة سر <span className="text-slate-400 text-xs">(6 حروف على الأقل)</span>
+                    اختار كلمة سر{" "}
+                    <span className="text-slate-400 text-xs">
+                      (12 حرف على الأقل، حرف كبير + صغير + رقم + رمز)
+                    </span>
                   </label>
                   <input
                     type="password"
                     name="password"
                     required
-                    minLength={6}
+                    minLength={12}
                     autoComplete="new-password"
                     className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none text-slate-900"
                   />
