@@ -137,7 +137,7 @@ export function buildAppMenu(getWindow: () => BrowserWindow | null): Menu {
         },
         {
           label: "تواصل مع الدعم (واتساب)",
-          click: () => shell.openExternal("https://wa.me/201553641615"),
+          click: () => shell.openExternal("https://wa.me/201055356622"),
         },
         { type: "separator" },
         {

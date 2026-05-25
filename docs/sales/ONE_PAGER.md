@@ -86,7 +86,7 @@
 
 ## 📞 تواصل النهاردة
 
-📱 **WhatsApp:** +20 155 364 1615  
+📱 **WhatsApp:** +20 105 535 6622  
 📧 **Email:** nidhamhr@proton.me  
 🌐 **الموقع:** nidhamhr.com  
 📅 **احجز demo:** nidhamhr.com/pricing

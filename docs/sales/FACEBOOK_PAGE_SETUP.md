@@ -56,7 +56,7 @@ Nidham — نِظام HR للشركات المصرية
 
 بربع تكلفة Bayzat — ابدأ Beta مجاناً.
 
-📞 +20 155 364 1615
+📞 +20 105 535 6622
 📧 nidhamhr@proton.me
 🌐 nidhamhr.com
 ```
@@ -64,7 +64,7 @@ Nidham — نِظام HR للشركات المصرية
 ### Contact Info
 | الحقل | القيمة |
 |------|--------|
-| Phone | `+20 155 364 1615` |
+| Phone | `+20 105 535 6622` |
 | Email | `nidhamhr@proton.me` |
 | Website | `https://nidhamhr.com` |
 | Address | `Damietta, Egypt` |
@@ -77,7 +77,7 @@ Nidham — نِظام HR للشركات المصرية
 
 ### Page Buttons (Call-to-Action)
 **Primary Button:** "Send Message" (Messenger) أو "Contact Us"  
-**Link to:** `https://wa.me/201553641615`
+**Link to:** `https://wa.me/201055356622`
 
 ---
 
@@ -110,7 +110,7 @@ Nidham — نِظام HR للشركات المصرية
 🎁 Beta Offer: 3 شهور مجاناً لأول 10 شركات
 
 🌐 nidhamhr.com
-📞 0155 364 1615
+📞 0105 535 6622
 
 #HR #مرتبات #تأمينات #SaaS #مصر
 ```
@@ -250,7 +250,7 @@ Nidham بيـ:
 
 7 مكان متبقي من 10 ✨
 
-✉️ كومنت "أنا" أو DM أو واتساب 0155 364 1615
+✉️ كومنت "أنا" أو DM أو واتساب 0105 535 6622
 🌐 nidhamhr.com للتفاصيل
 
 #Beta #HR_SaaS #مصر #فرصة_محدودة

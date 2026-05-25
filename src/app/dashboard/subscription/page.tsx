@@ -138,7 +138,7 @@ export default async function SubscriptionPage() {
 الخطة الحالية: ${PLAN_LABELS[subscription.plan]}
 ينتهي: ${subscription.ends_at}`,
   );
-  const whatsappLink = `https://wa.me/201553641615?text=${whatsappMessage}`;
+  const whatsappLink = `https://wa.me/201055356622?text=${whatsappMessage}`;
 
   return (
     <main className="flex-1 px-6 py-8 bg-gradient-to-b from-slate-50 via-white to-cyan-50/30 min-h-screen">
@@ -317,8 +317,8 @@ export default async function SubscriptionPage() {
 
         <p className="text-center text-xs text-slate-400 mt-8 font-cairo">
           الدفع حاليًا بنك ترانسفر أو فودافون كاش — كلمنا على واتساب
-          <a href="https://wa.me/201553641615" target="_blank" rel="noopener" className="text-brand-cyan-dark hover:underline mr-1">
-            01553641615
+          <a href="https://wa.me/201055356622" target="_blank" rel="noopener" className="text-brand-cyan-dark hover:underline mr-1">
+            01055356622
           </a>
         </p>
       </div>

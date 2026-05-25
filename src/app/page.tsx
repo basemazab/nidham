@@ -1067,7 +1067,7 @@ function MarketingStudioSection() {
           </div>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <a
-              href="https://wa.me/201553641615?text=أهلاً، عايز أعرف تفاصيل استوديو التسويق Enterprise"
+              href="https://wa.me/201055356622?text=أهلاً، عايز أعرف تفاصيل استوديو التسويق Enterprise"
               target="_blank"
               rel="noopener noreferrer"
               className="px-8 py-4 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 text-white font-black text-lg shadow-2xl hover:shadow-amber-500/50 hover:scale-105 transition-all font-cairo"
@@ -1377,7 +1377,7 @@ function DeploymentOptionsSection() {
             </div>
 
             <a
-              href="https://wa.me/201553641615?text=أهلاً، عايز أعرف تفاصيل نسخة Nidham Enterprise"
+              href="https://wa.me/201055356622?text=أهلاً، عايز أعرف تفاصيل نسخة Nidham Enterprise"
               target="_blank"
               rel="noopener noreferrer"
               className="block w-full text-center px-5 py-3 rounded-xl bg-gradient-to-r from-brand-gold to-amber-600 text-slate-900 font-bold text-sm hover:shadow-xl transition font-cairo"
@@ -1517,7 +1517,7 @@ function FinalCTASection() {
             ابدأ التجربة المجانية الآن
           </Link>
           <a
-            href="https://wa.me/201553641615"
+            href="https://wa.me/201055356622"
             target="_blank"
             rel="noopener noreferrer"
             className="px-8 py-4 rounded-xl border-2 border-white/40 text-white font-bold text-lg hover:bg-white/10 transition-all font-cairo"
@@ -1570,7 +1570,7 @@ function Footer() {
             </li>
             <li>
               <a
-                href="https://wa.me/201553641615?text=أهلاً، عايز أعرف تفاصيل نسخة Nidham Enterprise"
+                href="https://wa.me/201055356622?text=أهلاً، عايز أعرف تفاصيل نسخة Nidham Enterprise"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="hover:text-white transition"
@@ -1580,7 +1580,7 @@ function Footer() {
             </li>
             <li>
               <a
-                href="https://wa.me/201553641615?text=أهلاً، عايز أعرف تفاصيل استوديو التسويق Enterprise"
+                href="https://wa.me/201055356622?text=أهلاً، عايز أعرف تفاصيل استوديو التسويق Enterprise"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="hover:text-amber-300 transition"
@@ -1606,7 +1606,7 @@ function Footer() {
           <ul className="space-y-2 font-cairo">
             <li>
               <a
-                href="https://wa.me/201553641615"
+                href="https://wa.me/201055356622"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="hover:text-white transition"

@@ -194,7 +194,7 @@ export default function PricingPage() {
             الأولى على أي باقة. الشرط: اجتماع نص ساعة كل أسبوعين لـ feedback +
             موافقة على case study.{" "}
             <a
-              href="https://wa.me/201553641615?text=أهلاً، عايز أعرف تفاصيل برنامج Beta"
+              href="https://wa.me/201055356622?text=أهلاً، عايز أعرف تفاصيل برنامج Beta"
               target="_blank"
               rel="noopener noreferrer"
               className="text-brand-cyan-dark font-bold hover:underline"
@@ -227,7 +227,7 @@ export default function PricingPage() {
                 إعداد شخصي.
               </p>
               <a
-                href="https://wa.me/201553641615?text=أهلاً، عايز عرض Enterprise لشركة عندي [X] موظف"
+                href="https://wa.me/201055356622?text=أهلاً، عايز عرض Enterprise لشركة عندي [X] موظف"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-block px-6 py-3 rounded-xl bg-amber-400 text-slate-900 font-black font-cairo hover:bg-amber-300 transition"
@@ -332,7 +332,7 @@ export default function PricingPage() {
               🚀 ابدأ مجاناً
             </Link>
             <a
-              href="https://wa.me/201553641615?text=أهلاً، عايز demo لـ Nidham"
+              href="https://wa.me/201055356622?text=أهلاً، عايز demo لـ Nidham"
               target="_blank"
               rel="noopener noreferrer"
               className="px-6 py-3 rounded-xl bg-white/10 border border-white/30 text-white font-bold font-cairo hover:bg-white/20 transition"
