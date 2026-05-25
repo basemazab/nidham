@@ -1637,6 +1637,10 @@ function Footer() {
             عملاؤنا
           </Link>
           <span className="text-slate-700">·</span>
+          <Link href="/product" className="hover:text-white transition">
+            شوف النظام
+          </Link>
+          <span className="text-slate-700">·</span>
           <Link href="/security" className="hover:text-white transition">
             الأمان
           </Link>
