@@ -75,6 +75,15 @@ const ASSETS: Asset[] = [
     width: 1080,
     height: 1080,
   },
+  // 4:5 vertical comparison ad — Facebook News Feed recommended format
+  // for paid campaigns. Different aspect from the 1080x1080 squares so
+  // it gets its own entry rather than overwriting one of them.
+  {
+    url: "/ads/compare",
+    filename: "nidham-ad-compare.png",
+    width: 1080,
+    height: 1350,
+  },
   // Seasonal — Eid Al-Adha 1447H / May 2026. Add new seasonal cards above
   // this comment as we run more holiday campaigns (Eid Al-Fitr, Mother's
   // Day, Black Friday, etc.).
