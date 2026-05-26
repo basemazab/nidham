@@ -309,48 +309,51 @@ export default async function PayslipPage({ params }: PageProps) {
           </div>
         </section>
 
-        {/* NEW: Tardiness + early-leave MINUTES breakdown — explicit
-            transparency on the time-based deductions */}
-        {(totalTardinessMinutes > 0 || totalEarlyLeaveMinutes > 0) && (
-          <section className="px-8 py-5 border-b border-slate-100 bg-amber-50/40">
-            <h2 className="text-xs font-bold tracking-wider text-slate-400 uppercase mb-3 font-cairo">
-              تفصيل التأخير والانصراف المبكر
-            </h2>
-            <div className="grid grid-cols-2 gap-3 font-cairo text-sm">
-              <div className="bg-white border-2 border-amber-200 rounded-xl p-3">
-                <div className="text-[10px] text-amber-700 font-bold uppercase tracking-wider mb-1">
-                  ⏰ إجمالي التأخير في الشهر
-                </div>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-black text-amber-800 font-mono">
-                    {totalTardinessMinutes}
-                  </span>
-                  <span className="text-xs text-amber-700">دقيقة</span>
-                </div>
-                <div className="text-[10px] text-slate-500 mt-1">
-                  في {lateDaysCount} يوم تأخّرت فيهم
-                </div>
+        {/* Tardiness + early-leave MINUTES breakdown.
+            ALWAYS rendered (no conditional) — employee should see the
+            structure even at zero so they understand what's being tracked. */}
+        <section className="px-8 py-5 border-b border-slate-100 bg-amber-50/40">
+          <h2 className="text-xs font-bold tracking-wider text-slate-400 uppercase mb-3 font-cairo">
+            تفصيل التأخير والانصراف المبكر
+          </h2>
+          <div className="grid grid-cols-2 gap-3 font-cairo text-sm">
+            <div className="bg-white border-2 border-amber-200 rounded-xl p-3">
+              <div className="text-[10px] text-amber-700 font-bold uppercase tracking-wider mb-1">
+                ⏰ إجمالي التأخير في الشهر
               </div>
-              <div className="bg-white border-2 border-orange-200 rounded-xl p-3">
-                <div className="text-[10px] text-orange-700 font-bold uppercase tracking-wider mb-1">
-                  🚪 إجمالي الانصراف المبكر
-                </div>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-black text-orange-800 font-mono">
-                    {totalEarlyLeaveMinutes}
-                  </span>
-                  <span className="text-xs text-orange-700">دقيقة</span>
-                </div>
-                <div className="text-[10px] text-slate-500 mt-1">
-                  في {earlyLeaveDaysCount} يوم انصرفت فيهم بدري
-                </div>
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl font-black text-amber-800 font-mono">
+                  {totalTardinessMinutes}
+                </span>
+                <span className="text-xs text-amber-700">دقيقة</span>
+              </div>
+              <div className="text-[10px] text-slate-500 mt-1">
+                {lateDaysCount > 0
+                  ? `في ${lateDaysCount} يوم تأخّرت فيهم`
+                  : "✓ مفيش تأخير الشهر ده — ممتاز"}
               </div>
             </div>
-            <p className="text-[10px] text-slate-500 mt-2">
-              💡 خصم التأخير المالي مذكور تحت في قسم "الاستقطاعات"
-            </p>
-          </section>
-        )}
+            <div className="bg-white border-2 border-orange-200 rounded-xl p-3">
+              <div className="text-[10px] text-orange-700 font-bold uppercase tracking-wider mb-1">
+                🚪 إجمالي الانصراف المبكر
+              </div>
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl font-black text-orange-800 font-mono">
+                  {totalEarlyLeaveMinutes}
+                </span>
+                <span className="text-xs text-orange-700">دقيقة</span>
+              </div>
+              <div className="text-[10px] text-slate-500 mt-1">
+                {earlyLeaveDaysCount > 0
+                  ? `في ${earlyLeaveDaysCount} يوم انصرفت فيهم بدري`
+                  : "✓ مفيش انصراف مبكر — ممتاز"}
+              </div>
+            </div>
+          </div>
+          <p className="text-[10px] text-slate-500 mt-2">
+            💡 خصم التأخير المالي مذكور تحت في قسم "الاستقطاعات"
+          </p>
+        </section>
 
         {/* Earnings & Deductions side by side */}
         <section className="px-8 py-6 grid md:grid-cols-2 gap-8 border-b border-slate-100">
@@ -359,27 +362,59 @@ export default async function PayslipPage({ params }: PageProps) {
             <h2 className="text-xs font-bold tracking-wider text-emerald-600 uppercase mb-3 font-cairo border-b border-emerald-100 pb-2">
               💵 الإيرادات
             </h2>
-            <div className="space-y-2 text-sm font-cairo">
-              <LineItem label="الراتب الأساسي" value={entry.basic_salary} />
-              <LineItem label="بدل سكن" value={entry.housing_allowance} />
-              <LineItem label="بدل انتقال" value={entry.transport_allowance} />
-              <LineItem label="بدلات أخرى" value={entry.other_allowances} />
-              <LineItem label="حافز" value={entry.incentive_allowance} />
+            <div className="divide-y divide-emerald-100 text-sm font-cairo">
               <LineItem
+                emoji="💼"
+                label="الراتب الأساسي"
+                hint="الأجر الأساسي قبل أي بدلات"
+                value={entry.basic_salary}
+              />
+              <LineItem
+                emoji="🏠"
+                label="بدل سكن"
+                hint="حسب عقد العمل"
+                value={entry.housing_allowance}
+              />
+              <LineItem
+                emoji="🚗"
+                label="بدل انتقال"
+                hint="مواصلات يومية"
+                value={entry.transport_allowance}
+              />
+              <LineItem
+                emoji="📦"
+                label="بدلات أخرى"
+                hint="موبايل، أدوات، إلخ"
+                value={entry.other_allowances}
+              />
+              <LineItem
+                emoji="🎁"
+                label="حافز"
+                hint="حافز إنتاج / حافز أداء شهري"
+                value={entry.incentive_allowance}
+              />
+              <LineItem
+                emoji="🎉"
                 label={
                   entry.bonus_reason
                     ? `مكافأة (${entry.bonus_reason})`
                     : "مكافأة"
                 }
+                hint="مكافأة استثنائية لشهر معين"
                 value={entry.bonuses}
               />
-              <LineItem label="أوفر تايم" value={entry.overtime} />
-              {entry.eos_gratuity > 0 && (
-                <LineItem
-                  label="🚪 مكافأة نهاية الخدمة"
-                  value={entry.eos_gratuity}
-                />
-              )}
+              <LineItem
+                emoji="⏱"
+                label="أوفر تايم"
+                hint="ساعات إضافية × المعدل القانوني"
+                value={entry.overtime}
+              />
+              <LineItem
+                emoji="🚪"
+                label="مكافأة نهاية الخدمة"
+                hint="حسب مادة 122 — تظهر فقط عند الإنهاء"
+                value={entry.eos_gratuity}
+              />
               <div className="pt-2 mt-2 border-t border-slate-200 flex justify-between font-bold text-emerald-700">
                 <span>إجمالي الإيرادات</span>
                 <span>
@@ -405,12 +440,19 @@ export default async function PayslipPage({ params }: PageProps) {
             </h2>
             <div className="space-y-2 text-sm font-cairo">
               <LineItem
+                emoji="❌"
                 label={`خصم الغياب${
                   entry.absent_days > 0 ? ` (${entry.absent_days} يوم)` : ""
                 }`}
+                hint={
+                  entry.absent_days > 0
+                    ? "غياب بدون إذن — يخصم يوم كامل لكل يوم"
+                    : "خصم على الغياب بدون إذن"
+                }
                 value={entry.absence_deduction}
               />
               <LineItem
+                emoji="⏰"
                 label={`خصم التأخير${
                   totalTardinessMinutes > 0
                     ? ` (${totalTardinessMinutes} دقيقة)`
@@ -420,20 +462,43 @@ export default async function PayslipPage({ params }: PageProps) {
                     ? ` (${totalEarlyLeaveMinutes} دقيقة)`
                     : ""
                 }`}
+                hint={
+                  totalTardinessMinutes > 0 || totalEarlyLeaveMinutes > 0
+                    ? `إجمالي ${totalTardinessMinutes + totalEarlyLeaveMinutes} دقيقة في الشهر`
+                    : "تأخير عن مواعيد العمل / انصراف قبل ميعاد الانصراف"
+                }
                 value={entry.tardiness_deduction}
               />
-              <LineItem label="التأمينات الاجتماعية (14%)" value={entry.social_insurance} />
-              <LineItem label="ضريبة الدخل" value={entry.income_tax} />
               <LineItem
+                emoji="🏥"
+                label="التأمينات الاجتماعية (14%)"
+                hint="حصة الموظف — قانون 148/2019"
+                value={entry.social_insurance}
+              />
+              <LineItem
+                emoji="📊"
+                label="ضريبة الدخل"
+                hint="حسب شرائح 2026 الضريبية"
+                value={entry.income_tax}
+              />
+              <LineItem
+                emoji="💵"
                 label={`قسط السلفة هذا الشهر${
                   activeLoans.length > 1
-                    ? ` (${activeLoans.length} سلفة)`
+                    ? ` (${activeLoans.length} سلف نشطة)`
                     : ""
                 }`}
+                hint={
+                  activeLoans.length > 0
+                    ? `موزّع على ${activeLoans.length} سلفة — التفاصيل تحت`
+                    : "مفيش سلف نشطة"
+                }
                 value={entry.loan_deduction}
               />
               <LineItem
-                label="خصومات وجزاءات أخرى"
+                emoji="⚠"
+                label="جزاءات وخصومات أخرى"
+                hint="إنذارات / مخالفات / تلف عهدة / غيرها"
                 value={entry.other_deductions}
               />
               <div className="pt-2 mt-2 border-t border-slate-200 flex justify-between font-bold text-red-700">
@@ -478,94 +543,115 @@ export default async function PayslipPage({ params }: PageProps) {
           </section>
         )}
 
-        {/* NEW: Loan summary — what employees ALWAYS want to see.
-            Shows lifetime taken, paid back, and what's still due. */}
-        {allLoans.length > 0 && (
-          <section className="px-8 py-5 border-b border-slate-100">
-            <h2 className="text-xs font-bold tracking-wider text-slate-400 uppercase mb-3 font-cairo">
-              💵 ملخص السلف والقروض
-            </h2>
+        {/* Loan summary — ALWAYS rendered so the employee sees the
+            framework even at zero. Shows lifetime taken, paid back, and
+            what's still due. */}
+        <section className="px-8 py-5 border-b border-slate-100">
+          <h2 className="text-xs font-bold tracking-wider text-slate-400 uppercase mb-3 font-cairo">
+            💵 ملخص السلف والقروض
+          </h2>
 
-            {/* 3 big numbers */}
-            <div className="grid grid-cols-3 gap-3 mb-4 font-cairo">
-              <div className="p-3 rounded-xl bg-slate-50 border-2 border-slate-200 text-center">
-                <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">
-                  إجمالي السلف المأخوذة
-                </div>
-                <div className="text-xl font-black text-slate-800 font-mono" dir="ltr">
-                  {formatEGP(totalLoanAmount)}
-                </div>
-                <div className="text-[10px] text-slate-400 mt-0.5">
-                  عبر {allLoans.length} سلفة
-                </div>
+          {/* 3 big numbers — visible always */}
+          <div className="grid grid-cols-3 gap-3 mb-4 font-cairo">
+            <div className="p-3 rounded-xl bg-slate-50 border-2 border-slate-200 text-center">
+              <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">
+                إجمالي السلف المأخوذة
               </div>
-              <div className="p-3 rounded-xl bg-emerald-50 border-2 border-emerald-200 text-center">
-                <div className="text-[10px] text-emerald-700 font-bold uppercase tracking-wider mb-1">
-                  إجمالي المسدّد
-                </div>
-                <div className="text-xl font-black text-emerald-700 font-mono" dir="ltr">
-                  {formatEGP(totalLoanPaid)}
-                </div>
-                <div className="text-[10px] text-emerald-600 mt-0.5">
-                  من بداية تعيينك
-                </div>
+              <div
+                className="text-xl font-black text-slate-800 font-mono"
+                dir="ltr"
+              >
+                {formatEGP(totalLoanAmount)}
               </div>
-              <div className="p-3 rounded-xl bg-amber-50 border-2 border-amber-200 text-center">
-                <div className="text-[10px] text-amber-700 font-bold uppercase tracking-wider mb-1">
-                  المتبقي عليك
-                </div>
-                <div className="text-xl font-black text-amber-700 font-mono" dir="ltr">
-                  {formatEGP(totalLoanRemaining)}
-                </div>
-                <div className="text-[10px] text-amber-600 mt-0.5">
-                  {activeLoans.length} سلفة نشطة
-                </div>
+              <div className="text-[10px] text-slate-400 mt-0.5">
+                {allLoans.length > 0
+                  ? `عبر ${allLoans.length} سلفة`
+                  : "ما خدتش سلف لسه"}
               </div>
             </div>
-
-            {/* Active loans detail with progress bars */}
-            {activeLoans.length > 0 && (
-              <div className="space-y-2 text-xs font-cairo">
-                <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
-                  السلف النشطة:
-                </div>
-                {activeLoans.map((l) => {
-                  const paid = Number(l.amount) - Number(l.remaining_amount);
-                  const pct =
-                    Number(l.amount) > 0
-                      ? Math.round((paid / Number(l.amount)) * 100)
-                      : 0;
-                  return (
-                    <div
-                      key={l.id}
-                      className="p-2 rounded-lg bg-slate-50 border border-slate-200"
-                    >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-slate-700 truncate">
-                          {l.reason || `سلفة بقيمة ${formatEGP(Number(l.amount))}`}
-                        </span>
-                        <span className="font-mono text-slate-600 whitespace-nowrap" dir="ltr">
-                          {formatEGP(Number(l.remaining_amount))} متبقي ·{" "}
-                          {formatEGP(Number(l.monthly_installment))}/شهر
-                        </span>
-                      </div>
-                      <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-gradient-to-r from-amber-400 to-emerald-500"
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-                      <div className="text-[10px] text-slate-400 mt-0.5">
-                        {pct}% اتسدّد · بدأت في{" "}
-                        {formatIsoDate(l.requested_at.split("T")[0])}
-                      </div>
-                    </div>
-                  );
-                })}
+            <div className="p-3 rounded-xl bg-emerald-50 border-2 border-emerald-200 text-center">
+              <div className="text-[10px] text-emerald-700 font-bold uppercase tracking-wider mb-1">
+                إجمالي المسدّد
               </div>
-            )}
-          </section>
-        )}
+              <div
+                className="text-xl font-black text-emerald-700 font-mono"
+                dir="ltr"
+              >
+                {formatEGP(totalLoanPaid)}
+              </div>
+              <div className="text-[10px] text-emerald-600 mt-0.5">
+                من بداية تعيينك
+              </div>
+            </div>
+            <div className="p-3 rounded-xl bg-amber-50 border-2 border-amber-200 text-center">
+              <div className="text-[10px] text-amber-700 font-bold uppercase tracking-wider mb-1">
+                المتبقي عليك
+              </div>
+              <div
+                className="text-xl font-black text-amber-700 font-mono"
+                dir="ltr"
+              >
+                {formatEGP(totalLoanRemaining)}
+              </div>
+              <div className="text-[10px] text-amber-600 mt-0.5">
+                {activeLoans.length > 0
+                  ? `${activeLoans.length} سلفة نشطة`
+                  : "✓ خالي تماماً"}
+              </div>
+            </div>
+          </div>
+
+          {/* Active loans detail */}
+          {activeLoans.length > 0 ? (
+            <div className="space-y-2 text-xs font-cairo">
+              <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+                السلف النشطة:
+              </div>
+              {activeLoans.map((l) => {
+                const paid = Number(l.amount) - Number(l.remaining_amount);
+                const pct =
+                  Number(l.amount) > 0
+                    ? Math.round((paid / Number(l.amount)) * 100)
+                    : 0;
+                return (
+                  <div
+                    key={l.id}
+                    className="p-2 rounded-lg bg-slate-50 border border-slate-200"
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-slate-700 truncate">
+                        {l.reason ||
+                          `سلفة بقيمة ${formatEGP(Number(l.amount))}`}
+                      </span>
+                      <span
+                        className="font-mono text-slate-600 whitespace-nowrap"
+                        dir="ltr"
+                      >
+                        {formatEGP(Number(l.remaining_amount))} متبقي ·{" "}
+                        {formatEGP(Number(l.monthly_installment))}/شهر
+                      </span>
+                    </div>
+                    <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-amber-400 to-emerald-500"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                    <div className="text-[10px] text-slate-400 mt-0.5">
+                      {pct}% اتسدّد · بدأت في{" "}
+                      {formatIsoDate(l.requested_at.split("T")[0])}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-center text-xs font-cairo text-emerald-700">
+              ✓ مفيش سلف نشطة دلوقتي — لو احتجت سلفة، كلم HR من تطبيق
+              الموبايل
+            </div>
+          )}
+        </section>
 
         {/* Notes */}
         {entry.notes && (
@@ -656,11 +742,42 @@ function Stat({
   );
 }
 
-function LineItem({ label, value }: { label: string; value: number }) {
+function LineItem({
+  label,
+  value,
+  emoji,
+  hint,
+}: {
+  label: string;
+  value: number;
+  emoji?: string;
+  hint?: string;
+}) {
+  // Zero values are deliberately rendered (so the employee sees every
+  // possible payslip line) but visually muted so they don't compete
+  // with the lines that actually have money attached.
+  const isZero = value === 0;
   return (
-    <div className="flex justify-between text-slate-700">
-      <span>{label}</span>
-      <span className="font-mono" dir="ltr">
+    <div
+      className={`flex items-start justify-between py-1.5 ${
+        isZero ? "opacity-50" : ""
+      }`}
+    >
+      <div className="flex items-start gap-1.5 flex-1 min-w-0">
+        {emoji && <span className="text-base flex-shrink-0">{emoji}</span>}
+        <div className="flex-1 min-w-0">
+          <div className="text-slate-800 text-sm">{label}</div>
+          {hint && (
+            <div className="text-[10px] text-slate-500 mt-0.5">{hint}</div>
+          )}
+        </div>
+      </div>
+      <span
+        className={`font-mono whitespace-nowrap mr-2 ${
+          isZero ? "text-slate-400" : "text-slate-800 font-bold"
+        }`}
+        dir="ltr"
+      >
         {formatEGP(value)}
       </span>
     </div>
