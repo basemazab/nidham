@@ -60,6 +60,7 @@ const NAV_ITEMS: readonly NavItem[] = [
   { href: "/dashboard/shifts", label: "الورديات", icon: "🕒", section: "main", feature: "shifts_rotations" },
   { href: "/dashboard/payroll", label: "الرواتب", icon: "💰", section: "main", feature: "payroll" },
   { href: "/dashboard/loans", label: "السلف والمرتجعات 💵", icon: "💵", section: "main", feature: "payroll" },
+  { href: "/dashboard/eos-calculator", label: "مكافأة نهاية الخدمة ⚖", icon: "⚖", section: "main", feature: "payroll" },
   { href: "/dashboard/requests", label: "طلبات الموظفين", icon: "📨", section: "main", feature: "requests" },
   { href: "/dashboard/jobs", label: "التوظيف ✦", icon: "🎯", section: "main", feature: "recruitment" },
 
