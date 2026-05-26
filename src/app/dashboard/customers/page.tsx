@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getMyProfile } from "@/lib/permissions";
 import { formatEGP } from "@/lib/format";
+import { ensureSelfEmployee } from "@/lib/ensure-self-employee";
+import { QuickLogModal } from "./quick-log-modal";
 
 type Customer = {
   id: string;
@@ -54,6 +56,27 @@ export default async function CustomersPage() {
   // SELECT customers across every tenant otherwise.
   const { profile } = await getMyProfile();
   const callerCompanyId = profile?.company_id ?? "";
+
+  // For the QuickLogModal — we need the current user's employee_id to
+  // satisfy interactions.employee_id NOT NULL. CRM-only customers may
+  // not have an employee record yet; ensureSelfEmployee creates one if
+  // needed (uses service-role to bypass RLS).
+  const { data: { user: currentUser } } = await supabase.auth.getUser();
+  let currentEmployeeId = "";
+  if (currentUser && callerCompanyId) {
+    try {
+      currentEmployeeId = await ensureSelfEmployee(
+        supabase,
+        currentUser.id,
+        callerCompanyId,
+        profile?.full_name ?? undefined,
+        currentUser.email ?? undefined,
+      );
+    } catch (err) {
+      // Logging is enough — the button just won't render
+      console.warn("[customers] ensureSelfEmployee failed:", err);
+    }
+  }
 
   const { data: customers } = await supabase
     .from("customers")
@@ -234,12 +257,21 @@ export default async function CustomersPage() {
                         {formatEGP(customer.estimated_value)}
                       </td>
                       <td className="px-5 py-4">
-                        <Link
-                          href={`/dashboard/customers/${customer.id}`}
-                          className="text-xs text-brand-cyan-dark hover:text-brand-cyan font-cairo font-bold"
-                        >
-                          تعديل
-                        </Link>
+                        <div className="flex items-center gap-2 justify-end">
+                          {currentEmployeeId && (
+                            <QuickLogModal
+                              customerId={customer.id}
+                              customerName={customer.full_name}
+                              employeeId={currentEmployeeId}
+                            />
+                          )}
+                          <Link
+                            href={`/dashboard/customers/${customer.id}`}
+                            className="text-xs text-brand-cyan-dark hover:text-brand-cyan font-cairo font-bold"
+                          >
+                            تعديل
+                          </Link>
+                        </div>
                       </td>
                     </tr>
                   );
