@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import { checkLoginRateLimit } from "@/lib/rate-limit";
 import { validatePassword } from "@/lib/password";
 
@@ -183,12 +184,21 @@ export async function signup(formData: FormData) {
 
   // M1 — CRM-only path: hide HR features for this tenant. The sidebar
   // reads `tenant_feature_overrides` and removes any module whose
-  // feature_key is set to enabled=false (mig 041). We insert one row
-  // per HR feature so the customer's first dashboard render is CRM-pure.
+  // feature_key is set to enabled=false (mig 041).
+  //
+  // BUG fix: the RLS policy on tenant_feature_overrides only allows
+  // super_admin to INSERT/UPDATE. The newly-signed-up user is NOT a
+  // super_admin, so the regular `supabase` client's upsert silently
+  // fails (no error thrown, just zero rows affected).
+  //
+  // The fix: use the SERVICE-ROLE client for this one operation. It
+  // bypasses RLS because we trust the server-side signup action to do
+  // the right thing — we just inserted the user ourselves a few lines
+  // up, so we know exactly which company_id is theirs.
   const isCrmOnlyPlan = planSignal.startsWith("crm");
   if (isCrmOnlyPlan && data?.user?.id) {
-    // Look up the company_id the user was just attached to via the
-    // signup trigger (mig 001 creates company + profile).
+    // Look up the company_id via the regular client (RLS lets users
+    // read their own profile)
     const { data: profile } = await supabase
       .from("profiles")
       .select("company_id")
@@ -215,13 +225,29 @@ export async function signup(formData: FormData) {
         reason: `Auto-applied on signup with plan=${planSignal}`,
       }));
 
-      // ignoreDuplicates so a re-signup race doesn't error out
-      await supabase
-        .from("tenant_feature_overrides")
-        .upsert(overrideRows, {
-          onConflict: "company_id,feature_key",
-          ignoreDuplicates: false,
-        });
+      // ⚠ Use service-role client to bypass the super-admin-only RLS
+      // on tenant_feature_overrides. We're the server, we just
+      // created this user, we know what we're doing.
+      try {
+        const serviceClient = createServiceClient();
+        const { error: overrideErr } = await serviceClient
+          .from("tenant_feature_overrides")
+          .upsert(overrideRows, {
+            onConflict: "company_id,feature_key",
+            ignoreDuplicates: false,
+          });
+        if (overrideErr) {
+          console.error(
+            "[signup] failed to apply CRM-only overrides:",
+            overrideErr,
+          );
+        }
+      } catch (err) {
+        // Service-role key not configured (local dev / wrong env). Log
+        // but don't fail the signup — the user lands in the full
+        // dashboard, which is a degraded but non-broken state.
+        console.error("[signup] service client error:", err);
+      }
     }
   }
 
