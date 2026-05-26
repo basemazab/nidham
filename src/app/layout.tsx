@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Tajawal, Cairo, Reem_Kufi } from "next/font/google";
 import { Suspense } from "react";
 import { Toaster } from "sonner";
@@ -6,6 +6,7 @@ import "./globals.css";
 import { UrlToasts } from "@/components/url-toasts";
 import { ThemeProvider } from "@/components/theme-provider";
 import { MetaPixel } from "@/components/meta-pixel";
+import { PWAInstaller } from "@/components/pwa-installer";
 
 const tajawal = Tajawal({
   variable: "--font-tajawal",
@@ -31,6 +32,17 @@ const reemKufi = Reem_Kufi({
 const siteUrl =
   process.env.NEXT_PUBLIC_SITE_URL ?? "https://nidhamhr.com";
 
+// Viewport must be in its own export per Next.js 15+ convention. The
+// theme-color paints the Android status bar + iOS PWA chrome to match
+// our brand cyan so the installed app feels integrated, not webview-y.
+export const viewport: Viewport = {
+  themeColor: "#0891b2",
+  width: "device-width",
+  initialScale: 1,
+  // iOS-only: prevent zoom on input focus (annoying on signup forms)
+  maximumScale: 5,
+};
+
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
@@ -40,9 +52,20 @@ export const metadata: Metadata = {
   description:
     "نظام واحد بدل خمس أنظمة منفصلة. HR + CRM + ذكاء اصطناعي. متوافق مع قانون العمل المصري 12/2003 وقانون التأمينات 148/2019. حضور بالـ GPS، رواتب آلية، فحص CVs بالـ AI.",
   applicationName: "Nidham",
+  // PWA / install metadata
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Nidham",
+  },
+  formatDetection: {
+    telephone: false,
+  },
   icons: {
     icon: "/icon.svg",
     apple: "/icon.svg",
+    shortcut: "/icon.svg",
   },
   openGraph: {
     type: "website",
@@ -110,6 +133,10 @@ export default function RootLayout({
               Vercel env. Lives outside ThemeProvider so theme transitions
               don't trigger spurious PageView re-fires. */}
           <MetaPixel />
+          {/* PWA bootstrap — registers the service worker + captures the
+              `beforeinstallprompt` event so <PWAInstallButton /> can fire
+              it on user demand. Headless component. */}
+          <PWAInstaller />
         </ThemeProvider>
       </body>
     </html>

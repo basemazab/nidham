@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { RetentionBanner } from "@/components/retention-banner";
 import { SmartInsights } from "@/components/smart-insights";
+import { PWAInstallButton } from "@/components/pwa-install-button";
 
 type Profile = {
   full_name: string | null;
@@ -270,6 +271,11 @@ export default async function DashboardPage({
               <p className="inline-block text-brand-cyan-dark font-bold font-mono bg-cyan-50 px-3 py-1.5 rounded-lg text-xs">
                 {user.email}
               </p>
+              {/* Install-as-app CTA — only renders on installable browsers
+                  when the app isn't already a standalone window. */}
+              <div className="mt-3">
+                <PWAInstallButton />
+              </div>
             </div>
 
             {/* Subscription badge */}

@@ -17,6 +17,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { PWAInstallButton } from "@/components/pwa-install-button";
 
 type Props = {
   employeeId: string;
@@ -286,6 +287,12 @@ export function ClockInClient(props: Props) {
                 ? "خلصت يومك — لقاء الغد!"
                 : "ابدأ بتسجيل حضورك"}
           </p>
+          {/* PWA install nudge — only shows on installable browsers when
+              the app isn't already installed. Helps employees launch
+              clock-in from home screen instead of typing the URL daily. */}
+          <div className="mt-3">
+            <PWAInstallButton />
+          </div>
         </header>
 
         {/* Status pills (today's current state) */}
