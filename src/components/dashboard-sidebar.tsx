@@ -71,6 +71,7 @@ const NAV_ITEMS: readonly NavItem[] = [
 
   // Forms hub + compliance — always visible (no feature gate, useful to all tiers)
   { href: "/dashboard/forms", label: "النماذج 📋", icon: "📄", section: "main" },
+  { href: "/dashboard/signatures", label: "توقيع إلكتروني ✍", icon: "✍", section: "main", feature: "employees" },
   { href: "/dashboard/compliance", label: "دليل الامتثال ⚖", icon: "🏛", section: "main" },
 
   // Admin-only
