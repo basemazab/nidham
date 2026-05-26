@@ -19,6 +19,86 @@ import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { PWAInstallButton } from "@/components/pwa-install-button";
 
+// ============================================================================
+// In-app browser detection
+// ============================================================================
+// WhatsApp / Facebook / Instagram open external links in their OWN in-app
+// browser instead of Safari/Chrome. These browsers:
+//   - Cannot access the camera (getUserMedia silently fails or returns
+//     a black video element)
+//   - Cannot install PWAs (no Share button visible)
+//   - Have aggressive cookie restrictions
+//
+// Critical for our flow: HR sends the /clock-in link via WhatsApp →
+// employee taps it → opens in WhatsApp's browser → camera broken.
+// We detect this client-side and prompt the user to switch browsers.
+type BrowserHost =
+  | "safari"
+  | "chrome"
+  | "whatsapp"
+  | "facebook"
+  | "instagram"
+  | "messenger"
+  | "tiktok"
+  | "snapchat"
+  | "telegram"
+  | "twitter"
+  | "linkedin"
+  | "other_in_app"
+  | "unknown";
+
+function detectBrowserHost(): BrowserHost {
+  if (typeof navigator === "undefined") return "unknown";
+  const ua = navigator.userAgent;
+
+  // In-app browsers — order matters; WhatsApp UA contains "Safari" so
+  // we MUST check for the specific in-app markers first.
+  if (/WhatsApp/i.test(ua)) return "whatsapp";
+  if (/FBAN|FBAV|FB_IAB|Facebook/i.test(ua)) return "facebook";
+  if (/Instagram/i.test(ua)) return "instagram";
+  if (/Messenger/i.test(ua)) return "messenger";
+  if (/TikTok|Bytedance|musical_ly/i.test(ua)) return "tiktok";
+  if (/Snapchat/i.test(ua)) return "snapchat";
+  if (/Telegram/i.test(ua)) return "telegram";
+  if (/Twitter|TwitterAndroid/i.test(ua)) return "twitter";
+  if (/LinkedInApp/i.test(ua)) return "linkedin";
+
+  // Standard browsers
+  if (/CriOS|Chrome/i.test(ua)) return "chrome";
+  if (/Safari/i.test(ua)) return "safari";
+
+  return "unknown";
+}
+
+const IN_APP_HOSTS: ReadonlySet<BrowserHost> = new Set([
+  "whatsapp",
+  "facebook",
+  "instagram",
+  "messenger",
+  "tiktok",
+  "snapchat",
+  "telegram",
+  "twitter",
+  "linkedin",
+  "other_in_app",
+]);
+
+const HOST_LABELS: Record<BrowserHost, string> = {
+  whatsapp: "WhatsApp",
+  facebook: "Facebook",
+  instagram: "Instagram",
+  messenger: "Messenger",
+  tiktok: "TikTok",
+  snapchat: "Snapchat",
+  telegram: "Telegram",
+  twitter: "Twitter / X",
+  linkedin: "LinkedIn",
+  other_in_app: "تطبيق آخر",
+  safari: "Safari",
+  chrome: "Chrome",
+  unknown: "متصفح",
+};
+
 type Props = {
   employeeId: string;
   employeeName: string;
@@ -82,11 +162,63 @@ export function ClockInClient(props: Props) {
   const [checkedInAt, setCheckedInAt] = useState<string | null>(initialCheckedIn);
   const [checkedOutAt, setCheckedOutAt] = useState<string | null>(initialCheckedOut);
 
+  // Detect in-app browser AFTER mount to avoid hydration mismatch (server
+  // can't know userAgent reliably). Default to "unknown" until we know.
+  const [browserHost, setBrowserHost] = useState<BrowserHost>("unknown");
+  const [isIos, setIsIos] = useState(false);
+  const [copyDone, setCopyDone] = useState(false);
+
+  useEffect(() => {
+    setBrowserHost(detectBrowserHost());
+    setIsIos(/iPad|iPhone|iPod/.test(navigator.userAgent));
+  }, []);
+
+  const isInAppBrowser = IN_APP_HOSTS.has(browserHost);
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
   const isCheckOut = checkedInAt !== null && checkedOutAt === null;
   const isAlreadyDone = checkedInAt !== null && checkedOutAt !== null;
+
+  // Helper: try to open the current URL in the system browser.
+  // On iOS, x-safari-https:// is the standard way to force-launch Safari
+  // from a webview. On Android, intent:// is the equivalent for Chrome.
+  const openInSystemBrowser = () => {
+    const currentUrl =
+      typeof window !== "undefined" ? window.location.href : "";
+    if (!currentUrl) return;
+    if (isIos) {
+      // x-safari-https:// only works on iOS Safari handler. Strip the
+      // scheme prefix to reuse the original URL.
+      const stripped = currentUrl.replace(/^https?:\/\//, "");
+      window.location.href = `x-safari-https://${stripped}`;
+    } else {
+      // Android intent: scheme — Chrome registers itself as a handler
+      const stripped = currentUrl.replace(/^https?:\/\//, "");
+      window.location.href = `intent://${stripped}#Intent;scheme=https;package=com.android.chrome;end`;
+    }
+  };
+
+  const copyUrlToClipboard = async () => {
+    const url = typeof window !== "undefined" ? window.location.href : "";
+    if (!url) return;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopyDone(true);
+      setTimeout(() => setCopyDone(false), 3000);
+    } catch {
+      // Fallback for older browsers — create a temp input
+      const tmp = document.createElement("input");
+      tmp.value = url;
+      document.body.appendChild(tmp);
+      tmp.select();
+      document.execCommand("copy");
+      document.body.removeChild(tmp);
+      setCopyDone(true);
+      setTimeout(() => setCopyDone(false), 3000);
+    }
+  };
 
   // ── Phase 1: request geolocation ──
   const requestLocation = () => {
@@ -121,6 +253,17 @@ export function ClockInClient(props: Props) {
   };
 
   // ── Phase 2: open the camera ──
+  //
+  // SUBTLE BUG WE HIT: the <video ref={videoRef}> element is rendered
+  // INSIDE `{phase === "camera_on" && ...}`. If we attach the stream
+  // BEFORE setPhase, videoRef.current is still null (element not mounted).
+  // Attaching AFTER setPhase doesn't work either because React batches
+  // the re-render — the ref isn't populated until the render flushes.
+  //
+  // Fix: stash the stream in streamRef, then setPhase, then let a
+  // useEffect below (watching phase) attach the stream once React has
+  // rendered the <video> element. This guarantees ref.current is non-null
+  // by the time we touch it.
   const openCamera = async () => {
     setError("");
     try {
@@ -129,16 +272,36 @@ export function ClockInClient(props: Props) {
         audio: false,
       });
       streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
-      setPhase("camera_on");
-    } catch {
-      setError("ما قدرناش نشغّل الكاميرا. اسمح للكاميرا من إعدادات المتصفح.");
+      setPhase("camera_on"); // useEffect below attaches the stream
+    } catch (err) {
+      // Surface a more helpful message based on the error type — iOS Safari
+      // gives different reasons (PermissionDenied, NotAllowedError, etc.)
+      const name = err instanceof Error ? err.name : "";
+      const friendly =
+        name === "NotAllowedError" || name === "PermissionDeniedError"
+          ? "اسمح للكاميرا من إعدادات المتصفح وحاول تاني"
+          : name === "NotFoundError"
+            ? "الجهاز ده مفيش فيه كاميرا أمامية"
+            : name === "NotReadableError"
+              ? "الكاميرا مشغولة من تطبيق تاني — اقفل التطبيقات وحاول تاني"
+              : "ما قدرناش نشغّل الكاميرا. حاول تاني أو افتح اللينك في Safari/Chrome";
+      setError(friendly);
       setPhase("error");
     }
   };
+
+  // Attach the media stream once React has rendered the <video> element.
+  // Fires after every transition to "camera_on" — guarantees videoRef is
+  // populated. play() may need a user gesture on iOS; we already had one
+  // (the "open camera" tap) so it should pass.
+  useEffect(() => {
+    if (phase !== "camera_on") return;
+    if (!videoRef.current || !streamRef.current) return;
+    videoRef.current.srcObject = streamRef.current;
+    videoRef.current.play().catch((err) => {
+      console.warn("[clock-in] video play failed:", err);
+    });
+  }, [phase]);
 
   // ── Phase 3: capture selfie ──
   const captureSelfie = () => {
@@ -272,6 +435,69 @@ export function ClockInClient(props: Props) {
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-cyan-50 p-4 font-cairo">
       <div className="max-w-md mx-auto pt-6">
+        {/* ──────────────────────────────────────────────────────────────
+            CRITICAL: In-app browser warning
+            ──────────────────────────────────────────────────────────────
+            WhatsApp / Facebook / Instagram / Telegram open external links
+            in their own in-app browser, which BLOCKS:
+              ✗ Camera (getUserMedia returns black video)
+              ✗ PWA install (no Share button)
+              ✗ Cookies between sessions
+            Without this banner, the employee would just see broken UI
+            and assume the app is broken. Shown ABOVE everything else so
+            they fix the issue before tapping anything. */}
+        {isInAppBrowser && (
+          <div className="mb-5 bg-gradient-to-br from-amber-50 to-rose-50 border-2 border-amber-300 rounded-2xl p-4 shadow-md">
+            <div className="flex items-start gap-3 mb-3">
+              <span className="text-3xl">⚠</span>
+              <div className="flex-1">
+                <h2 className="font-black text-amber-900 mb-1">
+                  افتح اللينك في متصفّحك
+                </h2>
+                <p className="text-xs text-amber-800 leading-relaxed">
+                  أنت بتفتح الصفحة من جوّه{" "}
+                  <strong>{HOST_LABELS[browserHost]}</strong>، والكاميرا
+                  والـ GPS ما يقدروش يشتغلوا هنا. لازم تفتح اللينك في{" "}
+                  <strong>{isIos ? "Safari" : "Chrome"}</strong> علشان كل
+                  حاجة تشتغل صح.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={openInSystemBrowser}
+                className="w-full px-4 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-bold text-sm shadow-md transition active:scale-95"
+              >
+                🌐 افتح في {isIos ? "Safari" : "Chrome"}
+              </button>
+
+              <button
+                type="button"
+                onClick={copyUrlToClipboard}
+                className="w-full px-4 py-3 rounded-xl bg-white border-2 border-amber-300 hover:border-amber-500 text-amber-900 font-bold text-sm transition active:scale-95"
+              >
+                {copyDone ? "✓ اتنسخ — افتح المتصفح والصق" : "📋 انسخ الرابط"}
+              </button>
+            </div>
+
+            <details className="mt-3 text-xs text-amber-800">
+              <summary className="cursor-pointer font-bold">
+                مش شغّال؟ اعمل ده يدوياً ←
+              </summary>
+              <ol className="mt-2 space-y-1 list-decimal pr-5 leading-relaxed">
+                <li>اضغط على القائمة (الـ <strong>...</strong> أو الـ ٣ نقط)</li>
+                <li>
+                  لاقي <strong>"Open in {isIos ? "Safari" : "Chrome"}"</strong>{" "}
+                  أو <strong>"Open in Browser"</strong>
+                </li>
+                <li>أو ابسط: انسخ الرابط افتح متصفحك والصقه</li>
+              </ol>
+            </details>
+          </div>
+        )}
+
         {/* Header */}
         <header className="text-center mb-5">
           <div className="text-xs text-slate-500 tracking-widest font-bold uppercase mb-1">
@@ -288,11 +514,13 @@ export function ClockInClient(props: Props) {
                 : "ابدأ بتسجيل حضورك"}
           </p>
           {/* PWA install nudge — only shows on installable browsers when
-              the app isn't already installed. Helps employees launch
-              clock-in from home screen instead of typing the URL daily. */}
-          <div className="mt-3">
-            <PWAInstallButton />
-          </div>
+              the app isn't already installed. Hidden in in-app browsers
+              because they can't install PWAs anyway. */}
+          {!isInAppBrowser && (
+            <div className="mt-3">
+              <PWAInstallButton />
+            </div>
+          )}
         </header>
 
         {/* Status pills (today's current state) */}
