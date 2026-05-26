@@ -96,19 +96,19 @@ CLS (Cumulative Layout Shift):   < 0.1
 
 ## 4. Content Strategy — 30 blog posts roadmap
 
-### Month 1 (high-intent, immediate ranking targets)
-1. **"أفضل نظام HR مصري 2026 — مقارنة شاملة"** (covers Bayzat/ZenHR alternatives)
-2. **"كيف تحسب مرتب موظف في مصر 2026 — دليل خطوة بخطوة"** (calculator)
-3. **"شرح نموذج 1 تأمينات اجتماعية + تحميل النموذج جاهز"** (free download magnet)
-4. **"حساب نهاية الخدمة حسب قانون العمل 12/2003 — حاسبة مجانية"** (calculator + tutorial)
-5. **"ازاي تستخرج شهادة خبرة في 3 دقائق"** (link to Nidham forms module)
+### Month 1 (high-intent, immediate ranking targets) — **5/5 SHIPPED ✅**
+1. ✅ **"أفضل بديل لـ Bayzat في مصر 2026"** — `/blog/bayzat-alternative-egypt-2026` (targets very-low-difficulty "Bayzat alternative Egypt")
+2. ✅ **"كيف تحسب مرتب موظف في مصر 2026"** — `/blog/how-to-calculate-egypt-salary-2026` (high commercial intent, calculator searches)
+3. ✅ **"نموذج 1 تأمينات اجتماعية — الشرح الكامل"** — `/blog/social-insurance-form-1-egypt` (very-high HR-manager intent)
+4. ✅ **"حساب نهاية الخدمة في مصر — قانون 12/2003"** — `/blog/end-of-service-calculator-egypt` (high commercial intent, calculator)
+5. ✅ **"Excel vs نظام HR — متى تنتقل؟"** — `/blog/excel-vs-hr-system-egypt` (comparison shopping intent)
 
-### Month 2 (feature-led, mid-funnel)
-6. **"نظام حضور وانصراف بالـ GPS — هل يصلح للشركات المصرية؟"**
-7. **"بوت WhatsApp للموظفين — كيف يوفر 4 ساعات أسبوعياً للـ HR"**
-8. **"التوقيع الإلكتروني في مصر — هل قانوني؟ + خطوات التطبيق"**
-9. **"7 أسباب لتحديث نظام HR في شركتك خلال 2026"**
-10. **"Excel vs نظام HR — متى تنتقل؟"**
+### Month 2 (feature-led, mid-funnel) — **5/5 SHIPPED ✅**
+6. ✅ **"بوت WhatsApp للموظفين"** — `/blog/whatsapp-bot-for-employees-egypt` (differentiator)
+7. ✅ **"نظام حضور وانصراف بالـ GPS"** — `/blog/gps-attendance-system-egypt`
+8. ✅ **"التوقيع الإلكتروني في مصر — هل قانوني؟"** — `/blog/e-signature-legality-egypt`
+9. ✅ **"7 أخطاء HR شائعة في الشركات المصرية"** — `/blog/7-hr-mistakes-egyptian-companies` (listicle)
+10. ✅ **"ازاي تستخرج شهادة خبرة في 3 دقايق"** — `/blog/experience-certificate-egypt-tutorial`
 
 ### Month 3 (authority builders, long-form)
 11-30. Mix of: case studies (CircleCode style — anonymized), legal explainers (قانون العمل أهم 10 مواد), tutorials (10 dashboard walkthroughs).

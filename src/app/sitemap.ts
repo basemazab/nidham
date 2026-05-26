@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { POSTS } from "@/lib/blog/posts";
 
 // ============================================================================
 // /sitemap.xml — Next.js auto-generates this from app/sitemap.ts
@@ -147,7 +148,92 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "monthly",
       priority: 0.4,
     },
+
+    // ── Blog ──
+    // Index gets higher priority than individual posts because it links
+    // out to everything else. Posts inherit `weekly` so Google revisits
+    // them — we update content + add new posts continuously.
+    {
+      url: `${SITE}/blog`,
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 0.7,
+    },
+
+    // ── Free tools (link magnets) ──
+    // Each calculator is a high-intent landing page. Hub at /tools links
+    // to all of them. Priority 0.8 for the hub because it's a strong
+    // ranking target on its own ("أدوات HR مجانية").
+    {
+      url: `${SITE}/tools`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.8,
+    },
+    {
+      url: `${SITE}/tools/salary-calculator`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.8,
+    },
+    {
+      url: `${SITE}/tools/end-of-service`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.7,
+    },
+    {
+      url: `${SITE}/tools/social-insurance`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.7,
+    },
+
+    // ── Industry landing pages ──
+    // Each industry page targets high-intent industry-specific keywords
+    // (e.g. "نظام HR للمصانع" — much higher conversion than generic terms).
+    {
+      url: `${SITE}/industries`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.8,
+    },
+    {
+      url: `${SITE}/industries/manufacturing`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.7,
+    },
+    {
+      url: `${SITE}/industries/logistics`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.7,
+    },
+    {
+      url: `${SITE}/industries/restaurants`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.7,
+    },
+    {
+      url: `${SITE}/industries/retail`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.7,
+    },
   ];
+
+  // Blog posts — generated from the POSTS registry. Each entry uses the
+  // post's `updatedAt` so Google picks up content revisions immediately.
+  for (const post of POSTS) {
+    entries.push({
+      url: `${SITE}/blog/${post.slug}`,
+      lastModified: new Date(post.updatedAt),
+      changeFrequency: "monthly",
+      priority: 0.6,
+    });
+  }
 
   return entries;
 }

@@ -180,6 +180,69 @@ export function FAQPageSchema({
   );
 }
 
+// ── BlogPosting (Article rich result for /blog/[slug]) ──
+//
+// Triggers the Article-style search result with author, publish date, and
+// the "Top stories" carousel eligibility. Per Google's policy, this needs:
+//   • headline (≤ 110 chars)
+//   • datePublished + dateModified in ISO-8601
+//   • author with @type Person (NOT just a string)
+//   • publisher referencing OrganizationSchema via @id
+//
+// We don't include `image` here because we don't have post-specific OG
+// images yet — when we do, add it via the `image` prop (absolute URL).
+export function BlogPostingSchema({
+  slug,
+  title,
+  description,
+  author,
+  publishedAt,
+  updatedAt,
+  tags,
+  image,
+}: {
+  slug: string;
+  title: string;
+  description: string;
+  author: string;
+  publishedAt: string;
+  updatedAt: string;
+  tags?: string[];
+  image?: string;
+}) {
+  const url = `${SITE}/blog/${slug}`;
+  const schema = {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    "@id": `${url}#blogposting`,
+    headline: title,
+    description,
+    url,
+    mainEntityOfPage: {
+      "@type": "WebPage",
+      "@id": url,
+    },
+    datePublished: publishedAt,
+    dateModified: updatedAt,
+    author: {
+      "@type": "Person",
+      name: author,
+    },
+    publisher: {
+      "@id": `${SITE}/#organization`,
+    },
+    inLanguage: "ar-EG",
+    ...(image ? { image: image.startsWith("http") ? image : `${SITE}${image}` } : {}),
+    ...(tags && tags.length > 0 ? { keywords: tags.join(", ") } : {}),
+  };
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+    />
+  );
+}
+
 // ── Breadcrumb (cleaner search result presentation) ──
 export function BreadcrumbSchema({
   items,
