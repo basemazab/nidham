@@ -173,6 +173,93 @@ export default function ProductPage() {
           ))}
         </div>
 
+        {/* ──────────────────────────────────────────────────────────
+            New features 2026 — added after Basem's expansion sprint.
+            Compact grid (not full feature blocks) so the page doesn't
+            explode in length, but every new capability gets visibility.
+            ────────────────────────────────────────────────────────── */}
+        <section className="mb-16 p-8 rounded-3xl bg-gradient-to-br from-amber-50 via-cyan-50 to-white border-2 border-amber-200">
+          <div className="text-center mb-8">
+            <div className="inline-block px-4 py-1.5 rounded-full bg-amber-100 border border-amber-300 text-amber-800 text-xs font-bold mb-3 font-cairo">
+              ✦ جديد 2026 — أضفناه بناءً على طلبات العملاء
+            </div>
+            <h2 className="text-3xl font-black font-cairo text-slate-900 mb-2">
+              ٩ مميزات جديدة في إصدار هذا الشهر
+            </h2>
+            <p className="text-sm text-slate-600 font-cairo max-w-2xl mx-auto">
+              مفيش نظام HR مصري تاني عنده الميزات دي. كلها مبنية للسوق المصري
+              وبتشتغل من اليوم الأول.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <NewFeatureCard
+              emoji="🤖"
+              title="المساعد الذكي بالعربي"
+              desc="١٥ أداة AI تنفذ مهام HR فعلياً — قفل المرتبات، تحليل الاحتفاظ، فحص CVs."
+              href="/dashboard/ai"
+              badge="Pro"
+            />
+            <NewFeatureCard
+              emoji="💬"
+              title="بوت WhatsApp للموظفين"
+              desc='موظف يكتب "كم رصيد إجازاتي" → رد فوري على واتساب. ٦ أوامر مدعومة.'
+              href="/dashboard/whatsapp-test"
+              badge="Pro"
+            />
+            <NewFeatureCard
+              emoji="📍"
+              title="حضور بالـ GPS + سيلفي"
+              desc="الموظف يفتح اللينك من موبايله → GPS + صورة → اتسجّل حضوره."
+              href="/clock-in"
+            />
+            <NewFeatureCard
+              emoji="✍"
+              title="التوقيع الإلكتروني"
+              desc="ابعت عقد على واتساب → الموظف يوقّع بإصبعه على الموبايل في ثواني."
+              href="/dashboard/signatures"
+            />
+            <NewFeatureCard
+              emoji="⚖"
+              title="حاسبة نهاية الخدمة"
+              desc="حساب EOS حسب قانون 12/2003 — تفصيل سنة بسنة بالقيمة الفعلية."
+              href="/dashboard/eos-calculator"
+            />
+            <NewFeatureCard
+              emoji="💵"
+              title="السلف والمرتجعات"
+              desc="موظف يطلب سلفة → HR يعتمد → خصم تلقائي شهري من الراتب."
+              href="/dashboard/loans"
+            />
+            <NewFeatureCard
+              emoji="📊"
+              title="لوحة تحليلات متقدمة"
+              desc="٧ رسوم بيانية: تطور العدد، نمط التأخير، توزيع المرتبات، مخاطر الاستقالة."
+              href="/dashboard/analytics"
+            />
+            <NewFeatureCard
+              emoji="🎉"
+              title="ذكريات تعيين + أعياد ميلاد"
+              desc="تنبيه فوري قبل أي ذكرى + زرار 'تهنّي على واتساب' برسالة جاهزة."
+              href="/dashboard/celebrations"
+            />
+            <NewFeatureCard
+              emoji="🎨"
+              title="Onboarding wizard"
+              desc="الموظف الجديد يفتح اللينك ويسجّل نفسه — بدون ما HR يكتب عنه أي بيانات."
+              href="/onboard"
+            />
+          </div>
+
+          <div className="mt-6 p-4 rounded-xl bg-white border border-amber-200 font-cairo text-center">
+            <p className="text-sm text-slate-700">
+              ✦ <strong>ميزة إضافية مجانية:</strong> النظام يعمل كـ <strong>PWA</strong> —
+              الموظف يفتح اللينك من موبايله ويضغط "Add to Home Screen" يبقى عنده
+              تطبيق Nidham بدون ما تدفع لـ Apple أو Google رسوم.
+            </p>
+          </div>
+        </section>
+
         {/* Demo CTA */}
         <section className="p-8 rounded-3xl bg-gradient-to-br from-brand-cyan-dark via-brand-navy to-slate-900 text-white text-center mb-12">
           <h2 className="text-3xl font-black font-cairo mb-3">
@@ -530,5 +617,41 @@ function Stat({
       <div className="text-[10px] text-slate-500 font-bold">{label}</div>
       <div className="text-base font-black text-slate-800">{value}</div>
     </div>
+  );
+}
+
+// New-features compact card — used in the 2026 features grid.
+// Links into the live page so visitors who are already signed in can
+// click straight through. Pro/Enterprise gating still applies on the
+// destination page (so this isn't an exfil risk).
+function NewFeatureCard({
+  emoji,
+  title,
+  desc,
+  href,
+  badge,
+}: {
+  emoji: string;
+  title: string;
+  desc: string;
+  href: string;
+  badge?: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="block p-4 rounded-2xl bg-white border-2 border-slate-100 hover:border-amber-300 hover:shadow-md hover:-translate-y-0.5 transition-all font-cairo"
+    >
+      <div className="flex items-start justify-between mb-2">
+        <div className="text-3xl">{emoji}</div>
+        {badge && (
+          <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold border border-amber-300">
+            {badge}
+          </span>
+        )}
+      </div>
+      <h3 className="font-black text-slate-900 text-base mb-1">{title}</h3>
+      <p className="text-xs text-slate-600 leading-relaxed">{desc}</p>
+    </Link>
   );
 }
