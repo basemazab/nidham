@@ -11,6 +11,7 @@ type PageProps = {
 
 type Entry = {
   id: string;
+  employee_id: string;
   attended_days: number;
   half_day_days: number;
   leave_days: number;
@@ -34,17 +35,6 @@ type Entry = {
   eos_gratuity: number;
   net_salary: number;
   notes: string | null;
-  employees: {
-    full_name: string;
-    employee_code: string | null;
-    job_title: string | null;
-    department: string | null;
-    national_id: string | null;
-    social_insurance_number: string | null;
-    bank_name: string | null;
-    bank_account_number: string | null;
-    hire_date: string | null;
-  } | null;
   payroll_periods: {
     year: number;
     month: number;
@@ -55,6 +45,36 @@ type Entry = {
     status: string;
     paid_at: string | null;
   } | null;
+};
+
+type EmployeeWithPII = {
+  id: string;
+  full_name: string;
+  employee_code: string | null;
+  job_title: string | null;
+  department: string | null;
+  hire_date: string | null;
+  national_id_dec: string | null;
+  social_insurance_number_dec: string | null;
+  bank_name_dec: string | null;
+  bank_account_number_dec: string | null;
+};
+
+type Loan = {
+  id: string;
+  amount: number;
+  monthly_installment: number;
+  remaining_amount: number;
+  status: string;
+  reason: string | null;
+  requested_at: string;
+};
+
+type AttendanceDay = {
+  date: string;
+  status: string;
+  tardiness_minutes: number | null;
+  early_leave_minutes: number | null;
 };
 
 type Company = {
@@ -80,15 +100,89 @@ export default async function PayslipPage({ params }: PageProps) {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  // 1. Payroll entry + period (joined). We DON'T join employees here
+  //    because the employees table has the PII columns nulled after the
+  //    encryption trigger (mig 050). We read the DECRYPTED PII below
+  //    from employees_with_pii instead.
   const { data: entry } = await supabase
     .from("payroll_entries")
     .select(
-      "*, employees(full_name, employee_code, job_title, department, national_id, social_insurance_number, bank_name, bank_account_number, hire_date), payroll_periods(year, month, frequency, start_date, end_date, working_days, status, paid_at)",
+      "*, payroll_periods(year, month, frequency, start_date, end_date, working_days, status, paid_at)",
     )
     .eq("id", entryId)
     .single<Entry>();
 
   if (!entry) notFound();
+
+  // 2. Employee with decrypted PII (mig 067 grants pii_decrypt to
+  //    authenticated, so this returns proper values now — fixes the
+  //    old "—" display for national_id and bank info).
+  const { data: emp } = await supabase
+    .from("employees_with_pii")
+    .select(
+      "id, full_name, employee_code, job_title, department, hire_date, national_id_dec, social_insurance_number_dec, bank_name_dec, bank_account_number_dec",
+    )
+    .eq("id", entry.employee_id)
+    .maybeSingle<EmployeeWithPII>();
+
+  // 3. ALL loans for this employee (lifetime). Used to show:
+  //      • Total taken (sum of all amounts)
+  //      • Total paid back (sum of payments)
+  //      • Total remaining outstanding (sum across active loans)
+  //    This is exactly what the user asked for: "إجمالي السلف اللي اخدها".
+  const { data: loans } = await supabase
+    .from("employee_loans")
+    .select(
+      "id, amount, monthly_installment, remaining_amount, status, reason, requested_at",
+    )
+    .eq("employee_id", entry.employee_id)
+    .order("requested_at", { ascending: false })
+    .returns<Loan[]>();
+
+  const allLoans = loans ?? [];
+  const activeLoans = allLoans.filter(
+    (l) => l.status === "active" || l.status === "approved",
+  );
+  const totalLoanAmount = allLoans.reduce((s, l) => s + Number(l.amount), 0);
+  const totalLoanPaid = allLoans.reduce(
+    (s, l) => s + (Number(l.amount) - Number(l.remaining_amount)),
+    0,
+  );
+  const totalLoanRemaining = activeLoans.reduce(
+    (s, l) => s + Number(l.remaining_amount),
+    0,
+  );
+
+  // 4. Attendance details for the period — tardiness + early-leave
+  //    in MINUTES (not just the deduction amount). User explicitly
+  //    asked for this: "إجمالي التأخيرات".
+  const periodStart = entry.payroll_periods?.start_date;
+  const periodEnd = entry.payroll_periods?.end_date;
+  let attendance: AttendanceDay[] = [];
+  if (periodStart && periodEnd) {
+    const { data: attRows } = await supabase
+      .from("attendance")
+      .select("date, status, tardiness_minutes, early_leave_minutes")
+      .eq("employee_id", entry.employee_id)
+      .gte("date", periodStart)
+      .lte("date", periodEnd)
+      .returns<AttendanceDay[]>();
+    attendance = attRows ?? [];
+  }
+  const totalTardinessMinutes = attendance.reduce(
+    (s, r) => s + Number(r.tardiness_minutes ?? 0),
+    0,
+  );
+  const totalEarlyLeaveMinutes = attendance.reduce(
+    (s, r) => s + Number(r.early_leave_minutes ?? 0),
+    0,
+  );
+  const lateDaysCount = attendance.filter(
+    (r) => (r.tardiness_minutes ?? 0) > 0,
+  ).length;
+  const earlyLeaveDaysCount = attendance.filter(
+    (r) => (r.early_leave_minutes ?? 0) > 0,
+  ).length;
 
   // Company name for the header
   const { data: profile } = await supabase
@@ -108,7 +202,7 @@ export default async function PayslipPage({ params }: PageProps) {
   }
 
   const period = entry.payroll_periods;
-  const emp = entry.employees;
+  // (emp pulled separately above from employees_with_pii — see lines ~95)
   // Prefer the explicit cycle window (migration 026). Fall back to
   // year+month for any pre-026 row that wasn't backfilled.
   const monthLabel = period
@@ -186,12 +280,12 @@ export default async function PayslipPage({ params }: PageProps) {
             <Row label="كود الموظف" value={emp?.employee_code ?? "—"} mono />
             <Row
               label="الرقم القومي"
-              value={emp?.national_id ?? "—"}
+              value={emp?.national_id_dec ?? "—"}
               mono
             />
             <Row
               label="رقم التأمينات"
-              value={emp?.social_insurance_number ?? "—"}
+              value={emp?.social_insurance_number_dec ?? "—"}
               mono
             />
             <Row
@@ -202,10 +296,10 @@ export default async function PayslipPage({ params }: PageProps) {
           </div>
         </section>
 
-        {/* Attendance */}
+        {/* Attendance — days summary */}
         <section className="px-8 py-5 border-b border-slate-100 bg-slate-50/50">
           <h2 className="text-xs font-bold tracking-wider text-slate-400 uppercase mb-3 font-cairo">
-            الحضور والانصراف
+            الحضور والانصراف · ملخص الأيام
           </h2>
           <div className="grid grid-cols-4 gap-3 text-center text-sm font-cairo">
             <Stat label="حضور" value={String(entry.attended_days)} color="emerald" />
@@ -214,6 +308,49 @@ export default async function PayslipPage({ params }: PageProps) {
             <Stat label="غياب" value={String(entry.absent_days)} color="red" />
           </div>
         </section>
+
+        {/* NEW: Tardiness + early-leave MINUTES breakdown — explicit
+            transparency on the time-based deductions */}
+        {(totalTardinessMinutes > 0 || totalEarlyLeaveMinutes > 0) && (
+          <section className="px-8 py-5 border-b border-slate-100 bg-amber-50/40">
+            <h2 className="text-xs font-bold tracking-wider text-slate-400 uppercase mb-3 font-cairo">
+              تفصيل التأخير والانصراف المبكر
+            </h2>
+            <div className="grid grid-cols-2 gap-3 font-cairo text-sm">
+              <div className="bg-white border-2 border-amber-200 rounded-xl p-3">
+                <div className="text-[10px] text-amber-700 font-bold uppercase tracking-wider mb-1">
+                  ⏰ إجمالي التأخير في الشهر
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-3xl font-black text-amber-800 font-mono">
+                    {totalTardinessMinutes}
+                  </span>
+                  <span className="text-xs text-amber-700">دقيقة</span>
+                </div>
+                <div className="text-[10px] text-slate-500 mt-1">
+                  في {lateDaysCount} يوم تأخّرت فيهم
+                </div>
+              </div>
+              <div className="bg-white border-2 border-orange-200 rounded-xl p-3">
+                <div className="text-[10px] text-orange-700 font-bold uppercase tracking-wider mb-1">
+                  🚪 إجمالي الانصراف المبكر
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-3xl font-black text-orange-800 font-mono">
+                    {totalEarlyLeaveMinutes}
+                  </span>
+                  <span className="text-xs text-orange-700">دقيقة</span>
+                </div>
+                <div className="text-[10px] text-slate-500 mt-1">
+                  في {earlyLeaveDaysCount} يوم انصرفت فيهم بدري
+                </div>
+              </div>
+            </div>
+            <p className="text-[10px] text-slate-500 mt-2">
+              💡 خصم التأخير المالي مذكور تحت في قسم "الاستقطاعات"
+            </p>
+          </section>
+        )}
 
         {/* Earnings & Deductions side by side */}
         <section className="px-8 py-6 grid md:grid-cols-2 gap-8 border-b border-slate-100">
@@ -267,12 +404,38 @@ export default async function PayslipPage({ params }: PageProps) {
               💸 الاستقطاعات
             </h2>
             <div className="space-y-2 text-sm font-cairo">
-              <LineItem label="خصم الغياب" value={entry.absence_deduction} />
-              <LineItem label="خصم تأخير / انصراف مبكر" value={entry.tardiness_deduction} />
+              <LineItem
+                label={`خصم الغياب${
+                  entry.absent_days > 0 ? ` (${entry.absent_days} يوم)` : ""
+                }`}
+                value={entry.absence_deduction}
+              />
+              <LineItem
+                label={`خصم التأخير${
+                  totalTardinessMinutes > 0
+                    ? ` (${totalTardinessMinutes} دقيقة)`
+                    : ""
+                } والانصراف المبكر${
+                  totalEarlyLeaveMinutes > 0
+                    ? ` (${totalEarlyLeaveMinutes} دقيقة)`
+                    : ""
+                }`}
+                value={entry.tardiness_deduction}
+              />
               <LineItem label="التأمينات الاجتماعية (14%)" value={entry.social_insurance} />
               <LineItem label="ضريبة الدخل" value={entry.income_tax} />
-              <LineItem label="قسط قرض" value={entry.loan_deduction} />
-              <LineItem label="خصومات أخرى" value={entry.other_deductions} />
+              <LineItem
+                label={`قسط السلفة هذا الشهر${
+                  activeLoans.length > 1
+                    ? ` (${activeLoans.length} سلفة)`
+                    : ""
+                }`}
+                value={entry.loan_deduction}
+              />
+              <LineItem
+                label="خصومات وجزاءات أخرى"
+                value={entry.other_deductions}
+              />
               <div className="pt-2 mt-2 border-t border-slate-200 flex justify-between font-bold text-red-700">
                 <span>إجمالي الاستقطاعات</span>
                 <span>{formatEGP(entry.total_deductions)}</span>
@@ -299,15 +462,108 @@ export default async function PayslipPage({ params }: PageProps) {
         </section>
 
         {/* Bank details */}
-        {(emp?.bank_name || emp?.bank_account_number) && (
+        {(emp?.bank_name_dec || emp?.bank_account_number_dec) && (
           <section className="px-8 py-4 border-b border-slate-100 bg-slate-50/50">
             <h2 className="text-xs font-bold tracking-wider text-slate-400 uppercase mb-2 font-cairo">
               بيانات التحويل البنكي
             </h2>
             <div className="grid grid-cols-2 gap-x-6 text-sm font-cairo">
-              <Row label="البنك" value={emp.bank_name ?? "—"} />
-              <Row label="رقم الحساب" value={emp.bank_account_number ?? "—"} mono />
+              <Row label="البنك" value={emp.bank_name_dec ?? "—"} />
+              <Row
+                label="رقم الحساب"
+                value={maskAccount(emp.bank_account_number_dec)}
+                mono
+              />
             </div>
+          </section>
+        )}
+
+        {/* NEW: Loan summary — what employees ALWAYS want to see.
+            Shows lifetime taken, paid back, and what's still due. */}
+        {allLoans.length > 0 && (
+          <section className="px-8 py-5 border-b border-slate-100">
+            <h2 className="text-xs font-bold tracking-wider text-slate-400 uppercase mb-3 font-cairo">
+              💵 ملخص السلف والقروض
+            </h2>
+
+            {/* 3 big numbers */}
+            <div className="grid grid-cols-3 gap-3 mb-4 font-cairo">
+              <div className="p-3 rounded-xl bg-slate-50 border-2 border-slate-200 text-center">
+                <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">
+                  إجمالي السلف المأخوذة
+                </div>
+                <div className="text-xl font-black text-slate-800 font-mono" dir="ltr">
+                  {formatEGP(totalLoanAmount)}
+                </div>
+                <div className="text-[10px] text-slate-400 mt-0.5">
+                  عبر {allLoans.length} سلفة
+                </div>
+              </div>
+              <div className="p-3 rounded-xl bg-emerald-50 border-2 border-emerald-200 text-center">
+                <div className="text-[10px] text-emerald-700 font-bold uppercase tracking-wider mb-1">
+                  إجمالي المسدّد
+                </div>
+                <div className="text-xl font-black text-emerald-700 font-mono" dir="ltr">
+                  {formatEGP(totalLoanPaid)}
+                </div>
+                <div className="text-[10px] text-emerald-600 mt-0.5">
+                  من بداية تعيينك
+                </div>
+              </div>
+              <div className="p-3 rounded-xl bg-amber-50 border-2 border-amber-200 text-center">
+                <div className="text-[10px] text-amber-700 font-bold uppercase tracking-wider mb-1">
+                  المتبقي عليك
+                </div>
+                <div className="text-xl font-black text-amber-700 font-mono" dir="ltr">
+                  {formatEGP(totalLoanRemaining)}
+                </div>
+                <div className="text-[10px] text-amber-600 mt-0.5">
+                  {activeLoans.length} سلفة نشطة
+                </div>
+              </div>
+            </div>
+
+            {/* Active loans detail with progress bars */}
+            {activeLoans.length > 0 && (
+              <div className="space-y-2 text-xs font-cairo">
+                <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+                  السلف النشطة:
+                </div>
+                {activeLoans.map((l) => {
+                  const paid = Number(l.amount) - Number(l.remaining_amount);
+                  const pct =
+                    Number(l.amount) > 0
+                      ? Math.round((paid / Number(l.amount)) * 100)
+                      : 0;
+                  return (
+                    <div
+                      key={l.id}
+                      className="p-2 rounded-lg bg-slate-50 border border-slate-200"
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-slate-700 truncate">
+                          {l.reason || `سلفة بقيمة ${formatEGP(Number(l.amount))}`}
+                        </span>
+                        <span className="font-mono text-slate-600 whitespace-nowrap" dir="ltr">
+                          {formatEGP(Number(l.remaining_amount))} متبقي ·{" "}
+                          {formatEGP(Number(l.monthly_installment))}/شهر
+                        </span>
+                      </div>
+                      <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-amber-400 to-emerald-500"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                      <div className="text-[10px] text-slate-400 mt-0.5">
+                        {pct}% اتسدّد · بدأت في{" "}
+                        {formatIsoDate(l.requested_at.split("T")[0])}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </section>
         )}
 
@@ -418,4 +674,16 @@ function SignatureBox({ label }: { label: string }) {
       <div className="text-xs text-slate-500 font-cairo text-center">{label}</div>
     </div>
   );
+}
+
+/**
+ * Mask a bank account number so only the last 4 digits show. Used on
+ * the payslip to avoid full-account-number leak if the printed PDF is
+ * forwarded or photographed. Returns "—" for empty input.
+ */
+function maskAccount(acc: string | null | undefined): string {
+  if (!acc) return "—";
+  const clean = acc.replace(/\s+/g, "");
+  if (clean.length < 6) return clean;
+  return `**** **** ${clean.slice(-4)}`;
 }
