@@ -5,6 +5,15 @@ import { formatEGP } from "@/lib/payroll";
 import { PrintButton } from "./print-button";
 import { DownloadPdfButton } from "@/components/download-pdf-button";
 
+// Render fresh on every request — payslip data + structure both change
+// frequently (HR adjustments, new loans, late-day updates), and seeing
+// last week's cached version would confuse the employee. Combined with
+// the no-store header below, this bypasses any CDN / SW navigation
+// cache that might serve stale HTML.
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const fetchCache = "force-no-store";
+
 type PageProps = {
   params: Promise<{ id: string; entryId: string }>;
 };

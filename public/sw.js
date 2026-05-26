@@ -16,7 +16,10 @@
 // Cache versioning: bump CACHE_NAME whenever we change the SW so old
 // clients evict on next load.
 
-const CACHE_NAME = "nidham-v1";
+// Bumped to v2 (2026-05-26): force eviction of v1 caches that may have
+// staled HTML for dashboard pages. Increase this whenever a major UI
+// change ships so old PWA installs evict the cached shell.
+const CACHE_NAME = "nidham-v2";
 
 // Pre-cache the offline fallback + icon — tiny payload, must-have for
 // the install to look professional when the user is offline.
@@ -55,6 +58,10 @@ self.addEventListener("fetch", (event) => {
   if (url.pathname.startsWith("/api/")) return;
   if (url.pathname.startsWith("/auth/")) return;
   if (url.pathname.includes("/_next/data/")) return;
+  // Dashboard pages are dynamic + frequently updated. Caching the HTML
+  // shell of /dashboard/* would freeze data the user expects to be live
+  // (the payslip is the worst offender). Always pass through to network.
+  if (url.pathname.startsWith("/dashboard/")) return;
 
   // Network-first for navigation requests, with an offline fallback so the
   // app doesn't show the browser's default "no internet" page when the
