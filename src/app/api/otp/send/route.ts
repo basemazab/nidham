@@ -52,15 +52,39 @@ export async function POST(req: Request) {
     );
   }
 
-  // 3 sends per identifier per 10 minutes (prevent abuse + Meta cost)
-  const rl = checkRateLimit(`otp-send:${identifier}`, 3, 10 * 60_000);
-  if (!rl.ok) {
+  // J3 fix — two-bucket rate limit:
+  //   1. Per identifier (3 / 10 min) — prevents spamming a specific
+  //      recipient with codes they didn't ask for
+  //   2. Per IP (10 / 10 min)        — prevents an attacker from
+  //      iterating random phone numbers to burn Meta API spend
+  //      ($0.04/msg) and trigger Meta abuse-flagging on our sender
+  //
+  // Both buckets must pass. Attacker has to control 10x more IPs to
+  // achieve the same abuse rate.
+  const ip =
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    req.headers.get("x-real-ip") ||
+    "unknown";
+
+  const ipLimit = checkRateLimit(`otp-send:ip:${ip}`, 10, 10 * 60_000);
+  if (!ipLimit.ok) {
     return NextResponse.json(
       {
         ok: false,
-        error: `كتر إرسال الكود — جرب تاني بعد ${Math.ceil(rl.retryAfterSeconds / 60)} دقيقة`,
+        error: `كتير إرسال من شبكتك — جرب بعد ${Math.ceil(ipLimit.retryAfterSeconds / 60)} دقيقة`,
       },
-      { status: 429, headers: { "Retry-After": String(rl.retryAfterSeconds) } },
+      { status: 429, headers: { "Retry-After": String(ipLimit.retryAfterSeconds) } },
+    );
+  }
+
+  const idLimit = checkRateLimit(`otp-send:id:${identifier}`, 3, 10 * 60_000);
+  if (!idLimit.ok) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: `كتر إرسال الكود — جرب تاني بعد ${Math.ceil(idLimit.retryAfterSeconds / 60)} دقيقة`,
+      },
+      { status: 429, headers: { "Retry-After": String(idLimit.retryAfterSeconds) } },
     );
   }
 

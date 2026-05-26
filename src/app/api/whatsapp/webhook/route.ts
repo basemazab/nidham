@@ -17,7 +17,7 @@
 // all employees to find which tenant they belong to, then enforce
 // tenant scoping in the response.
 
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { sendText, normalizeEgyptPhone } from "@/lib/whatsapp";
 import { routeBotMessage } from "@/lib/whatsapp-bot";
@@ -81,10 +81,18 @@ export async function POST(req: Request) {
     }
   }
 
-  // Fire off the work — we don't await it so Meta sees a fast 200.
-  void Promise.all(messages.map(processMessage)).catch((err) =>
-    console.error("[whatsapp-webhook]", err),
-  );
+  // Process replies via `after()` so the response returns immediately but
+  // the async work survives past response close. On Vercel serverless,
+  // a plain `void Promise.all(...)` gets killed when the function returns
+  // and replies may never send. `after()` is the supported way to extend
+  // the function lifetime for post-response work.
+  after(async () => {
+    try {
+      await Promise.all(messages.map(processMessage));
+    } catch (err) {
+      console.error("[whatsapp-webhook]", err);
+    }
+  });
 
   return NextResponse.json({ ok: true });
 }
@@ -96,13 +104,22 @@ async function processMessage(msg: IncomingMessage) {
 
   const supabase = createServiceClient();
 
-  // Find the employee by phone. Since phone is encrypted, we use the
-  // `employees_with_pii` view that decrypts on read (mig 050). For
-  // tenants who haven't set up encryption yet, the unencrypted phone
-  // column is the fallback.
+  // Find the employee by phone. We try several normalisation forms
+  // because employee phones might be stored as "01055356622",
+  // "+201055356622", "201055356622", etc.
   //
-  // We try several normalisation forms because employee phones might be
-  // stored as "01055356622", "+201055356622", "201055356622", etc.
+  // ⚠ NO company_id scoping here — we have no way to know which tenant
+  // the message is for, since incoming WhatsApp messages don't carry
+  // tenant identity. So if two tenants happen to have an employee with
+  // the same phone number (a real person who works at two companies),
+  // the bot would respond with whichever row Supabase returned first —
+  // potentially leaking the wrong company's data.
+  //
+  // Mitigation: fetch ALL matches across tenants. If there's exactly ONE
+  // active match, reply with that tenant's data (intended use case). If
+  // multiple tenants share the phone, we refuse to reply and tell the
+  // user to specify the company — the alternative (silently picking one)
+  // is a tenant data leak.
   const candidates = [
     fromPhone,
     "0" + fromPhone.slice(2), // 201xxxxxxxxx → 01xxxxxxxxx
@@ -112,20 +129,35 @@ async function processMessage(msg: IncomingMessage) {
 
   const { data: matches } = await supabase
     .from("employees")
-    .select("id, company_id, full_name, phone, status")
+    .select("id, company_id, full_name, phone, status, companies(name)")
     .in("phone", candidates)
     .eq("status", "active")
-    .limit(1)
     .returns<Array<{
       id: string;
       company_id: string;
       full_name: string;
       phone: string | null;
       status: string;
+      companies: { name: string } | null;
     }>>();
 
-  const employee = matches?.[0];
+  const matchList = matches ?? [];
   const incomingText = msg.text.body.trim();
+
+  // Multiple tenants share this phone — refuse to reply to avoid data leak
+  if (matchList.length > 1) {
+    const companyNames = matchList
+      .map((m) => m.companies?.name)
+      .filter(Boolean)
+      .join(" / ");
+    await sendText(
+      fromPhone,
+      `الرقم ده مسجّل في أكتر من شركة (${companyNames}). لأمان بياناتك، كلم HR في الشركة المطلوبة مباشرة.`,
+    );
+    return;
+  }
+
+  const employee = matchList[0];
 
   if (!employee) {
     // Unknown sender — friendly hint + opt-out info. Don't reveal we're

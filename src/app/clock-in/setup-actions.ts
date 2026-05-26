@@ -66,28 +66,45 @@ export async function linkSelfAsEmployee() {
 
   // Fall back: name match — only when the auth profile has a full_name.
   // Uses ILIKE %name% so "HR — باسم محمود عزب" matches a "Basem" auth
-  // profile. Defensive: only link if EXACTLY one unlinked match exists,
-  // to avoid wrong-binding when two employees share a first name.
+  // profile. Defensive: only link if EXACTLY one unlinked match exists.
+  //
+  // J2 fix — ILIKE injection: the previous version interpolated firstWord
+  // directly into the LIKE pattern. A profile named "%" would have
+  // matched every employee in the tenant. Escape the three Postgres LIKE
+  // wildcards (%, _, \) before passing them through. Also reject any
+  // first word with non-letter chars to be defensive.
   if (displayName.trim().length >= 3) {
     const firstWord = displayName.trim().split(/\s+/)[0];
-    const { data: nameMatches } = await supabase
-      .from("employees")
-      .select("id")
-      .eq("company_id", profile.company_id)
-      .is("user_id", null)
-      .ilike("full_name", `%${firstWord}%`)
-      .returns<Array<{ id: string }>>();
+    // Only allow letters (Arabic + Latin) + digits. Anything else is
+    // either junk or an injection attempt; skip the name-match path.
+    const isSafeFirstWord = /^[\p{L}\p{N}'\-.]+$/u.test(firstWord);
+    if (isSafeFirstWord) {
+      // Escape LIKE metacharacters explicitly even though the regex above
+      // already blocked them — defense in depth.
+      const escapedFirstWord = firstWord
+        .replace(/\\/g, "\\\\")
+        .replace(/%/g, "\\%")
+        .replace(/_/g, "\\_");
 
-    if (nameMatches && nameMatches.length === 1) {
-      await supabase
+      const { data: nameMatches } = await supabase
         .from("employees")
-        .update({ user_id: user.id, email })
-        .eq("id", nameMatches[0].id);
-      revalidatePath("/clock-in");
-      redirect("/clock-in");
+        .select("id")
+        .eq("company_id", profile.company_id)
+        .is("user_id", null)
+        .ilike("full_name", `%${escapedFirstWord}%`)
+        .returns<Array<{ id: string }>>();
+
+      if (nameMatches && nameMatches.length === 1) {
+        await supabase
+          .from("employees")
+          .update({ user_id: user.id, email })
+          .eq("id", nameMatches[0].id);
+        revalidatePath("/clock-in");
+        redirect("/clock-in");
+      }
+      // 2+ matches: ambiguous — don't auto-link, fall through to create
+      // a fresh record and let HR manually merge later
     }
-    // 2+ matches: ambiguous — don't auto-link, fall through to create
-    // a fresh record and let HR manually merge later
   }
 
   // 2. No existing row — create a minimal one. HR can flesh out the

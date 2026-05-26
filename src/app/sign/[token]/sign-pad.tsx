@@ -48,6 +48,11 @@ export function SignPad({ token, defaultName }: Props) {
   // ── Drawing handlers ──
   const drawingRef = useRef(false);
   const lastPointRef = useRef<{ x: number; y: number } | null>(null);
+  // J6: total pixel-distance drawn. The previous "hasDrawn" flag flipped
+  // true on the first 2-pixel move, which accepted near-empty signatures
+  // (a single twitch). Require ~50px of actual ink before enabling submit.
+  const totalDrawnRef = useRef(0);
+  const MIN_SIGNATURE_DISTANCE = 50;
 
   const startDraw = (x: number, y: number) => {
     drawingRef.current = true;
@@ -64,8 +69,14 @@ export function SignPad({ token, defaultName }: Props) {
     ctx.moveTo(last.x, last.y);
     ctx.lineTo(x, y);
     ctx.stroke();
+    // Track cumulative pixel distance so we can reject blank-ish signatures
+    const dx = x - last.x;
+    const dy = y - last.y;
+    totalDrawnRef.current += Math.sqrt(dx * dx + dy * dy);
     lastPointRef.current = { x, y };
-    if (!hasDrawn) setHasDrawn(true);
+    if (!hasDrawn && totalDrawnRef.current >= MIN_SIGNATURE_DISTANCE) {
+      setHasDrawn(true);
+    }
   };
 
   const endDraw = () => {
@@ -92,6 +103,7 @@ export function SignPad({ token, defaultName }: Props) {
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, rect.width, rect.height);
     setHasDrawn(false);
+    totalDrawnRef.current = 0; // J6: reset the stroke counter on clear
   };
 
   const submit = async () => {

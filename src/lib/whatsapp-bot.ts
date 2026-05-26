@@ -41,18 +41,70 @@ const HELP_MENU = `أهلاً بيك! 👋
 
 اكتب كلمة من اللي فوق وهرد عليك فوراً.`;
 
-/** Detect intent from raw message text. Heuristic, Arabic-first. */
+/** Detect intent from raw message text. Heuristic, Arabic-first.
+ *
+ * Regex tightening (J5): previous patterns over-matched. "عمل" inside
+ * the certificate intent matched every "إزاي العمل" / "أول يوم عمل"
+ * message; "إجاز" matched verbs like "أجاز"; English "leave" matched
+ * "I will leave the office". The patterns below use:
+ *   • Explicit phrase anchors ("شهادة عمل" / "رصيد إجازاتي" / "آخر مرتب")
+ *     instead of single tokens that could appear in normal speech
+ *   • \b word boundaries for ASCII keywords ("\bleave\b" not "leave")
+ *   • Specific intent-marker words first ("شهادة", "رصيد", "آخر") that
+ *     are unambiguous on their own
+ *
+ * Order matters: more specific intents come BEFORE more generic ones.
+ * E.g. "شهادة عمل" must match certificate, not be hijacked by attendance.
+ */
 function detectIntent(text: string): string {
   const t = text.trim().toLowerCase();
 
-  if (/(مساعد|menu|قائمة|list|ايه الخدمات|ابدأ|start)/i.test(t)) return "help";
-  if (/(رصيد|إجاز|اجاز|اجازات|leave|balance)/.test(t)) return "leave_balance";
-  if (/(مرتب|راتب|salary|payslip|paystub|اخر مرتب|آخر مرتب)/.test(t)) {
+  // Help — always first so menu/start commands take priority
+  if (/(مساعد|menu|\bقائمة\b|\blist\b|ايه الخدمات|^ابدأ$|\bstart\b|الأوامر)/i.test(t)) {
+    return "help";
+  }
+
+  // Certificate FIRST — "شهادة عمل" must beat the "عمل" → attendance trap
+  if (
+    /(شهادة|certificate|\bخبرة\b|شهادة عمل|شهادة خبرة|شهادة راتب|certificate of employment)/i.test(
+      t,
+    )
+  ) {
+    return "certificate";
+  }
+
+  // Leave balance — anchor on "رصيد" or "إجازة" with the ة. The verb forms
+  // (أجاز / يجيز) don't end in ة, so requiring the ة filters them out.
+  if (
+    /(رصيد|إجازة|إجازات|اجازة|اجازات|عطلة|\bleave balance\b|leave days|كم رصيد)/i.test(
+      t,
+    )
+  ) {
+    return "leave_balance";
+  }
+
+  // Payroll — explicit pay-related words
+  if (
+    /(مرتب|راتب|قسيمة|\bsalary\b|\bpayslip\b|\bpaystub\b|آخر مرتب|اخر مرتب|كم مرتب|payroll)/i.test(
+      t,
+    )
+  ) {
     return "payroll";
   }
-  if (/(حضور|انصراف|attendance|مواعيد|تأخير)/.test(t)) return "attendance";
-  if (/(سلف|سلفة|قرض|advance|loan)/.test(t)) return "loans";
-  if (/(شهادة|certificate|خبرة|عمل)/.test(t)) return "certificate";
+
+  // Loans / advances
+  if (
+    /(سلف|سلفة|سلفه|قرض|قروض|\badvance\b|\bloan\b|installment|قسط)/i.test(t)
+  ) {
+    return "loans";
+  }
+
+  // Attendance — LAST among data intents because "حضور" could be ambiguous
+  // (e.g., "حضرت اجتماع" but that's already handled by leave_balance not
+  // matching above)
+  if (/(حضور|حضوري|انصراف|attendance|سجل|مواعيد|تأخير)/i.test(t)) {
+    return "attendance";
+  }
 
   return "unknown";
 }

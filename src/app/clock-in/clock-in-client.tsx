@@ -266,6 +266,13 @@ export function ClockInClient(props: Props) {
   // by the time we touch it.
   const openCamera = async () => {
     setError("");
+    // J6: stop any previously-acquired stream BEFORE asking for a new one.
+    // The retake flow used to overwrite streamRef.current without stopping
+    // the old tracks, leaking the camera + microphone indicator until the
+    // tab was closed. Stopping the old stream first releases the device
+    // and keeps the indicator honest.
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "user", width: 720, height: 720 },
@@ -358,7 +365,11 @@ export function ClockInClient(props: Props) {
       .from("attendance-photos")
       .upload(path, photoBlob, {
         contentType: "image/jpeg",
-        cacheControl: "private, max-age=3600",
+        // J6: Supabase Storage's cacheControl expects a numeric seconds
+        // value, not the full Cache-Control header. Previous value
+        // "private, max-age=3600" was silently dropped. Use just "3600"
+        // so the photo is cached for an hour in the signed-URL response.
+        cacheControl: "3600",
         upsert: true,
       });
 

@@ -11,6 +11,7 @@
 
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 const MAX_PNG_LENGTH = 500_000; // ~500KB base64 data URL
 
@@ -23,6 +24,29 @@ export async function POST(
     return NextResponse.json(
       { ok: false, error: "Token مفقود" },
       { status: 400 },
+    );
+  }
+
+  // J6: rate-limit per token + per IP. The 36-char UUID is unguessable
+  // but if it leaks (browser history, server logs, screenshot in a chat),
+  // an attacker shouldn't be able to spam submissions trying to land
+  // their PNG before the real recipient.
+  const ip =
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    req.headers.get("x-real-ip") ||
+    "unknown";
+  const tokenLimit = checkRateLimit(`sign-submit:tok:${token}`, 5, 10 * 60_000);
+  if (!tokenLimit.ok) {
+    return NextResponse.json(
+      { ok: false, error: "محاولات كتيرة على نفس الرابط — جرب بعد قليل" },
+      { status: 429 },
+    );
+  }
+  const ipLimit = checkRateLimit(`sign-submit:ip:${ip}`, 20, 10 * 60_000);
+  if (!ipLimit.ok) {
+    return NextResponse.json(
+      { ok: false, error: "محاولات كتيرة من شبكتك" },
+      { status: 429 },
     );
   }
 
@@ -89,11 +113,8 @@ export async function POST(
     );
   }
 
-  // Capture the signer's IP + UA for the audit trail
-  const ip =
-    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    req.headers.get("x-real-ip") ||
-    null;
+  // Reuse the IP from the rate-limit block above for the audit trail
+  const auditIp = ip === "unknown" ? null : ip;
   const ua = req.headers.get("user-agent") ?? null;
 
   // Insert capture row (bypassing the "deny anon inserts" RLS policy
@@ -104,7 +125,7 @@ export async function POST(
       request_id: request.id,
       signer_name: signerName,
       signature_png_data_url: signaturePng,
-      signer_ip: ip,
+      signer_ip: auditIp,
       signer_user_agent: ua,
     });
 

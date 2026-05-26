@@ -82,14 +82,18 @@ export default async function TaxCertificatePage({
       p_employee_id: employeeId,
       p_year: year,
     }),
-    // Two-step pattern: read main employee from the TABLE (RLS proven),
-    // splice in decrypted national_id from the VIEW below if it
-    // returns. Reading directly from the view in this position dropped
-    // RLS context for the authenticated user — see employees/[id]/page.tsx
-    // note for details.
+    // J4: Single-step read from employees_with_pii. The previous two-step
+    // workaround existed because pii_decrypt was REVOKE'd from
+    // authenticated (migration 050 quirk). Migration 067 fixed that, so
+    // the view now returns decrypted PII correctly under the authenticated
+    // context. If the view ever fails for a real reason (employee missing,
+    // RLS denial), notFound() below catches it instead of silently
+    // rendering a blank national_id on an official tax certificate.
     supabase
-      .from("employees")
-      .select("full_name, job_title, department, hire_date, basic_salary")
+      .from("employees_with_pii")
+      .select(
+        "full_name, job_title, department, hire_date, basic_salary, national_id_dec",
+      )
       .eq("id", employeeId)
       .single<{
         full_name: string;
@@ -97,6 +101,7 @@ export default async function TaxCertificatePage({
         department: string | null;
         hire_date: string | null;
         basic_salary: number | null;
+        national_id_dec: string | null;
       }>(),
     supabase
       .from("payroll_periods")
@@ -123,18 +128,9 @@ export default async function TaxCertificatePage({
 
   if (!employeeRes.data) notFound();
 
-  // Splice in decrypted national_id from the view. Best-effort: if the
-  // view returns null (RLS quirk), we render the certificate with a
-  // blank national_id rather than 404'ing the page.
-  const { data: pii } = await supabase
-    .from("employees_with_pii")
-    .select("national_id_dec")
-    .eq("id", employeeId)
-    .maybeSingle<{ national_id_dec: string | null }>();
-
   const employee = {
     ...employeeRes.data,
-    national_id: pii?.national_id_dec ?? null,
+    national_id: employeeRes.data.national_id_dec,
   };
 
   const certArr = (certRes.data ?? []) as CertRow[];

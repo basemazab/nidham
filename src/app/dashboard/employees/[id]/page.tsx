@@ -126,38 +126,21 @@ export default async function EditEmployeePage({ params, searchParams }: PagePro
   // verified the view works as the postgres role, but not as
   // authenticated). Keeping the heavy SELECT on the table sidesteps
   // that quirk entirely.
-  const { data: employeeRaw } = await supabase
-    .from("employees")
+  // J4: Single-step read from employees_with_pii. The previous two-step
+  // workaround was a band-aid for the pii_decrypt REVOKE issue (migration
+  // 050) which was properly fixed in migration 067. Reading from the view
+  // directly means the form is guaranteed to either get all decrypted PII
+  // columns OR notFound() if the row doesn't exist — never the half-empty
+  // state that confused HR into thinking saves didn't work.
+  const { data: employeeRow } = await supabase
+    .from("employees_with_pii")
     .select("*")
     .eq("id", id)
-    .single<Omit<Employee, "national_id_dec" | "social_insurance_number_dec" | "bank_name_dec" | "bank_account_number_dec">>();
+    .single<Employee>();
 
-  if (!employeeRaw) notFound();
+  if (!employeeRow) notFound();
 
-  // Decrypted PII pulled separately. The view is read here in a narrow
-  // SELECT — if THIS query happens to return null (RLS quirk), the page
-  // still renders, the four PII fields just show empty until HR re-saves
-  // them.
-  const { data: pii } = await supabase
-    .from("employees_with_pii")
-    .select(
-      "national_id_dec, social_insurance_number_dec, bank_name_dec, bank_account_number_dec",
-    )
-    .eq("id", id)
-    .maybeSingle<{
-      national_id_dec: string | null;
-      social_insurance_number_dec: string | null;
-      bank_name_dec: string | null;
-      bank_account_number_dec: string | null;
-    }>();
-
-  const employee: Employee = {
-    ...employeeRaw,
-    national_id_dec: pii?.national_id_dec ?? null,
-    social_insurance_number_dec: pii?.social_insurance_number_dec ?? null,
-    bank_name_dec: pii?.bank_name_dec ?? null,
-    bank_account_number_dec: pii?.bank_account_number_dec ?? null,
-  };
+  const employee: Employee = employeeRow;
 
   // The "إنهاء التوظيف" modal is admin-only because terminating an
   // employee snapshots an EOS gratuity and locks them out of the system.

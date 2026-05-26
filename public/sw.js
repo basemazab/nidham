@@ -59,18 +59,29 @@ self.addEventListener("fetch", (event) => {
   // Network-first for navigation requests, with an offline fallback so the
   // app doesn't show the browser's default "no internet" page when the
   // user is on the subway / in a basement.
+  //
+  // J6 fix: the previous `.catch(...)` only triggered on NETWORK errors
+  // (DNS fail, request aborted). A 5xx from the origin is a SUCCESSFUL
+  // fetch with `response.ok === false`, so the user got the server's
+  // 500 page instead of our friendly offline.html. Now we explicitly
+  // reject non-OK navigations (except 304 Not Modified) so the fallback
+  // also catches origin outages.
   if (event.request.mode === "navigate") {
     event.respondWith(
-      fetch(event.request).catch(async () => {
-        const cache = await caches.open(CACHE_NAME);
-        return (
-          (await cache.match("/offline.html")) ||
-          new Response(
-            "Offline. Reconnect to access Nidham.",
-            { headers: { "Content-Type": "text/plain" } },
-          )
-        );
-      }),
+      fetch(event.request)
+        .then((response) => {
+          if (response.ok || response.status === 304) return response;
+          throw new Error(`Upstream returned ${response.status}`);
+        })
+        .catch(async () => {
+          const cache = await caches.open(CACHE_NAME);
+          return (
+            (await cache.match("/offline.html")) ||
+            new Response("Offline. Reconnect to access Nidham.", {
+              headers: { "Content-Type": "text/plain" } },
+            )
+          );
+        }),
     );
     return;
   }

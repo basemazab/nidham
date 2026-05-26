@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getMyProfile } from "@/lib/permissions";
-import { calculateEosGratuity } from "@/lib/eos";
+import { calculateEosGratuity, EosInvalidDateError } from "@/lib/eos";
 
 // ============================================================================
 // EOS Gratuity Calculator (مكافأة نهاية الخدمة)
@@ -85,10 +85,22 @@ export default async function EosCalculatorPage({
       : Number(selected.basic_salary ?? 0)
     : 0;
 
-  const calc =
-    selected && selected.hire_date && baseSalary > 0
-      ? calculateEosGratuity(selected.hire_date, termDate, baseSalary)
-      : null;
+  // J6: catch EosInvalidDateError so termination-before-hire shows a
+  // clear error instead of silently rendering "0 EGP gratuity" on an
+  // official certificate-style page.
+  let calc = null;
+  let calcError: string | null = null;
+  if (selected && selected.hire_date && baseSalary > 0) {
+    try {
+      calc = calculateEosGratuity(selected.hire_date, termDate, baseSalary);
+    } catch (err) {
+      if (err instanceof EosInvalidDateError) {
+        calcError = err.message;
+      } else {
+        throw err;
+      }
+    }
+  }
 
   return (
     <main className="flex-1 px-6 py-8 bg-gradient-to-b from-slate-50 via-white to-cyan-50/30 min-h-screen">
@@ -196,6 +208,14 @@ export default async function EosCalculatorPage({
             <p className="text-sm text-slate-500 font-cairo">
               النتيجة هتظهر هنا بتفصيل سنة بسنة.
             </p>
+          </div>
+        )}
+
+        {/* J6: calculation error (e.g., termination before hire) */}
+        {calcError && (
+          <div className="bg-rose-50 border-2 border-rose-200 rounded-2xl p-6 font-cairo">
+            <div className="font-bold text-rose-900 mb-1">⚠ خطأ في الحساب</div>
+            <p className="text-sm text-rose-800">{calcError}</p>
           </div>
         )}
 

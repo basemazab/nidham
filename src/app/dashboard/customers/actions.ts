@@ -121,15 +121,20 @@ export async function updateCustomer(id: string, formData: FormData) {
 }
 
 export async function deleteCustomer(id: string) {
-  const { profile } = await requireHR();
-  const supabase = await createClient();
-  // RLS hardening: company_id clamp prevents cross-tenant deletes under
-  // super-admin sessions (mig 038).
-  await supabase
+  // J4: error path now reported instead of swallowed
+  const { profile, supabase } = await requireHR();
+  const { error } = await supabase
     .from("customers")
     .delete()
     .eq("id", id)
     .eq("company_id", profile.company_id);
+  if (error) {
+    redirect(
+      `/dashboard/customers?error=${encodeURIComponent(
+        "ما قدرناش نمسح العميل: " + error.message,
+      )}`,
+    );
+  }
   revalidatePath("/dashboard/customers");
   bustDashboardCache();
 }

@@ -42,15 +42,37 @@ export type EosCalculation = {
   basicSalary: number;
 };
 
+/** Sentinel error for J6: termination-before-hire silently returned 0,
+ *  which let the UI display an "EOS = 0 EGP" certificate without HR
+ *  noticing the input was nonsense. Now the caller can branch on this. */
+export class EosInvalidDateError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "EosInvalidDateError";
+  }
+}
+
 /**
  * Compute completed months between two ISO dates.
  * Treats partial months by calendar — e.g. 2020-01-15 → 2025-01-14 = 59 months.
+ *
+ * Throws EosInvalidDateError when the inputs are nonsensical (termination
+ * before hire, unparseable strings). The previous "return 0 silently"
+ * masked the real bug.
  */
 function completedMonths(from: string, to: string): number {
   const a = new Date(from + (from.length === 10 ? "T00:00:00" : ""));
   const b = new Date(to + (to.length === 10 ? "T00:00:00" : ""));
-  if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return 0;
-  if (b < a) return 0;
+  if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) {
+    throw new EosInvalidDateError(
+      "تواريخ غير صحيحة — تأكد من صيغة التعيين والإنهاء",
+    );
+  }
+  if (b < a) {
+    throw new EosInvalidDateError(
+      "تاريخ الإنهاء أقدم من تاريخ التعيين — راجع البيانات",
+    );
+  }
   let months = (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth());
   if (b.getDate() < a.getDate()) months -= 1;
   return Math.max(0, months);

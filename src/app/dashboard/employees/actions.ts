@@ -251,9 +251,26 @@ export async function terminateEmployee(formData: FormData) {
 export async function deleteEmployee(id: string) {
   // Deletion cascades to attendance, payroll_entries, leave_requests,
   // advance_requests, permission_requests -- restrict to admin only.
-  await requireAdmin();
-  const supabase = await createClient();
-  await supabase.from("employees").delete().eq("id", id);
+  //
+  // J4 hardening: previously did just .eq("id", id) with no company
+  // clamp and no error check. RLS scopes the DELETE for normal admin
+  // sessions, but super-admin sessions (mig 038) bypass RLS, so a
+  // forged employee id from a different tenant would silently no-op
+  // OR delete the wrong tenant's row. Now we explicitly clamp by
+  // company_id AND check the error.
+  const { profile, supabase } = await requireAdmin();
+  const { error } = await supabase
+    .from("employees")
+    .delete()
+    .eq("id", id)
+    .eq("company_id", profile.company_id);
+  if (error) {
+    redirect(
+      `/dashboard/employees?error=${encodeURIComponent(
+        "ما قدرناش نمسح الموظف: " + error.message,
+      )}`,
+    );
+  }
   revalidatePath("/dashboard/employees");
   bustDashboardCache();
 }
