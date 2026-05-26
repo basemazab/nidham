@@ -155,15 +155,23 @@ export default async function ShiftsPage({
           </Link>
         </div>
 
-        <header className="mb-8">
-          <h1 className="text-3xl font-black font-cairo text-slate-800 mb-1">
-            ⏱ الورديات والتدوير
-          </h1>
-          <p className="text-sm text-slate-500 font-cairo leading-relaxed max-w-3xl">
-            عرّف ورديات العمل (الأولى / الثانية / الثالثة / الإدارة) وأنماط التدوير
-            (مثل 6 أيام × 3 ورديات). الموظف بيتربط على وردية ثابتة أو على نمط تدوير
-            من صفحته.
-          </p>
+        <header className="mb-8 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-3xl font-black font-cairo text-slate-800 mb-1">
+              ⏱ الورديات والتدوير
+            </h1>
+            <p className="text-sm text-slate-500 font-cairo leading-relaxed max-w-3xl">
+              عرّف ورديات العمل (الأولى / الثانية / الثالثة / الإدارة) وأنماط التدوير
+              (مثل 6 أيام × 3 ورديات). الموظف بيتربط على وردية ثابتة أو على نمط تدوير
+              من صفحته.
+            </p>
+          </div>
+          <Link
+            href="/dashboard/shifts/weekly"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-600 hover:to-cyan-700 text-white font-bold text-sm shadow-md font-cairo transition whitespace-nowrap"
+          >
+            📅 جدول أسبوعي قابل للطباعة
+          </Link>
         </header>
 
         {banner && (
