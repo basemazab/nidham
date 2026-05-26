@@ -89,88 +89,169 @@ export default function SalesBrochurePage() {
         <PrintButton />
 
         {/* ─────────────────────────────────────────────────────────────
-            PAGE 1 — Cover
-            ───────────────────────────────────────────────────────────── */}
-        <section className="a4-page page-break overflow-hidden relative bg-gradient-to-br from-brand-navy via-slate-900 to-brand-navy text-white">
-          {/* Decorative orbs */}
+            PAGE 1 — Cover (redesigned for PDF clarity)
+            ─────────────────────────────────────────────────────────────
+            Rewritten after user feedback that the original was unclear
+            in PDF form. Removed:
+              ✗ bg-clip-text gradient on hero headline (prints as black
+                or transparent on dark background in Chrome's PDF export)
+              ✗ blurred decorative orbs (print muddy / wash out colors)
+              ✗ low-contrast text-white/50 micro-labels (illegible on A4)
+
+            Added:
+              ✓ Solid cyan/amber colored words (no gradient text)
+              ✓ Bold geometric accent shapes that print cleanly
+              ✓ High-contrast white-on-navy throughout
+              ✓ Larger, more confident type hierarchy
+              ✓ Clear visual anchor: huge "نِظام" wordmark
+              ✓ Trust badges row anchored at the bottom
+        ───────────────────────────────────────────────────────────── */}
+        <section
+          className="a4-page page-break overflow-hidden relative text-white"
+          style={{
+            background:
+              "linear-gradient(135deg, #0a1428 0%, #112048 50%, #0a1428 100%)",
+          }}
+        >
+          {/* Clean geometric accent — no blurs. A solid cyan corner block
+              prints crisply in PDF and gives the cover its visual identity. */}
           <div
-            className="absolute rounded-full bg-brand-cyan/20 blur-3xl"
-            style={{ width: 480, height: 480, top: -160, right: -160 }}
+            className="absolute"
+            style={{
+              top: 0,
+              right: 0,
+              width: 220,
+              height: 220,
+              background:
+                "linear-gradient(225deg, #22d3ee 0%, #0891b2 100%)",
+              clipPath: "polygon(40% 0, 100% 0, 100% 60%)",
+            }}
           />
           <div
-            className="absolute rounded-full bg-amber-500/15 blur-3xl"
-            style={{ width: 320, height: 320, bottom: -120, left: -120 }}
-          />
-          <div
-            className="absolute rounded-full bg-white/5 blur-3xl"
-            style={{ width: 600, height: 600, top: 200, left: -200 }}
+            className="absolute"
+            style={{
+              bottom: 0,
+              left: 0,
+              width: 180,
+              height: 180,
+              background: "linear-gradient(45deg, #f59e0b 0%, #d97706 100%)",
+              clipPath: "polygon(0 40%, 60% 100%, 0 100%)",
+            }}
           />
 
           <div className="relative h-full flex flex-col">
-            {/* Top bar — small logo + edition */}
-            <div className="flex items-center justify-between mb-12">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-brand-cyan to-brand-cyan-dark flex items-center justify-center shadow-2xl shadow-brand-cyan/40">
-                  <span className="text-2xl font-black text-white font-display">ن</span>
+            {/* Top bar — bigger logo + clear edition tag */}
+            <div className="flex items-center justify-between mb-10">
+              <div className="flex items-center gap-4">
+                <div
+                  className="w-16 h-16 rounded-2xl flex items-center justify-center shadow-xl"
+                  style={{
+                    background:
+                      "linear-gradient(135deg, #22d3ee 0%, #0891b2 100%)",
+                  }}
+                >
+                  <span className="text-3xl font-black text-white font-display">
+                    ن
+                  </span>
                 </div>
                 <div>
-                  <div className="text-2xl font-black tracking-tight font-cairo">
+                  <div className="text-3xl font-black tracking-tight font-cairo leading-none">
                     نِظام
                   </div>
-                  <div className="text-[10px] text-brand-cyan tracking-[0.4em] uppercase font-bold">
-                    Nidham · HR + AI
+                  <div
+                    className="text-[10px] tracking-[0.4em] uppercase font-bold mt-1"
+                    style={{ color: "#22d3ee" }}
+                  >
+                    Nidham · HR + Payroll + AI
                   </div>
                 </div>
               </div>
-              <div className="text-xs text-white/50 font-cairo">
-                إصدار 2026 · كتيب رسمي
+              <div
+                className="px-3 py-1.5 rounded-full border font-cairo text-xs font-bold"
+                style={{
+                  borderColor: "rgba(255,255,255,0.3)",
+                  color: "rgba(255,255,255,0.9)",
+                }}
+              >
+                إصدار 2026
               </div>
             </div>
 
-            {/* Hook headline */}
+            {/* Hook headline — SOLID colors, no gradient text */}
             <div className="flex-1 flex flex-col justify-center max-w-3xl">
-              <div className="inline-block px-4 py-1.5 rounded-full bg-amber-500/20 border border-amber-300/40 text-amber-200 text-xs font-bold mb-6 font-cairo w-fit">
-                ✦ للشركات المصرية ✦
+              <div
+                className="inline-block px-5 py-2 rounded-full text-xs font-black mb-8 font-cairo w-fit border-2"
+                style={{
+                  backgroundColor: "#f59e0b",
+                  borderColor: "#d97706",
+                  color: "#0a1428",
+                }}
+              >
+                ✦ للشركات المصرية الناجحة ✦
               </div>
 
-              <h1 className="text-6xl font-black font-cairo leading-[1.05] mb-6">
-                وقف عن إدارة الموظفين
+              <h1 className="text-[64px] font-black font-cairo leading-[1.02] mb-6 text-white">
+                وقف عن إدارة
                 <br />
-                <span className="bg-gradient-to-r from-brand-cyan via-cyan-300 to-amber-300 bg-clip-text text-transparent">
-                  بالشكاوي والاجتماعات.
-                </span>
+                الموظفين
+                <br />
+                <span style={{ color: "#22d3ee" }}>بالشكاوي</span>
+                <span style={{ color: "#f59e0b" }}> والاجتماعات.</span>
               </h1>
 
-              <p className="text-xl text-white/80 leading-relaxed font-cairo mb-8 max-w-2xl">
-                نظام HR + Payroll + AI متكامل، مبني خصيصاً للسوق المصري. متوافق مع
-                قانون العمل 12/2003 وقانون التأمينات 148/2019. بربع تكلفة Bayzat
-                و ZenHR وضعفي قدراتهم.
+              <p className="text-xl leading-relaxed font-cairo mb-10 max-w-2xl text-white">
+                نظام HR + Payroll + AI متكامل، مبني خصيصاً للسوق المصري. متوافق
+                مع قانون العمل <strong style={{ color: "#22d3ee" }}>12/2003</strong>{" "}
+                وقانون التأمينات{" "}
+                <strong style={{ color: "#22d3ee" }}>148/2019</strong>. بربع
+                تكلفة Bayzat و ZenHR.
               </p>
 
-              {/* Marquee stats row */}
-              <div className="grid grid-cols-3 gap-6 mt-8">
-                <CoverStat num="16" label="موديول كامل" />
-                <CoverStat num="8" label="مميزات AI" sub="بالذكاء الاصطناعي" />
-                <CoverStat num="٦٧" label="ألف جنيه" sub="توفير سنوي مقدّر" />
+              {/* Stats row — high contrast, clean borders */}
+              <div className="grid grid-cols-3 gap-4 mt-4">
+                <CoverStatV2
+                  num="16"
+                  label="موديول كامل"
+                  sub="HR + CRM + AI"
+                />
+                <CoverStatV2
+                  num="8"
+                  label="مميزات AI"
+                  sub="ذكاء اصطناعي"
+                />
+                <CoverStatV2
+                  num="٦٧"
+                  label="ألف جنيه"
+                  sub="توفير سنوي مقدّر"
+                  highlight
+                />
               </div>
             </div>
 
-            {/* Footer of cover */}
-            <div className="mt-auto pt-12 flex items-end justify-between flex-wrap gap-4 text-sm">
-              <div className="font-cairo">
-                <div className="text-[10px] tracking-[0.3em] uppercase text-white/40 mb-1">
+            {/* Footer of cover — bigger and more confident */}
+            <div className="mt-auto pt-10 grid grid-cols-2 gap-4 text-sm border-t-2 border-white/15">
+              <div className="font-cairo pt-6">
+                <div
+                  className="text-[10px] tracking-[0.3em] uppercase font-bold mb-2"
+                  style={{ color: "#22d3ee" }}
+                >
                   للاتصال المباشر
                 </div>
-                <div className="text-white/90 font-bold">📱 01055356622</div>
-                <div className="text-white/60 text-xs">
-                  💻 nidhamhr.com · WhatsApp جاهز
+                <div className="text-white font-bold text-lg" dir="ltr">
+                  📱 +20 105 535 6622
+                </div>
+                <div className="text-white/80 text-xs mt-1">
+                  💻 nidhamhr.com · WhatsApp 24/7
                 </div>
               </div>
-              <div className="text-right">
-                <div className="text-[10px] tracking-[0.3em] uppercase text-white/40 mb-1">
+              <div className="text-right font-cairo pt-6">
+                <div
+                  className="text-[10px] tracking-[0.3em] uppercase font-bold mb-2"
+                  style={{ color: "#22d3ee" }}
+                >
                   Page
                 </div>
-                <div className="text-xl font-black font-cairo">01 / 10</div>
+                <div className="text-3xl font-black">01 / 10</div>
               </div>
             </div>
           </div>
@@ -247,12 +328,12 @@ export default function SalesBrochurePage() {
             ✦ هدف نِظام في جملة واحدة
           </div>
 
-          <h2 className="text-6xl font-black font-cairo text-slate-900 leading-tight mb-12">
-            <span className="text-brand-cyan-dark">نظام واحد</span>
+          <h2 className="text-6xl font-black font-cairo text-slate-900 leading-tight mb-10">
+            <span style={{ color: "#0891b2" }}>نظام واحد</span>
             <br />
             بياخد كل اللي بتعمله يدوي
             <br />
-            ويخلّيه <span className="text-emerald-600">أوتوماتيك.</span>
+            ويخلّيه <span style={{ color: "#059669" }}>أوتوماتيك.</span>
           </h2>
 
           {/* Before / After comparison */}
@@ -794,72 +875,118 @@ export default function SalesBrochurePage() {
         </section>
 
         {/* ─────────────────────────────────────────────────────────────
-            PAGE 10 — CTA + Contact
+            PAGE 10 — CTA + Contact (PDF-safe redesign)
             ───────────────────────────────────────────────────────────── */}
-        <section className="a4-page bg-gradient-to-br from-brand-navy via-slate-900 to-brand-navy text-white relative overflow-hidden">
+        <section
+          className="a4-page text-white relative overflow-hidden"
+          style={{
+            background:
+              "linear-gradient(135deg, #0a1428 0%, #112048 50%, #0a1428 100%)",
+          }}
+        >
+          {/* Solid accents — no blurs, prints cleanly */}
           <div
-            className="absolute rounded-full bg-brand-cyan/20 blur-3xl"
-            style={{ width: 500, height: 500, top: -150, right: -150 }}
+            className="absolute"
+            style={{
+              top: 0,
+              left: 0,
+              width: 200,
+              height: 200,
+              background:
+                "linear-gradient(135deg, #22d3ee 0%, #0891b2 100%)",
+              clipPath: "polygon(0 0, 100% 0, 0 100%)",
+            }}
           />
           <div
-            className="absolute rounded-full bg-amber-500/15 blur-3xl"
-            style={{ width: 380, height: 380, bottom: -100, left: -100 }}
+            className="absolute"
+            style={{
+              bottom: 0,
+              right: 0,
+              width: 220,
+              height: 220,
+              background: "linear-gradient(225deg, #f59e0b 0%, #d97706 100%)",
+              clipPath: "polygon(100% 40%, 100% 100%, 40% 100%)",
+            }}
           />
 
           <div className="relative h-full flex flex-col">
             <PageHeader number="10" sectionLabel="ابدأ" white />
 
             <div className="flex-1 flex flex-col justify-center">
-              <h2 className="text-7xl font-black font-cairo leading-[1.05] mb-6">
+              <h2 className="text-7xl font-black font-cairo leading-[1.05] mb-6 text-white">
                 ابدأ مجاناً
                 <br />
-                <span className="bg-gradient-to-r from-brand-cyan via-cyan-300 to-amber-300 bg-clip-text text-transparent">
-                  النهاردة.
-                </span>
+                <span style={{ color: "#f59e0b" }}>النهاردة.</span>
               </h2>
 
-              <p className="text-xl text-white/80 leading-relaxed font-cairo mb-10 max-w-2xl">
+              <p className="text-xl text-white leading-relaxed font-cairo mb-10 max-w-2xl">
                 مفيش setup معقّد. مفيش credit card. ١٤ يوم تجربة كاملة، استورد
                 موظفينك من Excel في ٣ دقايق، وابدأ تحس بالفرق من أول يوم.
               </p>
 
               {/* CTAs */}
-              <div className="grid grid-cols-2 gap-3 mb-8">
-                <div className="bg-white text-slate-900 rounded-2xl p-5 font-cairo">
-                  <div className="text-xs text-emerald-700 font-bold tracking-wider uppercase mb-2">
+              <div className="grid grid-cols-2 gap-4 mb-8">
+                <div className="bg-white text-slate-900 rounded-2xl p-5 font-cairo border-2" style={{ borderColor: "#22d3ee" }}>
+                  <div
+                    className="text-[10px] font-black tracking-widest uppercase mb-3"
+                    style={{ color: "#059669" }}
+                  >
                     خيار 1 — أسرع
                   </div>
-                  <div className="text-2xl font-black mb-3 text-slate-900">
+                  <div className="text-2xl font-black mb-2 text-slate-900">
                     💬 WhatsApp
                   </div>
-                  <div className="text-sm text-slate-600 mb-3">
+                  <div className="text-sm text-slate-700 mb-3">
                     كلمنا مباشرة. هنرد في ٥ دقايق:
                   </div>
-                  <div className="text-lg font-bold font-mono text-brand-cyan-dark" dir="ltr">
+                  <div
+                    className="text-xl font-black font-mono"
+                    style={{ color: "#0891b2" }}
+                    dir="ltr"
+                  >
                     +20 105 535 6622
                   </div>
                 </div>
 
-                <div className="bg-gradient-to-br from-brand-cyan to-brand-cyan-dark rounded-2xl p-5 font-cairo">
-                  <div className="text-xs text-white/80 font-bold tracking-wider uppercase mb-2">
+                <div
+                  className="rounded-2xl p-5 font-cairo border-2"
+                  style={{
+                    background:
+                      "linear-gradient(135deg, #22d3ee 0%, #0891b2 100%)",
+                    borderColor: "#f59e0b",
+                  }}
+                >
+                  <div
+                    className="text-[10px] font-black tracking-widest uppercase mb-3"
+                    style={{ color: "#fef3c7" }}
+                  >
                     خيار 2 — جرّب أولاً
                   </div>
-                  <div className="text-2xl font-black mb-3 text-white">
+                  <div className="text-2xl font-black mb-2 text-white">
                     🌐 nidhamhr.com
                   </div>
-                  <div className="text-sm text-white/90 mb-3">
+                  <div className="text-sm text-white mb-3">
                     سجّل دلوقتي وابدأ تجربتك الـ ١٤ يوم:
                   </div>
-                  <div className="text-lg font-bold text-white">
+                  <div className="text-lg font-black text-white">
                     /signup → ١ دقيقة → جاهز
                   </div>
                 </div>
               </div>
 
               {/* Trust badges */}
-              <div className="bg-white/10 backdrop-blur rounded-2xl p-5 border border-white/20 font-cairo">
-                <div className="text-xs text-amber-300 font-bold uppercase tracking-widest mb-3">
-                  ✦ ضمانات إضافية
+              <div
+                className="rounded-2xl p-5 border-2 font-cairo"
+                style={{
+                  borderColor: "rgba(245, 158, 11, 0.6)",
+                  backgroundColor: "rgba(245, 158, 11, 0.1)",
+                }}
+              >
+                <div
+                  className="text-xs font-black uppercase tracking-widest mb-3"
+                  style={{ color: "#fbbf24" }}
+                >
+                  ✦ ضمانات إضافية مع الاشتراك
                 </div>
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <TrustItem text="✓ Migration من نظامك القديم مجاناً" />
@@ -871,14 +998,19 @@ export default function SalesBrochurePage() {
             </div>
 
             {/* Footer */}
-            <div className="mt-auto pt-8 border-t border-white/10 flex items-end justify-between flex-wrap gap-4">
+            <div
+              className="mt-auto pt-6 border-t-2 flex items-end justify-between flex-wrap gap-4"
+              style={{ borderColor: "rgba(255,255,255,0.2)" }}
+            >
               <div className="font-cairo">
-                <div className="text-2xl font-black mb-1">نِظام · Nidham</div>
-                <div className="text-xs text-white/60">
+                <div className="text-2xl font-black mb-1 text-white">
+                  نِظام · Nidham
+                </div>
+                <div className="text-xs text-white">
                   Made in Damietta, Egypt 🇪🇬 · للسوق المصري بكل تفاصيله
                 </div>
               </div>
-              <div className="text-right text-xs text-white/40">
+              <div className="text-right text-xs text-white">
                 © 2026 Nidham HR · هذا الكتيب للتسويق فقط
                 <br />
                 الأسعار قابلة للتغيير حسب العرض المعتمد
@@ -931,6 +1063,47 @@ function CoverStat({
   );
 }
 
+/**
+ * CoverStatV2 — redesigned cover stat block with PDF-safe contrast.
+ *
+ * Each stat sits in a bordered card with solid hex colors (not Tailwind
+ * opacity utilities, which Chrome's print engine sometimes flattens to
+ * pure black). The "highlight" variant for the headline stat uses the
+ * brand amber.
+ */
+function CoverStatV2({
+  num,
+  label,
+  sub,
+  highlight,
+}: {
+  num: string;
+  label: string;
+  sub: string;
+  highlight?: boolean;
+}) {
+  return (
+    <div
+      className="p-4 rounded-2xl border-2 font-cairo"
+      style={{
+        borderColor: highlight ? "#f59e0b" : "rgba(34, 211, 238, 0.5)",
+        backgroundColor: highlight
+          ? "rgba(245, 158, 11, 0.1)"
+          : "rgba(34, 211, 238, 0.08)",
+      }}
+    >
+      <div
+        className="stat-num text-5xl mb-1"
+        style={{ color: highlight ? "#f59e0b" : "#22d3ee" }}
+      >
+        {num}
+      </div>
+      <div className="text-sm font-bold text-white">{label}</div>
+      <div className="text-[10px] text-white/80">{sub}</div>
+    </div>
+  );
+}
+
 function PageHeader({
   number,
   sectionLabel,
@@ -940,29 +1113,36 @@ function PageHeader({
   sectionLabel: string;
   white?: boolean;
 }) {
+  // PDF-safe header — uses solid colors instead of Tailwind opacity
+  // utilities (text-white/70 etc.), which Chrome's print engine can
+  // flatten to pure-black or transparent on dark backgrounds.
   return (
     <div
-      className={`flex items-center justify-between mb-8 pb-4 border-b font-cairo ${
-        white ? "border-white/20" : "border-slate-200"
-      }`}
+      className="flex items-center justify-between mb-8 pb-4 border-b-2 font-cairo"
+      style={{
+        borderColor: white ? "rgba(255,255,255,0.25)" : "#e2e8f0",
+      }}
     >
       <div className="flex items-center gap-3">
         <div
-          className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-black ${
-            white ? "bg-brand-cyan text-white" : "bg-brand-cyan-dark text-white"
-          }`}
+          className="w-9 h-9 rounded-lg flex items-center justify-center text-xs font-black text-white"
+          style={{
+            backgroundColor: white ? "#22d3ee" : "#0891b2",
+          }}
         >
           {number}
         </div>
         <div
-          className={`text-[10px] uppercase tracking-[0.3em] font-bold ${
-            white ? "text-white/70" : "text-slate-500"
-          }`}
+          className="text-[11px] uppercase tracking-[0.3em] font-black"
+          style={{ color: white ? "#22d3ee" : "#64748b" }}
         >
           {sectionLabel}
         </div>
       </div>
-      <div className={`text-xs ${white ? "text-white/50" : "text-slate-400"}`}>
+      <div
+        className="text-xs font-bold"
+        style={{ color: white ? "#cbd5e1" : "#94a3b8" }}
+      >
         نِظام · Sales Brochure 2026
       </div>
     </div>
@@ -1246,7 +1426,7 @@ function PriceCard({
 
 function TrustItem({ text }: { text: string }) {
   return (
-    <div className="text-white/90 font-cairo flex items-start gap-2">
+    <div className="text-white font-cairo flex items-start gap-2 font-medium">
       <span>{text}</span>
     </div>
   );
