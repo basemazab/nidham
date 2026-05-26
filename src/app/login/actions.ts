@@ -160,15 +160,70 @@ export async function signup(formData: FormData) {
 
   // Capture the marketing-funnel signal (which pricing tier did they click
   // before signing up?) so we can a) tailor the welcome modal to that tier,
-  // and b) show "you selected Pro" UX during the trial. The pricing page
-  // CTAs send /signup?plan=pro|starter|business; signup form forwards it
-  // as a hidden input. Whitelist values so a forged query can't write
-  // arbitrary strings into the company record.
+  // and b) show "you selected Pro" UX during the trial.
+  //
+  // M1: Added crm / crm-starter / crm-pro tiers. When the user signs up
+  // via the /crm landing page, we apply feature overrides to hide all
+  // HR/payroll modules — the customer asked for "CRM only", let's give
+  // them a clean CRM-focused dashboard.
   const planChoice = (formData.get("plan") as string | null)?.toLowerCase() ?? "";
-  const VALID_PLAN_CHOICES = ["free", "starter", "pro", "business", "enterprise"] as const;
+  const VALID_PLAN_CHOICES = [
+    "free",
+    "starter",
+    "pro",
+    "business",
+    "enterprise",
+    "crm",
+    "crm-starter",
+    "crm-pro",
+  ] as const;
   const planSignal = (VALID_PLAN_CHOICES as readonly string[]).includes(planChoice)
     ? planChoice
     : "";
+
+  // M1 — CRM-only path: hide HR features for this tenant. The sidebar
+  // reads `tenant_feature_overrides` and removes any module whose
+  // feature_key is set to enabled=false (mig 041). We insert one row
+  // per HR feature so the customer's first dashboard render is CRM-pure.
+  const isCrmOnlyPlan = planSignal.startsWith("crm");
+  if (isCrmOnlyPlan && data?.user?.id) {
+    // Look up the company_id the user was just attached to via the
+    // signup trigger (mig 001 creates company + profile).
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("company_id")
+      .eq("id", data.user.id)
+      .maybeSingle<{ company_id: string }>();
+
+    if (profile?.company_id) {
+      // Features to DISABLE for CRM-only tenants. Anything NOT in this
+      // list stays at its tier-default (CRM, AI assistant if Pro, etc.)
+      const hrFeaturesToHide = [
+        "employees",
+        "attendance",
+        "shifts_rotations",
+        "payroll",
+        "requests",
+        "recruitment",
+        "bridge_analytics",
+      ];
+
+      const overrideRows = hrFeaturesToHide.map((f) => ({
+        company_id: profile.company_id,
+        feature_key: f,
+        enabled: false,
+        reason: `Auto-applied on signup with plan=${planSignal}`,
+      }));
+
+      // ignoreDuplicates so a re-signup race doesn't error out
+      await supabase
+        .from("tenant_feature_overrides")
+        .upsert(overrideRows, {
+          onConflict: "company_id,feature_key",
+          ignoreDuplicates: false,
+        });
+    }
+  }
 
   // Redirect to dashboard with welcome + plan hint so the dashboard can
   // render a first-run UX (welcome modal + "we noticed you picked Pro,

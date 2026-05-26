@@ -16,6 +16,12 @@ const PLAN_LABEL: Record<string, string> = {
   pro: "Pro (100 موظف · 1,500 ج/شهر)",
   business: "Business (500 موظف · 3,500 ج/شهر)",
   enterprise: "Enterprise (تواصل لتسعير خاص)",
+  // CRM-only plans — for customers who want CRM/Sales pipeline only,
+  // not HR. The signup action detects these and applies feature
+  // overrides that hide all HR/Payroll modules in the dashboard.
+  crm: "CRM فقط — تجربة مجانية 14 يوم",
+  "crm-starter": "CRM Starter (5 بائعين · 599 ج/شهر)",
+  "crm-pro": "CRM Pro (15 بائع · 1,490 ج/شهر)",
 };
 
 export default async function SignupPage({
