@@ -14,6 +14,11 @@ export const config = {
   //   would rewrite them through a 200 → 302 chain that breaks the SW
   //   registration handshake)
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|offline.html|robots.txt|sitemap.xml|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff|woff2|ttf|otf|webmanifest)$).*)",
+    // Already excluded above: PWA + static images + fonts.
+    // O1 also exclude sitemap.xml + robots.txt — Next.js generates
+    // both from app/sitemap.ts and app/robots.ts, but the proxy was
+    // running on them and returning HTML 404. Search engines need
+    // raw text/xml responses.
+    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|offline.html|robots.txt|sitemap.xml|sitemap-.*\\.xml|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff|woff2|ttf|otf|webmanifest|xml|txt)$).*)",
   ],
 };
