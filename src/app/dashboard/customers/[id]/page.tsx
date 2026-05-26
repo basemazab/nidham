@@ -23,6 +23,12 @@ type Customer = {
   source: string | null;
   notes: string | null;
   created_at: string;
+  // Shipping-industry fields (mig 069) — nullable for non-shipping users
+  fleet_size: number | null;
+  shipments_per_month: number | null;
+  current_tms: string | null;
+  decision_maker: string | null;
+  decision_maker_role: string | null;
 };
 
 type EmployeeOption = { id: string; full_name: string };
@@ -220,6 +226,104 @@ export default async function EditCustomerPage({ params, searchParams }: PagePro
                   className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none transition text-slate-900"
                 />
               </div>
+            </div>
+
+            {/* Shipping-industry fields — useful for B2B software sales
+                to logistics customers (mig 069). All optional; blank
+                rows hide visually thanks to defaultValue="". */}
+            <div className="bg-gradient-to-br from-cyan-50/50 to-amber-50/30 rounded-2xl border-2 border-cyan-100 p-5">
+              <h3 className="text-sm font-bold font-cairo text-slate-800 mb-3 flex items-center gap-2">
+                <span>🚚</span>
+                <span>معلومات إضافية (لشركات الشحن / Logistics)</span>
+              </h3>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label
+                    htmlFor="fleet_size"
+                    className="block text-xs font-medium text-slate-700 mb-1 font-cairo"
+                  >
+                    🚛 حجم الأسطول (عدد السيارات)
+                  </label>
+                  <input
+                    id="fleet_size"
+                    name="fleet_size"
+                    type="number"
+                    min="0"
+                    defaultValue={customer.fleet_size ?? ""}
+                    placeholder="مثلاً: 50"
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none text-slate-900"
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="shipments_per_month"
+                    className="block text-xs font-medium text-slate-700 mb-1 font-cairo"
+                  >
+                    📦 شحنات/شهر (متوسط)
+                  </label>
+                  <input
+                    id="shipments_per_month"
+                    name="shipments_per_month"
+                    type="number"
+                    min="0"
+                    defaultValue={customer.shipments_per_month ?? ""}
+                    placeholder="مثلاً: 2000"
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none text-slate-900"
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="current_tms"
+                    className="block text-xs font-medium text-slate-700 mb-1 font-cairo"
+                  >
+                    🖥 الـ TMS المستخدم حالياً
+                  </label>
+                  <input
+                    id="current_tms"
+                    name="current_tms"
+                    type="text"
+                    defaultValue={customer.current_tms ?? ""}
+                    placeholder="مثلاً: Oracle TMS / Excel / Zoho / مفيش"
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none text-slate-900"
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="decision_maker"
+                    className="block text-xs font-medium text-slate-700 mb-1 font-cairo"
+                  >
+                    👤 صاحب القرار
+                  </label>
+                  <input
+                    id="decision_maker"
+                    name="decision_maker"
+                    type="text"
+                    defaultValue={customer.decision_maker ?? ""}
+                    placeholder="مثلاً: أحمد محمد"
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none text-slate-900"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label
+                    htmlFor="decision_maker_role"
+                    className="block text-xs font-medium text-slate-700 mb-1 font-cairo"
+                  >
+                    💼 منصبه
+                  </label>
+                  <input
+                    id="decision_maker_role"
+                    name="decision_maker_role"
+                    type="text"
+                    defaultValue={customer.decision_maker_role ?? ""}
+                    placeholder="مثلاً: COO، مدير العمليات، CEO"
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none text-slate-900"
+                  />
+                </div>
+              </div>
+              <p className="text-[10px] text-slate-500 mt-3 font-cairo">
+                💡 هذه الحقول اختيارية — مفيدة بشكل خاص لو بتبيع لشركات
+                logistics أو شحن
+              </p>
             </div>
 
             <div>

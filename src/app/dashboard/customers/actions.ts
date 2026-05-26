@@ -90,6 +90,8 @@ export async function updateCustomer(id: string, formData: FormData) {
 
   // RLS hardening: company_id clamp prevents cross-tenant updates under
   // super-admin sessions (mig 038).
+  // N3: shipping-industry fields added (mig 069) — read alongside the
+  // standard columns and saved together in a single UPDATE.
   const { error } = await supabase
     .from("customers")
     .update({
@@ -103,6 +105,11 @@ export async function updateCustomer(id: string, formData: FormData) {
       estimated_value: asNumber(formData.get("estimated_value")),
       source: asText(formData.get("source")),
       notes: asText(formData.get("notes")),
+      fleet_size: asNumber(formData.get("fleet_size")),
+      shipments_per_month: asNumber(formData.get("shipments_per_month")),
+      current_tms: asText(formData.get("current_tms")),
+      decision_maker: asText(formData.get("decision_maker")),
+      decision_maker_role: asText(formData.get("decision_maker_role")),
     })
     .eq("id", id)
     .eq("company_id", profile.company_id);
