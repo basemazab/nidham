@@ -146,13 +146,22 @@ export default async function CustomersPage() {
             </p>
           </div>
 
-          <Link
-            href="/dashboard/customers/new"
-            className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-brand-cyan to-brand-cyan-dark text-white font-bold shadow-lg shadow-cyan-500/30 hover:shadow-cyan-500/50 hover:-translate-y-0.5 transition-all font-cairo"
-          >
-            <span className="text-lg leading-none">+</span>
-            <span>إضافة عميل</span>
-          </Link>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Link
+              href="/dashboard/customers/import"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border-2 border-amber-300 text-amber-700 hover:bg-amber-50 font-bold shadow-sm transition-all font-cairo"
+            >
+              <span>📥</span>
+              <span>استورد من Excel</span>
+            </Link>
+            <Link
+              href="/dashboard/customers/new"
+              className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-brand-cyan to-brand-cyan-dark text-white font-bold shadow-lg shadow-cyan-500/30 hover:shadow-cyan-500/50 hover:-translate-y-0.5 transition-all font-cairo"
+            >
+              <span className="text-lg leading-none">+</span>
+              <span>إضافة عميل</span>
+            </Link>
+          </div>
         </header>
 
         {/* Pipeline stats */}
