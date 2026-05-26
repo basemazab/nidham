@@ -42,6 +42,7 @@ export async function createEmployee(formData: FormData) {
     phone: asText(formData.get("phone")),
     email: asText(formData.get("email")),
     hire_date: asText(formData.get("hire_date")),
+    date_of_birth: asText(formData.get("date_of_birth")),
     basic_salary: asNumber(formData.get("basic_salary")),
     housing_allowance: asNumber(formData.get("housing_allowance")),
     transport_allowance: asNumber(formData.get("transport_allowance")),

@@ -127,16 +127,30 @@ export default async function NewEmployeePage({
               </div>
             </div>
 
-            <div>
-              <label htmlFor="hire_date" className="block text-sm font-medium text-slate-700 mb-2 font-cairo">
-                تاريخ التعيين
-              </label>
-              <input
-                id="hire_date"
-                name="hire_date"
-                type="date"
-                className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none transition text-slate-900"
-              />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="hire_date" className="block text-sm font-medium text-slate-700 mb-2 font-cairo">
+                  تاريخ التعيين
+                </label>
+                <input
+                  id="hire_date"
+                  name="hire_date"
+                  type="date"
+                  className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none transition text-slate-900"
+                />
+              </div>
+              <div>
+                <label htmlFor="date_of_birth" className="block text-sm font-medium text-slate-700 mb-2 font-cairo">
+                  تاريخ الميلاد 🎂
+                  <span className="text-xs text-slate-400 font-normal mr-1">(للاحتفالات)</span>
+                </label>
+                <input
+                  id="date_of_birth"
+                  name="date_of_birth"
+                  type="date"
+                  className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none transition text-slate-900"
+                />
+              </div>
             </div>
 
             {/* Salary structure — feeds the payroll module */}

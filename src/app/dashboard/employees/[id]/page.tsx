@@ -78,6 +78,7 @@ type Employee = {
   phone: string | null;
   email: string | null;
   hire_date: string | null;
+  date_of_birth: string | null;
   basic_salary: number | null;
   housing_allowance: number | null;
   transport_allowance: number | null;
@@ -484,15 +485,30 @@ export default async function EditEmployeePage({ params, searchParams }: PagePro
               </div>
             </div>
 
-            <div>
-              <label htmlFor="hire_date" className="block text-sm font-medium text-slate-700 mb-2 font-cairo">تاريخ التعيين</label>
-              <input
-                id="hire_date"
-                name="hire_date"
-                type="date"
-                defaultValue={employee.hire_date ?? ""}
-                className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none transition text-slate-900"
-              />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="hire_date" className="block text-sm font-medium text-slate-700 mb-2 font-cairo">تاريخ التعيين</label>
+                <input
+                  id="hire_date"
+                  name="hire_date"
+                  type="date"
+                  defaultValue={employee.hire_date ?? ""}
+                  className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none transition text-slate-900"
+                />
+              </div>
+              <div>
+                <label htmlFor="date_of_birth" className="block text-sm font-medium text-slate-700 mb-2 font-cairo">
+                  تاريخ الميلاد 🎂
+                  <span className="text-xs text-slate-400 font-normal mr-1">(لصفحة الاحتفالات)</span>
+                </label>
+                <input
+                  id="date_of_birth"
+                  name="date_of_birth"
+                  type="date"
+                  defaultValue={employee.date_of_birth ?? ""}
+                  className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 outline-none transition text-slate-900"
+                />
+              </div>
             </div>
 
             {/* Salary structure — feeds the payroll module */}

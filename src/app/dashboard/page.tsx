@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { RetentionBanner } from "@/components/retention-banner";
+import { SmartInsights } from "@/components/smart-insights";
 
 type Profile = {
   full_name: string | null;
@@ -415,6 +416,12 @@ export default async function DashboardPage({
         {/* Retention banner — only renders if there are pending insights
             AND the subscription unlocks retention_insights. Otherwise null. */}
         <RetentionBanner />
+
+        {/* Smart Insights — surfaces 6 categories of actionable HR signals
+            (tardiness offenders, contracts expiring, pending leaves, new
+            hires onboarding, today's unmarked attendance, work
+            anniversaries). Renders nothing if no data is actionable. */}
+        <SmartInsights companyId={callerCompanyId} />
 
         {/* Modules section */}
         <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 font-cairo">
