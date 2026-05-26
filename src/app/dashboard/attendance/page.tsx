@@ -11,6 +11,8 @@ import {
 } from "./actions";
 import { BulkAttendanceModal } from "./bulk-attendance-modal";
 import { AttendanceFilters } from "./attendance-filters";
+import { AttendanceTimeCell } from "./attendance-time-cell";
+import { workedHours, formatHours } from "@/lib/attendance";
 
 type SearchParams = Promise<{
   date?: string;
@@ -82,10 +84,13 @@ export default async function AttendancePage({
     typeof recentImportCount === "number" ? recentImportCount : 0;
 
   // Existing attendance for this date -- pulled with tardiness +
-  // early-leave so the form defaults reflect what's already saved.
+  // early-leave + check_in/check_out so the form defaults reflect
+  // everything already saved.
   const { data: existing } = await supabase
     .from("attendance")
-    .select("employee_id, status, tardiness_minutes, early_leave_minutes")
+    .select(
+      "employee_id, status, tardiness_minutes, early_leave_minutes, check_in, check_out, hours_worked",
+    )
     .eq("company_id", callerCompanyId)
     .eq("date", selectedDate)
     .returns<
@@ -94,12 +99,22 @@ export default async function AttendancePage({
         status: string;
         tardiness_minutes: number | null;
         early_leave_minutes: number | null;
+        check_in: string | null;
+        check_out: string | null;
+        hours_worked: number | null;
       }>
     >();
 
   const existingMap = new Map<
     string,
-    { status: string; tardiness: number; earlyLeave: number }
+    {
+      status: string;
+      tardiness: number;
+      earlyLeave: number;
+      checkIn: string | null;
+      checkOut: string | null;
+      hoursWorked: number | null;
+    }
   >(
     existing?.map((r) => [
       r.employee_id,
@@ -107,6 +122,9 @@ export default async function AttendancePage({
         status: r.status,
         tardiness: r.tardiness_minutes ?? 0,
         earlyLeave: r.early_leave_minutes ?? 0,
+        checkIn: r.check_in,
+        checkOut: r.check_out,
+        hoursWorked: r.hours_worked,
       },
     ]) ?? [],
   );
@@ -469,6 +487,18 @@ export default async function AttendancePage({
                     <th className="px-5 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider font-cairo">
                       الحالة
                     </th>
+                    <th className="px-3 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider font-cairo">
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-emerald-700">دخول</span>
+                        <span className="text-rose-700">خروج</span>
+                        <span className="text-[9px] font-normal text-slate-400 normal-case">
+                          {formatArabicDate(selectedDate)}
+                        </span>
+                      </div>
+                    </th>
+                    <th className="px-3 py-3 text-xs font-bold text-cyan-700 uppercase tracking-wider font-cairo">
+                      ساعات
+                    </th>
                     <th className="px-3 py-3 text-xs font-bold text-amber-700 uppercase tracking-wider font-cairo">
                       تأخير (د)
                     </th>
@@ -531,6 +561,32 @@ export default async function AttendancePage({
                           </select>
                         </td>
                         <td className="px-3 py-3">
+                          <AttendanceTimeCell
+                            employeeId={emp.id}
+                            defaultCheckIn={current?.checkIn}
+                            defaultCheckOut={current?.checkOut}
+                          />
+                        </td>
+                        <td className="px-3 py-3 text-center">
+                          {(() => {
+                            // Show stored hours if present, else recompute
+                            // from the times we just rendered. Same number
+                            // either way — but storing lets us skip the
+                            // re-derive on every reload.
+                            const hrs =
+                              current?.hoursWorked ??
+                              workedHours(
+                                current?.checkIn ?? null,
+                                current?.checkOut ?? null,
+                              );
+                            return (
+                              <span className="text-sm font-mono text-cyan-700 font-bold">
+                                {hrs > 0 ? formatHours(hrs) : "—"}
+                              </span>
+                            );
+                          })()}
+                        </td>
+                        <td className="px-3 py-3">
                           <input
                             type="number"
                             name={`tardiness_${emp.id}`}
@@ -561,9 +617,12 @@ export default async function AttendancePage({
               </table>
             </div>
 
-            <div className="flex items-center justify-between bg-white p-4 rounded-xl border border-slate-100 sticky bottom-4 shadow-lg">
+            <div className="flex items-center justify-between bg-white p-4 rounded-xl border border-slate-100 sticky bottom-4 shadow-lg gap-3 flex-wrap">
               <p className="text-sm text-slate-600 font-cairo">
-                لو موظف ساكت ما عليش — مش هيتسجل ليه حاجة. اختار الحالة لكل موظف عايز تسجّله.
+                لو موظف ساكت ما عليش — مش هيتسجل ليه حاجة. اضغط{" "}
+                <span className="font-bold text-emerald-700">"الآن"</span>{" "}
+                علشان تسجّل ساعة الدخول/الخروج بضغطة، وعمود "ساعات" بيتحسب
+                تلقائياً.
               </p>
               <button
                 type="submit"

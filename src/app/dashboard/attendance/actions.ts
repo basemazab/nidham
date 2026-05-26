@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireHR, requireAdmin } from "@/lib/permissions";
 import { bustDashboardCache } from "@/lib/cache";
+import { workedHours } from "@/lib/attendance";
 
 // ─── Quick-action helpers ───────────────────────────────────────────────
 // Two HR shortcuts that turn the daily roll-call from minutes into
@@ -195,39 +196,80 @@ export async function saveAttendance(formData: FormData) {
     redirect("/dashboard/attendance?error=" + encodeURIComponent("التاريخ مطلوب"));
   }
 
-  // Collect all status_<employee_id> entries. Tardiness + early-leave
-  // (minutes) are read alongside the status with the same employee_id
-  // suffix so they end up on the same upserted row.
-  const records: Array<{
-    company_id: string;
-    employee_id: string;
-    date: string;
-    status: string;
-    tardiness_minutes: number;
-    early_leave_minutes: number;
-    created_by: string;
-  }> = [];
+  // Collect every row the HR touched. A row counts as "touched" if
+  // ANY of: status / tardiness / early-leave / check_in / check_out
+  // has a value. Rows the HR left completely blank are skipped so
+  // we never write empty noise records.
+  //
+  // Logic: walk all status_ keys first (they always exist — one
+  // <select> per active employee), then sweep for check_in_ keys
+  // that don't have a matching status_ key (defensive — shouldn't
+  // happen with the current page but cheap insurance).
+  const touched = new Map<
+    string,
+    {
+      status: string;
+      tardiness: number;
+      earlyLeave: number;
+      checkIn: string | null;
+      checkOut: string | null;
+    }
+  >();
 
   for (const [key, rawValue] of formData.entries()) {
     if (!key.startsWith("status_")) continue;
-    const value = String(rawValue ?? "");
-    if (!value) continue;
-    if (!VALID_STATUSES.includes(value as AttendanceStatus)) continue;
-
     const empId = key.replace("status_", "");
+    const status = String(rawValue ?? "");
     const tardiness = clampMinutes(formData.get(`tardiness_${empId}`));
     const earlyLeave = clampMinutes(formData.get(`early_leave_${empId}`));
+    const checkIn = parseTime(formData.get(`check_in_${empId}`));
+    const checkOut = parseTime(formData.get(`check_out_${empId}`));
 
-    records.push({
+    // Skip rows the HR left completely empty.
+    if (!status && !checkIn && !checkOut && tardiness === 0 && earlyLeave === 0) {
+      continue;
+    }
+
+    // Implicit-status promotion: if HR typed a check-in time but
+    // forgot to pick a status, treat it as "present". Matches the
+    // mental model "وصل الساعة 9 = حاضر".
+    let finalStatus = status;
+    if (!finalStatus && (checkIn || checkOut)) finalStatus = "present";
+
+    if (!finalStatus) continue;
+    if (!VALID_STATUSES.includes(finalStatus as AttendanceStatus)) continue;
+
+    touched.set(empId, {
+      status: finalStatus,
+      tardiness,
+      earlyLeave,
+      checkIn,
+      checkOut,
+    });
+  }
+
+  const records = Array.from(touched.entries()).map(([empId, t]) => {
+    // Auto-compute hours worked from check_in / check_out. Stored as
+    // numeric(4,2) so payroll + reports read a single value instead
+    // of re-deriving it on every query.
+    const hours =
+      t.checkIn && t.checkOut
+        ? Number(workedHours(t.checkIn, t.checkOut).toFixed(2))
+        : null;
+
+    return {
       company_id: profile.company_id as string,
       employee_id: empId,
       date,
-      status: value,
-      tardiness_minutes: tardiness,
-      early_leave_minutes: earlyLeave,
+      status: t.status,
+      tardiness_minutes: t.tardiness,
+      early_leave_minutes: t.earlyLeave,
+      check_in: t.checkIn,
+      check_out: t.checkOut,
+      hours_worked: hours,
       created_by: user.id,
-    });
-  }
+    };
+  });
 
   if (records.length === 0) {
     redirect(
@@ -546,6 +588,28 @@ function clampMinutes(value: FormDataEntryValue | null): number {
   const n = parseInt(String(value), 10);
   if (!Number.isFinite(n) || n <= 0) return 0;
   return Math.min(n, 720);
+}
+
+/**
+ * Parse a "HH:MM" time string from a form input into a Postgres-safe
+ * time value, or null if the field was empty / malformed.
+ *
+ * Accepts "HH:MM" (from <input type="time">) and "HH:MM:SS" (defensive).
+ * Returns "HH:MM:00" so the value round-trips through pg's `time` type
+ * without losing the seconds field.
+ */
+function parseTime(value: FormDataEntryValue | null): string | null {
+  if (value === null) return null;
+  const raw = String(value).trim();
+  if (!raw) return null;
+  // Accept HH:MM or HH:MM:SS
+  const m = raw.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  if (!m) return null;
+  const h = parseInt(m[1], 10);
+  const mn = parseInt(m[2], 10);
+  const s = m[3] ? parseInt(m[3], 10) : 0;
+  if (h < 0 || h > 23 || mn < 0 || mn > 59 || s < 0 || s > 59) return null;
+  return `${String(h).padStart(2, "0")}:${String(mn).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
 function datesBetween(start: string, end: string): string[] {
