@@ -10,12 +10,60 @@
 // FAQ section answers the 5 questions every prospect asks in demos.
 
 import Link from "next/link";
+import { FAQPageSchema } from "@/components/json-ld";
 
+// SEO O2: title front-loads "أسعار" + "نظام HR" — common Egyptian search.
 export const metadata = {
-  title: "الأسعار — نِظام",
+  title: "أسعار نظام HR ومرتبات مصري — من 749 ج/شهر | نِظام",
   description:
-    "أربع باقات مناسبة لكل أحجام الشركات المصرية، من 0 موظف لـ 500+ موظف. ابدأ ببقة مجانية للأبد لحد 5 موظفين.",
+    "باقات نظام HR ومرتبات مصري — Free / Starter (749 ج) / Pro (2,430 ج) / Business (5,990 ج). 14 يوم تجربة مجاناً. خصم 20% على الاشتراك السنوي.",
+  alternates: { canonical: "/pricing" },
 };
+
+// FAQ schema content — populated below into JSON-LD AND rendered visually
+// on the page so users + Google see the same answers.
+const PRICING_FAQS = [
+  {
+    question: "كم سعر نظام HR ومرتبات لشركة 50 موظف في مصر؟",
+    answer:
+      "باقة Pro من نِظام بـ 2,430 جنيه شهرياً (أو 1,944 ج/شهر مع الاشتراك السنوي بخصم 20%) تكفي لـ 100 موظف وتشمل كل الـ HR + Payroll + AI Assistant + WhatsApp Bot للموظفين. متوافقة مع قانون العمل المصري 12/2003 وقانون التأمينات 148/2019.",
+  },
+  {
+    question: "هل في نسخة مجانية من نِظام؟",
+    answer:
+      "أيوة. الـ Free Plan مجاني للأبد لحد 5 موظفين، ويشمل إدارة موظفين أساسية + حضور وانصراف + 9 نماذج رسمية للتأمينات والضرايب. مفيش credit card مطلوب.",
+  },
+  {
+    question: "إيه الفرق بين نِظام و Bayzat و ZenHR؟",
+    answer:
+      "نِظام مبني خصيصاً للسوق المصري — حساب التأمينات بشرائح 2024، شرائح ضريبة الدخل المصرية، 9 نماذج رسمية مصرية، واجهة عربية كاملة، ودعم WhatsApp بالعربي. السعر أقل بـ 60-70% من Bayzat / ZenHR لنفس الموظفين.",
+  },
+  {
+    question: "هل النظام بيحسب التأمينات الاجتماعية والضرايب تلقائياً؟",
+    answer:
+      "أيوة، النظام بيحسب حصة الموظف وحصة صاحب العمل من التأمينات الاجتماعية حسب قانون 148/2019 وشرائح 2024، وضريبة الدخل حسب شرائح قانون 91/2005 المحدّثة لـ 2026 (7 شرائح من 0% لـ 27.5%).",
+  },
+  {
+    question: "هل يقدر الموظف يسجّل حضوره من موبايله؟",
+    answer:
+      "أيوة. الموظف بيفتح اللينك من موبايله (PWA - بدون تنزيل تطبيق) → بيسمح للـ GPS والكاميرا → بياخد سيلفي → النظام بيتحقق إنه في مكان العمل (Geofencing) وبيسجّل حضوره مع الوقت والصورة.",
+  },
+  {
+    question: "كم وقت يستغرق Setup النظام لشركتي؟",
+    answer:
+      "أقل من 5 دقايق. تسجّل حسابك → تستورد موظفينك من Excel (مجاناً) → تضبط إعدادات الشركة → تبدأ. لو محتاج مساعدة، فيه تدريب لفريق HR لمدة ساعة مجاناً مع كل اشتراك Pro.",
+  },
+  {
+    question: "هل في API للتكامل مع أنظمة شركتي؟",
+    answer:
+      "أيوة، في REST API متاح لباقات Pro و Business، يشمل endpoints لإدارة الموظفين والعملاء والحضور والمرتبات. للـ Enterprise بنبني integration مخصص حسب احتياجك.",
+  },
+  {
+    question: "هل بياناتي آمنة وفقاً لقانون حماية البيانات المصري؟",
+    answer:
+      "أيوة، النظام متوافق مع قانون حماية البيانات المصري 151/2020 (PDPL). كل بيانات الـ PII الحساسة (الرقم القومي، بيانات البنك، رقم التأمينات) مشفّرة بـ AES-256، ويوجد سجل نشاط (audit log) كامل لكل عمليات الوصول.",
+  },
+];
 
 type Tier = {
   name: string;
@@ -158,6 +206,11 @@ const FAQ = [
 export default function PricingPage() {
   return (
     <main className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-cyan-50/30 py-12 px-6">
+      {/* SEO O3: FAQ Schema for "People Also Ask" + Featured Snippets.
+          Google reads this and may render expandable Q&A directly in
+          search results — massive CTR boost for pricing keywords. */}
+      <FAQPageSchema questions={PRICING_FAQS} />
+
       <div className="max-w-6xl mx-auto">
         {/* Breadcrumb */}
         <div className="mb-6">

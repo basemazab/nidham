@@ -7,6 +7,11 @@ import { UrlToasts } from "@/components/url-toasts";
 import { ThemeProvider } from "@/components/theme-provider";
 import { MetaPixel } from "@/components/meta-pixel";
 import { PWAInstaller } from "@/components/pwa-installer";
+import {
+  OrganizationSchema,
+  SoftwareApplicationSchema,
+  WebsiteSchema,
+} from "@/components/json-ld";
 
 const tajawal = Tajawal({
   variable: "--font-tajawal",
@@ -45,12 +50,48 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
+  // SEO O2: title front-loads the most-searched Egyptian Arabic keywords
+  // ("نظام إدارة موارد بشرية", "مرتبات", "مصر") to maximize click-through
+  // from search results. 60-char limit respected. Brand at the end —
+  // it's strong enough to stand without being first.
   title: {
-    default: "نِظام — منصة HR + CRM + AI Recruitment للسوق المصري",
-    template: "%s | نِظام",
+    default:
+      "نظام إدارة موارد بشرية ومرتبات للشركات المصرية | نِظام",
+    template: "%s | نِظام HR",
   },
   description:
-    "نظام واحد بدل خمس أنظمة منفصلة. HR + CRM + ذكاء اصطناعي. متوافق مع قانون العمل المصري 12/2003 وقانون التأمينات 148/2019. حضور بالـ GPS، رواتب آلية، فحص CVs بالـ AI.",
+    "أفضل نظام HR ومرتبات مصري بـ AI — متوافق مع قانون 12/2003 والتأمينات 148/2019. حضور بالـ GPS، حساب رواتب آلي، نماذج تأمينات، توقيع إلكتروني. تجربة 14 يوم مجاناً.",
+  keywords: [
+    // ── Primary Arabic intent keywords ──
+    "نظام HR مصري",
+    "برنامج موارد بشرية",
+    "نظام مرتبات مصري",
+    "برنامج مرتبات للشركات",
+    "نظام حضور وانصراف",
+    "حضور وانصراف GPS",
+    "نظام تأمينات اجتماعية",
+    "حساب التأمينات والضرايب",
+    "نموذج 1 تأمينات",
+    "نموذج 6 تأمينات",
+    "شهادة خبرة جاهزة",
+    "حساب نهاية الخدمة",
+    "نظام CRM مصري",
+    "برنامج إدارة العملاء",
+    // ── Comparative / alternative ──
+    "بديل Bayzat",
+    "بديل ZenHR",
+    "Bayzat alternative Egypt",
+    // ── English ──
+    "egyptian hr software",
+    "egypt payroll system",
+    "hr software egypt",
+    "egypt labor law compliance",
+    "arabic hr system",
+    // ── Brand ──
+    "نِظام",
+    "Nidham HR",
+    "نظام نظام",
+  ],
   applicationName: "Nidham",
   // PWA / install metadata
   manifest: "/manifest.webmanifest",
@@ -69,17 +110,27 @@ export const metadata: Metadata = {
   },
   openGraph: {
     type: "website",
-    siteName: "Nidham",
-    title: "نِظام — منصة HR + CRM + AI Recruitment للسوق المصري",
+    siteName: "Nidham HR",
+    title: "نظام إدارة موارد بشرية ومرتبات للشركات المصرية | نِظام",
     description:
-      "نظام واحد بدل خمس أنظمة منفصلة. HR + CRM + ذكاء اصطناعي. متوافق مع قانون العمل المصري والتأمينات.",
+      "أفضل نظام HR ومرتبات مصري بـ AI — متوافق مع قانون 12/2003. حضور بالـ GPS، نماذج تأمينات، توقيع إلكتروني. 14 يوم مجاناً.",
     locale: "ar_EG",
+    alternateLocale: ["en_US"],
   },
   twitter: {
     card: "summary_large_image",
-    title: "نِظام — منصة HR + CRM + AI Recruitment",
+    title: "نظام HR ومرتبات للشركات المصرية | نِظام",
     description:
-      "نظام HR + CRM + AI واحد للسوق المصري. متوافق قانونيًا. حضور بالـ GPS وفحص CVs بالـ AI.",
+      "أفضل نظام HR + Payroll + AI مصري · متوافق قانونياً · حضور GPS · 14 يوم مجاناً.",
+    site: "@nidham_hr",
+  },
+  // SEO O2: explicit canonical to prevent www / non-www duplication
+  alternates: {
+    canonical: siteUrl,
+    languages: {
+      "ar-EG": siteUrl,
+      "x-default": siteUrl,
+    },
   },
   robots: {
     index: true,
@@ -104,6 +155,13 @@ export default function RootLayout({
       className={`${tajawal.variable} ${cairo.variable} ${reemKufi.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col font-sans">
+        {/* SEO: schema.org structured data on every page.
+            Organization + SoftwareApplication + WebSite power
+            Google's Knowledge Panel, rich card results, and the
+            sitelinks search box. */}
+        <OrganizationSchema />
+        <SoftwareApplicationSchema />
+        <WebsiteSchema />
         <ThemeProvider>
           {children}
           {/* Sonner toaster — top-center so RTL feels natural. richColors
