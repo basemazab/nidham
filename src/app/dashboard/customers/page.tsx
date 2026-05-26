@@ -66,6 +66,28 @@ export default async function CustomersPage() {
 
   const list = customers ?? [];
 
+  // M1 follow-up: last-contact tracking — the customer specifically asked
+  // for "هل تم التواصل معاه ولا لا". Pull the most recent interaction
+  // per customer in a single query, then build a map so the row render
+  // can show the freshness pill ("الآن" / "5 أيام" / "⚠ مفيش تواصل").
+  const customerIds = list.map((c) => c.id);
+  let lastContactByCustomer: Record<string, string> = {};
+  if (customerIds.length > 0) {
+    const { data: interactions } = await supabase
+      .from("interactions")
+      .select("customer_id, interaction_date")
+      .in("customer_id", customerIds)
+      .order("interaction_date", { ascending: false })
+      .returns<Array<{ customer_id: string; interaction_date: string }>>();
+
+    // Take the first (most recent) interaction per customer
+    for (const i of interactions ?? []) {
+      if (!lastContactByCustomer[i.customer_id]) {
+        lastContactByCustomer[i.customer_id] = i.interaction_date;
+      }
+    }
+  }
+
   // Quick stats
   const byStatus = {
     lead: list.filter((c) => c.status === "lead").length,
@@ -161,6 +183,7 @@ export default async function CustomersPage() {
                   <th className="px-5 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider font-cairo">العميل</th>
                   <th className="px-5 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider font-cairo">الموبايل</th>
                   <th className="px-5 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider font-cairo">الحالة</th>
+                  <th className="px-5 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider font-cairo">آخر تواصل</th>
                   <th className="px-5 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider font-cairo">المسؤول</th>
                   <th className="px-5 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider font-cairo">القيمة</th>
                   <th className="px-5 py-3"></th>
@@ -191,6 +214,19 @@ export default async function CustomersPage() {
                           {status.text}
                         </span>
                       </td>
+                      <td className="px-5 py-4 font-cairo">
+                        {(() => {
+                          const last = lastContactByCustomer[customer.id];
+                          const pill = lastContactPill(last);
+                          return (
+                            <span
+                              className={`inline-block px-2.5 py-1 rounded-full text-xs font-bold border ${pill.classes}`}
+                            >
+                              {pill.text}
+                            </span>
+                          );
+                        })()}
+                      </td>
                       <td className="px-5 py-4 text-slate-600 text-sm font-cairo">
                         {customer.employees?.full_name ?? "—"}
                       </td>
@@ -215,4 +251,62 @@ export default async function CustomersPage() {
       </div>
     </main>
   );
+}
+
+/**
+ * Convert a last-interaction ISO date into a colored "freshness pill"
+ * that fits in the customers table. Logic the user described:
+ *   - "هل تم التواصل معاه ولا لا" → if never, show red "⚠ مفيش تواصل"
+ *   - Otherwise show how recent the contact was, color-coded
+ */
+function lastContactPill(iso: string | undefined): {
+  text: string;
+  classes: string;
+} {
+  if (!iso) {
+    return {
+      text: "⚠ مفيش تواصل",
+      classes: "bg-rose-50 text-rose-700 border-rose-200",
+    };
+  }
+  const lastDate = new Date(iso);
+  const now = new Date();
+  const daysAgo = Math.floor(
+    (now.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24),
+  );
+
+  if (daysAgo < 1) {
+    return {
+      text: "النهاردة",
+      classes: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    };
+  }
+  if (daysAgo === 1) {
+    return {
+      text: "امبارح",
+      classes: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    };
+  }
+  if (daysAgo <= 7) {
+    return {
+      text: `${daysAgo} أيام`,
+      classes: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    };
+  }
+  if (daysAgo <= 14) {
+    return {
+      text: `${daysAgo} يوم`,
+      classes: "bg-amber-50 text-amber-700 border-amber-200",
+    };
+  }
+  if (daysAgo <= 30) {
+    return {
+      text: `${daysAgo} يوم`,
+      classes: "bg-orange-50 text-orange-700 border-orange-200",
+    };
+  }
+  return {
+    text: `${daysAgo} يوم ⚠`,
+    classes: "bg-rose-50 text-rose-700 border-rose-200",
+  };
 }
