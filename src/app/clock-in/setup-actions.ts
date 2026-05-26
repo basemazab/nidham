@@ -35,21 +35,26 @@ export async function linkSelfAsEmployee() {
     redirect("/clock-in");
   }
 
-  // 1. Try to find an existing employees row by email — common for
-  //    founders who added themselves manually to the employee list.
+  // 1. Try to find an existing employees row by email OR full_name match —
+  //    founders often add themselves to the employee list manually with a
+  //    different email (or no email at all) than the auth account they
+  //    log in with. Trying just email creates a duplicate that has to be
+  //    cleaned up later — same bug that hit Basem in production.
   const email = user.email ?? "";
+  const displayName = profile.full_name ?? "";
+
+  // Try email first (exact match — strongest signal)
   if (email) {
     const { data: byEmail } = await supabase
       .from("employees")
-      .select("id, user_id")
+      .select("id")
       .eq("company_id", profile.company_id)
       .eq("email", email)
       .is("user_id", null)
       .limit(1)
-      .maybeSingle<{ id: string; user_id: string | null }>();
+      .maybeSingle<{ id: string }>();
 
     if (byEmail) {
-      // Found a match — link it
       await supabase
         .from("employees")
         .update({ user_id: user.id })
@@ -59,17 +64,41 @@ export async function linkSelfAsEmployee() {
     }
   }
 
+  // Fall back: name match — only when the auth profile has a full_name.
+  // Uses ILIKE %name% so "HR — باسم محمود عزب" matches a "Basem" auth
+  // profile. Defensive: only link if EXACTLY one unlinked match exists,
+  // to avoid wrong-binding when two employees share a first name.
+  if (displayName.trim().length >= 3) {
+    const firstWord = displayName.trim().split(/\s+/)[0];
+    const { data: nameMatches } = await supabase
+      .from("employees")
+      .select("id")
+      .eq("company_id", profile.company_id)
+      .is("user_id", null)
+      .ilike("full_name", `%${firstWord}%`)
+      .returns<Array<{ id: string }>>();
+
+    if (nameMatches && nameMatches.length === 1) {
+      await supabase
+        .from("employees")
+        .update({ user_id: user.id, email })
+        .eq("id", nameMatches[0].id);
+      revalidatePath("/clock-in");
+      redirect("/clock-in");
+    }
+    // 2+ matches: ambiguous — don't auto-link, fall through to create
+    // a fresh record and let HR manually merge later
+  }
+
   // 2. No existing row — create a minimal one. HR can flesh out the
   //    details (salary, allowances) later from /dashboard/employees/[id].
-  const displayName =
-    profile.full_name ??
-    email.split("@")[0] ??
-    "Admin";
+  const fallbackName =
+    displayName || email.split("@")[0] || "Admin";
 
   const { error } = await supabase.from("employees").insert({
     company_id: profile.company_id,
     user_id: user.id,
-    full_name: displayName,
+    full_name: fallbackName,
     email,
     status: "active",
     pay_frequency: "monthly",
