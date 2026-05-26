@@ -429,156 +429,90 @@ export default async function DashboardPage({
             anniversaries). Renders nothing if no data is actionable. */}
         <SmartInsights companyId={callerCompanyId} />
 
-        {/* Modules section */}
-        <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 font-cairo">
-          الموديولات
-        </h2>
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 mb-8">
-          <Link
-            href="/dashboard/employees"
-            className="bg-white p-6 rounded-2xl border border-slate-100 hover:border-brand-cyan/40 hover:shadow-lg hover:-translate-y-0.5 transition-all"
-          >
-            <div className="text-3xl mb-2">👥</div>
-            <h3 className="font-bold font-cairo mb-1 text-slate-800">الموظفين</h3>
-            <p className="text-xs text-slate-500">إدارة فريقك</p>
-          </Link>
+        {/* ─────────────────────────────────────────────────────────────
+            Modules — grouped by job-to-be-done.
+            Six categories matching the sidebar IA. Each group is a
+            small grid of compact cards so the user scans visually
+            instead of reading a wall of 30+ tiles.
+            ───────────────────────────────────────────────────────────── */}
 
-          <Link
-            href="/dashboard/attendance"
-            className="bg-white p-6 rounded-2xl border border-slate-100 hover:border-brand-cyan/40 hover:shadow-lg hover:-translate-y-0.5 transition-all"
-          >
-            <div className="text-3xl mb-2">⏰</div>
-            <h3 className="font-bold font-cairo mb-1 text-slate-800">الحضور والانصراف</h3>
-            <p className="text-xs text-slate-500">تسجيل يومي</p>
-          </Link>
+        <ModuleGroup
+          title="👥 الفريق"
+          subtitle="إدارة الموظفين والأداء"
+          modules={[
+            { href: "/dashboard/employees", emoji: "👥", title: "الموظفين", desc: "ضيف، عدّل، استورد" },
+            { href: "/dashboard/org-chart", emoji: "🌳", title: "الهيكل التنظيمي", desc: "خريطة المناصب" },
+            { href: "/dashboard/performance", emoji: "📈", title: "تقييم الأداء", desc: "KPIs + مراجعات" },
+            { href: "/dashboard/assets", emoji: "📦", title: "الأصول والعهد", desc: "اللاب توب + الموبايل" },
+            { href: "/dashboard/celebrations", emoji: "🎉", title: "الاحتفالات", desc: "ذكريات + أعياد ميلاد" },
+          ]}
+        />
 
-          <Link
-            href="/dashboard/customers"
-            className="bg-white p-6 rounded-2xl border border-slate-100 hover:border-brand-cyan/40 hover:shadow-lg hover:-translate-y-0.5 transition-all"
-          >
-            <div className="text-3xl mb-2">💼</div>
-            <h3 className="font-bold font-cairo mb-1 text-slate-800">العملاء</h3>
-            <p className="text-xs text-slate-500">CRM + Pipeline</p>
-          </Link>
+        <ModuleGroup
+          title="⏰ الوقت والحضور"
+          subtitle="الحضور، الورديات، الإجازات"
+          modules={[
+            { href: "/dashboard/attendance", emoji: "⏰", title: "تسجيل الحضور", desc: "يومي + دخول/خروج" },
+            { href: "/dashboard/shifts", emoji: "🕒", title: "الورديات", desc: "جدول أسبوعي للطباعة" },
+            { href: "/dashboard/team-calendar", emoji: "📅", title: "تقويم الإجازات", desc: "مين في إجازة الأسبوع ده" },
+            { href: "/dashboard/requests", emoji: "📨", title: "طلبات الموظفين", desc: "إجازة + سلفة + استئذان" },
+          ]}
+        />
 
-          <Link
-            href="/dashboard/interactions"
-            className="bg-gradient-to-br from-amber-50 to-cyan-50 p-6 rounded-2xl border-2 border-amber-200 hover:border-amber-400 hover:shadow-lg hover:-translate-y-0.5 transition-all"
-          >
-            <div className="text-3xl mb-2">💬</div>
-            <h3 className="font-bold font-cairo mb-1 text-slate-800">التفاعلات</h3>
-            <p className="text-xs text-amber-700 font-bold">قلب Bridge</p>
-          </Link>
+        <ModuleGroup
+          title="💰 المرتبات"
+          subtitle="الرواتب والاستحقاقات"
+          modules={[
+            { href: "/dashboard/payroll", emoji: "💰", title: "الرواتب", desc: "دورات + كشف صرف" },
+            { href: "/dashboard/loans", emoji: "💵", title: "السلف والمرتجعات", desc: "خصم تلقائي شهري" },
+            { href: "/dashboard/eos-calculator", emoji: "⚖", title: "نهاية الخدمة", desc: "حاسبة قانون 12/2003" },
+          ]}
+        />
 
-          <Link
-            href="/dashboard/contracts"
-            className="bg-white p-6 rounded-2xl border border-slate-100 hover:border-brand-cyan/40 hover:shadow-lg hover:-translate-y-0.5 transition-all relative overflow-hidden"
-          >
-            <div className="absolute top-2 left-2 text-[10px] text-brand-gold font-bold tracking-wider">
-              جديد ✦
-            </div>
-            <div className="text-3xl mb-2">📋</div>
-            <h3 className="font-bold font-cairo mb-1 text-slate-800">العقود</h3>
-            <p className="text-xs text-slate-500">تنبيه قبل التجديد</p>
-          </Link>
+        <ModuleGroup
+          title="💼 العملاء والمبيعات"
+          subtitle="CRM + Pipeline + عقود"
+          modules={[
+            { href: "/dashboard/customers", emoji: "💼", title: "العملاء", desc: "Pipeline + متابعة" },
+            { href: "/dashboard/interactions", emoji: "💬", title: "التفاعلات", desc: "قلب Bridge", highlight: "amber" },
+            { href: "/dashboard/contracts", emoji: "📋", title: "العقود", desc: "تنبيه قبل التجديد" },
+          ]}
+        />
 
-          <Link
-            href="/dashboard/retention"
-            className="bg-gradient-to-br from-rose-50 via-amber-50 to-emerald-50 p-6 rounded-2xl border-2 border-amber-200 hover:border-amber-400 hover:shadow-lg hover:-translate-y-0.5 transition-all relative overflow-hidden"
-          >
-            <div className="absolute top-2 left-2 text-[10px] text-rose-600 font-bold tracking-wider">
-              ✦ ذكاء
-            </div>
-            <div className="text-3xl mb-2">🎯</div>
-            <h3 className="font-bold font-cairo mb-1 text-slate-800">
-              احتفاظ بالموظفين
-            </h3>
-            <p className="text-xs text-amber-700 font-bold">زيادات · مكافآت · إنذارات</p>
-          </Link>
+        <ModuleGroup
+          title="📄 المستندات والامتثال"
+          subtitle="نماذج رسمية + توقيع + لوائح"
+          modules={[
+            { href: "/dashboard/forms", emoji: "📄", title: "النماذج", desc: "٩ نماذج تأمينات + ضرايب" },
+            { href: "/dashboard/signatures", emoji: "✍", title: "التوقيع الإلكتروني", desc: "بإصبع الموظف على الموبايل" },
+            { href: "/dashboard/compliance", emoji: "🏛", title: "دليل الامتثال", desc: "٧ جهات تفتيش" },
+          ]}
+        />
 
-          <Link
-            href="/dashboard/forms"
-            className="bg-gradient-to-br from-amber-50 via-yellow-50 to-cyan-50 p-6 rounded-2xl border-2 border-amber-200 hover:border-amber-400 hover:shadow-lg hover:-translate-y-0.5 transition-all relative overflow-hidden"
-          >
-            <div className="absolute top-2 left-2 text-[10px] text-amber-700 font-bold tracking-wider">
-              ✦ جديد
-            </div>
-            <div className="text-3xl mb-2">📄</div>
-            <h3 className="font-bold font-cairo mb-1 text-slate-800">
-              نماذج HR الرسمية
-            </h3>
-            <p className="text-xs text-amber-700 font-bold">
-              ٩ نماذج جاهزة للطباعة
-            </p>
-          </Link>
+        <ModuleGroup
+          title="🤖 ذكاء + تسويق"
+          subtitle="AI + Recruitment + Marketing Studio"
+          modules={[
+            { href: "/dashboard/ai", emoji: "🤖", title: "المساعد الذكي", desc: "١٥ أداة + شات بالعربي", highlight: "amber" },
+            { href: "/dashboard/jobs", emoji: "🎯", title: "التوظيف الذكي", desc: "ATS + فحص CV بالـ AI" },
+            { href: "/dashboard/retention", emoji: "🛡", title: "احتفاظ بالموظفين", desc: "زيادات + إنذارات" },
+            { href: "/dashboard/marketing", emoji: "✦", title: "Marketing Studio", desc: "👑 Enterprise", highlight: "gold" },
+          ]}
+        />
 
-          <Link
-            href="/dashboard/compliance"
-            className="bg-gradient-to-br from-cyan-50 via-amber-50 to-rose-50 p-6 rounded-2xl border-2 border-amber-200 hover:border-amber-400 hover:shadow-lg hover:-translate-y-0.5 transition-all relative overflow-hidden"
-          >
-            <div className="absolute top-2 left-2 text-[10px] text-rose-600 font-bold tracking-wider">
-              ✦ جديد
-            </div>
-            <div className="text-3xl mb-2">🏛</div>
-            <h3 className="font-bold font-cairo mb-1 text-slate-800">
-              دليل الامتثال
-            </h3>
-            <p className="text-xs text-amber-700 font-bold">
-              ٧ جهات تفتيش · مكتب العمل + التأمينات + الضرائب
-            </p>
-          </Link>
-
-          {/* Enterprise-only Marketing Studio module — gold gradient
-              + crown badge so the upsell is obvious to non-Enterprise
-              tenants. The page itself enforces the gate via
-              canUseFeature("marketing_studio"). */}
-          <Link
-            href="/dashboard/marketing"
-            className="bg-gradient-to-br from-amber-100 via-yellow-50 to-orange-100 p-6 rounded-2xl border-2 border-amber-400 hover:border-amber-500 hover:shadow-lg hover:-translate-y-0.5 transition-all relative overflow-hidden"
-          >
-            <div className="absolute top-2 left-2 text-[10px] text-amber-700 font-bold tracking-wider">
-              👑 Enterprise
-            </div>
-            <div className="text-3xl mb-2">✦</div>
-            <h3 className="font-black font-cairo mb-1 text-slate-800">
-              Marketing Studio
-            </h3>
-            <p className="text-xs text-amber-800 font-bold">
-              وكالة تسويق ذكية · إعلانات + SEO + حملات
-            </p>
-          </Link>
-        </div>
-
-        {/* Reports section */}
-        <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 font-cairo">
-          التقارير
-        </h2>
-        <div className="grid md:grid-cols-2 gap-4">
-          <Link
-            href="/dashboard/reports/attendance"
-            className="bg-white p-6 rounded-2xl border border-slate-100 hover:border-brand-cyan/40 hover:shadow-lg hover:-translate-y-0.5 transition-all"
-          >
-            <div className="text-3xl mb-2">📊</div>
-            <h3 className="font-bold font-cairo mb-1 text-slate-800">تقرير الحضور الشهري</h3>
-            <p className="text-xs text-slate-500">إحصائيات + Top Performer</p>
-          </Link>
-
-          <Link
-            href="/dashboard/reports/bridge"
-            className="bg-gradient-to-br from-amber-50 via-cyan-50 to-white p-6 rounded-2xl border-2 border-amber-300 hover:border-amber-500 hover:shadow-xl hover:-translate-y-0.5 transition-all relative overflow-hidden"
-          >
-            <div className="absolute top-2 left-2 text-[10px] text-brand-gold font-bold tracking-wider">
-              جديد ✦
-            </div>
-            <div className="text-3xl mb-2">✦</div>
-            <h3 className="font-bold font-cairo mb-1 text-slate-800">Bridge Analytics</h3>
-            <p className="text-xs text-amber-700 font-bold">مين ملتزم إداريًا — وكمان منتج فعليًا؟</p>
-          </Link>
-        </div>
+        <ModuleGroup
+          title="📊 التقارير والتحليلات"
+          subtitle="لوحات أرقام + تحليل عميق"
+          modules={[
+            { href: "/dashboard/analytics", emoji: "📊", title: "لوحة التحليلات", desc: "٧ رسوم بيانية" },
+            { href: "/dashboard/reports/attendance", emoji: "📋", title: "تقرير الحضور", desc: "شهري + Top Performer" },
+            { href: "/dashboard/reports/bridge", emoji: "✦", title: "Bridge Analytics", desc: "ربط إداري × إنتاجية", highlight: "gold" },
+          ]}
+        />
 
         {/* Status note */}
         <div className="mt-8 p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-sm text-emerald-800 font-cairo text-center">
-          ✓ النظام كامل: HR (موظفين + حضور) + CRM (عملاء) + Bridge (تفاعلات + تقارير تربط الاتنين). ده اللي مفيش نظام تاني في السوق بيعمله.
+          ✓ النظام كامل: HR + CRM + Bridge + AI + PWA + WhatsApp bot. ده اللي مفيش نظام تاني في السوق المصري بيعمله.
         </div>
       </div>
     </main>
@@ -616,6 +550,92 @@ function FirstStepCard({
           ←
         </div>
       </div>
+    </Link>
+  );
+}
+
+// ----------------------------------------------------------------------------
+// ModuleGroup + ModuleCard — compact tile renderer used in the modules grid.
+//
+// Each group renders one section header + a 2/3/4-column grid of cards.
+// The card is intentionally small (single-line title, one-line desc) so
+// the user can scan 30+ modules across 7 groups without scrolling for
+// 5 screens. The previous 6xl-padding cards looked great with 9 items
+// but became overwhelming once the count tripled.
+//
+// highlight props paint the card with a brand-tinted background for
+// modules that need extra pull (Marketing Studio premium, Bridge premium,
+// Interactions = heart of Bridge analytics).
+// ----------------------------------------------------------------------------
+
+type ModuleCardProps = {
+  href: string;
+  emoji: string;
+  title: string;
+  desc?: string;
+  highlight?: "amber" | "gold" | "default";
+};
+
+function ModuleGroup({
+  title,
+  subtitle,
+  modules,
+}: {
+  title: string;
+  subtitle?: string;
+  modules: ModuleCardProps[];
+}) {
+  return (
+    <section className="mb-6">
+      <div className="flex items-baseline justify-between mb-3">
+        <h2 className="text-sm font-bold text-slate-700 font-cairo">{title}</h2>
+        {subtitle && (
+          <p className="text-[10px] text-slate-400 font-cairo">{subtitle}</p>
+        )}
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+        {modules.map((m) => (
+          <ModuleCard key={m.href} {...m} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ModuleCard({
+  href,
+  emoji,
+  title,
+  desc,
+  highlight = "default",
+}: ModuleCardProps) {
+  // Tone palettes — keep these tight so the card stays readable
+  const palettes: Record<NonNullable<ModuleCardProps["highlight"]>, string> = {
+    default:
+      "bg-white border-slate-100 hover:border-brand-cyan/40",
+    amber:
+      "bg-gradient-to-br from-amber-50 to-cyan-50 border-2 border-amber-200 hover:border-amber-400",
+    gold:
+      "bg-gradient-to-br from-amber-100 via-yellow-50 to-orange-100 border-2 border-amber-400 hover:border-amber-500",
+  };
+  return (
+    <Link
+      href={href}
+      className={`block p-4 rounded-xl border transition hover:shadow-md hover:-translate-y-0.5 ${palettes[highlight]}`}
+    >
+      <div className="text-2xl mb-1">{emoji}</div>
+      <h3 className="font-bold font-cairo text-sm text-slate-800 mb-0.5 leading-tight">
+        {title}
+      </h3>
+      {desc && (
+        <p
+          className={`text-[10px] leading-snug ${
+            highlight === "default" ? "text-slate-500" : "text-amber-800 font-bold"
+          }`}
+        >
+          {desc}
+        </p>
+      )}
     </Link>
   );
 }

@@ -28,80 +28,122 @@ type Props = {
   featureOverrides?: Partial<Record<Feature, boolean>>;
 };
 
+// ────────────────────────────────────────────────────────────────────────────
+// Sidebar information architecture
+// ────────────────────────────────────────────────────────────────────────────
+// One single "Modules" section with 20+ items was overwhelming — users had
+// to scan a 200-pixel-tall list every time they wanted to find anything.
+// The new layout groups items by job-to-be-done so the eye can hop between
+// section headers (which act as tabs):
+//
+//   home       — quick return to dashboard
+//   people     — anything about the humans (employees, perf, assets, celebs)
+//   time       — anything time-related (attendance, shifts, leaves, requests)
+//   payroll    — money out the door (payroll, loans, EOS)
+//   crm        — money in (customers, interactions, contracts)
+//   docs       — paperwork (forms, e-signature, compliance guide)
+//   ai         — AI + retention insights (still in its own section because
+//                they're the "premium" pull for upgrades)
+//   marketing  — separate from AI because most HR-only tenants disable it
+//   reports    — read-only dashboards
+//   settings   — admin knobs + help
+//
+// Each section renders with its own header so users see "🕒 الوقت والحضور"
+// instead of one giant "الموديولات" wall.
+
+type NavSectionKey =
+  | "home"
+  | "people"
+  | "time"
+  | "payroll"
+  | "crm"
+  | "docs"
+  | "ai"
+  | "marketing"
+  | "reports"
+  | "settings";
+
 type NavItem = {
   href: string;
   label: string;
   icon: string;
-  section: "main" | "ai" | "reports" | "settings";
-  // Roles that may see + click this item. Defaults to HR (admin + manager).
-  // Settings + team management are admin-only.
+  section: NavSectionKey;
   visibleTo?: Role[];
-  // Subscription feature gate. ALL business items have one now so the
-  // super-admin can hide modules per-tenant via Migration-041 overrides.
-  // Items with feature=undefined are always visible (dashboard home,
-  // forms hub, etc.). The render below decides between "lock icon"
-  // (tier-locked) and "hide entirely" (explicit override=false).
   feature?: Feature;
 };
 
+// Ordered list of [key, header label] — drives the render order.
+// Putting "people" before "time" matches the typical Egyptian HR's daily
+// flow: morning roll-call (people) → mark attendance (time) → process
+// payroll at month-end (payroll).
+const SECTION_ORDER: ReadonlyArray<{ key: NavSectionKey; label: string }> = [
+  { key: "home", label: "" }, // no header for the home link — keeps top tight
+  { key: "people", label: "👥 الفريق" },
+  { key: "time", label: "⏰ الوقت والحضور" },
+  { key: "payroll", label: "💰 المرتبات" },
+  { key: "crm", label: "💼 العملاء والمبيعات" },
+  { key: "docs", label: "📄 المستندات والامتثال" },
+  { key: "ai", label: "🤖 ذكاء HR" },
+  { key: "marketing", label: "✦ تسويق" },
+  { key: "reports", label: "📊 التقارير" },
+  { key: "settings", label: "⚙ الإعدادات" },
+];
+
 const NAV_ITEMS: readonly NavItem[] = [
-  // Always-visible essentials
-  { href: "/dashboard", label: "الرئيسية", icon: "🏠", section: "main" },
+  // ── Home ──
+  { href: "/dashboard", label: "الرئيسية", icon: "🏠", section: "home" },
 
-  // Core HR (gated on individual features so super-admin can sell
-  // an "HR-only" or "Marketing-only" package)
-  { href: "/dashboard/employees", label: "الموظفين", icon: "👥", section: "main", feature: "employees" },
-  { href: "/dashboard/org-chart", label: "الهيكل التنظيمي 🌳", icon: "🌳", section: "main", feature: "employees" },
-  { href: "/dashboard/team-calendar", label: "تقويم الإجازات 📅", icon: "📅", section: "main", feature: "requests" },
-  { href: "/dashboard/assets", label: "إدارة الأصول 📦", icon: "📦", section: "main", feature: "employees" },
-  { href: "/dashboard/performance", label: "تقييم الأداء 📊", icon: "📊", section: "main", feature: "employees" },
-  { href: "/dashboard/celebrations", label: "احتفالات 🎉", icon: "🎉", section: "main", feature: "employees" },
-  { href: "/dashboard/attendance", label: "الحضور", icon: "⏰", section: "main", feature: "attendance" },
-  { href: "/dashboard/shifts", label: "الورديات", icon: "🕒", section: "main", feature: "shifts_rotations" },
-  { href: "/dashboard/payroll", label: "الرواتب", icon: "💰", section: "main", feature: "payroll" },
-  { href: "/dashboard/loans", label: "السلف والمرتجعات 💵", icon: "💵", section: "main", feature: "payroll" },
-  { href: "/dashboard/eos-calculator", label: "مكافأة نهاية الخدمة ⚖", icon: "⚖", section: "main", feature: "payroll" },
-  { href: "/dashboard/requests", label: "طلبات الموظفين", icon: "📨", section: "main", feature: "requests" },
-  { href: "/dashboard/jobs", label: "التوظيف ✦", icon: "🎯", section: "main", feature: "recruitment" },
+  // ── People (الفريق) ──
+  { href: "/dashboard/employees",    label: "الموظفين",         icon: "👥", section: "people", feature: "employees" },
+  { href: "/dashboard/org-chart",    label: "الهيكل التنظيمي",  icon: "🌳", section: "people", feature: "employees" },
+  { href: "/dashboard/performance",  label: "تقييم الأداء",     icon: "📈", section: "people", feature: "employees" },
+  { href: "/dashboard/assets",       label: "الأصول والعهد",    icon: "📦", section: "people", feature: "employees" },
+  { href: "/dashboard/celebrations", label: "الاحتفالات",       icon: "🎉", section: "people", feature: "employees" },
+  { href: "/dashboard/team",         label: "فريق الشركة",      icon: "🤝", section: "people", visibleTo: ["admin"] },
 
-  // CRM
-  { href: "/dashboard/customers", label: "العملاء", icon: "💼", section: "main", feature: "crm" },
-  { href: "/dashboard/interactions", label: "التفاعلات", icon: "💬", section: "main", feature: "crm" },
-  { href: "/dashboard/contracts", label: "العقود", icon: "📋", section: "main", feature: "crm" },
+  // ── Time (الوقت والحضور) ──
+  { href: "/dashboard/attendance",      label: "تسجيل الحضور",     icon: "⏰", section: "time", feature: "attendance" },
+  { href: "/dashboard/shifts",          label: "الورديات",          icon: "🕒", section: "time", feature: "shifts_rotations" },
+  { href: "/dashboard/team-calendar",   label: "تقويم الإجازات",   icon: "📅", section: "time", feature: "requests" },
+  { href: "/dashboard/requests",        label: "طلبات الموظفين",   icon: "📨", section: "time", feature: "requests" },
 
-  // Forms hub + compliance — always visible (no feature gate, useful to all tiers)
-  { href: "/dashboard/forms", label: "النماذج 📋", icon: "📄", section: "main" },
-  { href: "/dashboard/signatures", label: "توقيع إلكتروني ✍", icon: "✍", section: "main", feature: "employees" },
-  { href: "/dashboard/compliance", label: "دليل الامتثال ⚖", icon: "🏛", section: "main" },
+  // ── Payroll (المرتبات) ──
+  { href: "/dashboard/payroll",        label: "الرواتب",                 icon: "💰", section: "payroll", feature: "payroll" },
+  { href: "/dashboard/loans",          label: "السلف والمرتجعات",        icon: "💵", section: "payroll", feature: "payroll" },
+  { href: "/dashboard/eos-calculator", label: "مكافأة نهاية الخدمة",     icon: "⚖", section: "payroll", feature: "payroll" },
 
-  // Admin-only
-  { href: "/dashboard/team", label: "فريق الشركة", icon: "🤝", section: "main", visibleTo: ["admin"] },
+  // ── CRM (العملاء) ──
+  { href: "/dashboard/customers",    label: "العملاء",     icon: "💼", section: "crm", feature: "crm" },
+  { href: "/dashboard/interactions", label: "التفاعلات",   icon: "💬", section: "crm", feature: "crm" },
+  { href: "/dashboard/contracts",    label: "العقود",      icon: "📋", section: "crm", feature: "crm" },
 
-  // AI + Marketing section
-  { href: "/dashboard/ai", label: "المساعد الذكي ✦", icon: "🤖", section: "ai", feature: "ai_assistant" },
-  { href: "/dashboard/marketing", label: "Marketing Studio 👑", icon: "✦", section: "ai", feature: "marketing_studio" },
-  // Leads inbox surfaces the day-to-day workflow on its own row so users
-  // don't have to dive into Marketing Hub every time they want to check
-  // who came in via the funnel.
-  { href: "/dashboard/marketing/leads", label: "Leads Inbox 📥", icon: "📥", section: "ai", feature: "marketing_studio" },
-  { href: "/dashboard/marketing/landing-pages", label: "صفحات الهبوط", icon: "🏠", section: "ai", feature: "marketing_studio" },
-  { href: "/dashboard/marketing/analytics", label: "تحليل التسويق", icon: "📊", section: "ai", feature: "marketing_studio" },
-  { href: "/dashboard/retention", label: "احتفاظ بالموظفين 🎯", icon: "🎯", section: "ai", feature: "retention_insights" },
+  // ── Documents (المستندات) ──
+  { href: "/dashboard/forms",       label: "النماذج",            icon: "📄", section: "docs" },
+  { href: "/dashboard/signatures",  label: "التوقيع الإلكتروني", icon: "✍", section: "docs", feature: "employees" },
+  { href: "/dashboard/compliance",  label: "دليل الامتثال",      icon: "🏛", section: "docs" },
 
-  // Reports
-  { href: "/dashboard/analytics", label: "لوحة التحليلات 📊", icon: "📊", section: "reports", feature: "employees" },
-  { href: "/dashboard/reports/attendance", label: "تقرير الحضور", icon: "📊", section: "reports", feature: "attendance" },
-  { href: "/dashboard/reports/bridge", label: "Bridge ✦", icon: "✦", section: "reports", feature: "bridge_analytics" },
-  { href: "/dashboard/audit-log", label: "سجل النشاط", icon: "📋", section: "reports", visibleTo: ["admin"], feature: "audit_log" },
+  // ── AI / Smart features ──
+  { href: "/dashboard/ai",         label: "المساعد الذكي",       icon: "🤖", section: "ai", feature: "ai_assistant" },
+  { href: "/dashboard/jobs",       label: "التوظيف الذكي",        icon: "🎯", section: "ai", feature: "recruitment" },
+  { href: "/dashboard/retention",  label: "احتفاظ بالموظفين",     icon: "🛡", section: "ai", feature: "retention_insights" },
 
-  // Settings
-  { href: "/dashboard/settings/office-location", label: "موقع المكتب 📍", icon: "⚙", section: "settings", visibleTo: ["admin"] },
-  { href: "/dashboard/settings/leave-rollover", label: "ترحيل الإجازات", icon: "🗓", section: "settings", visibleTo: ["admin"] },
-  { href: "/dashboard/settings/holidays", label: "العطلات الرسمية 📅", icon: "📅", section: "settings", visibleTo: ["admin"] },
+  // ── Marketing ──
+  { href: "/dashboard/marketing",                label: "Marketing Studio", icon: "✦",  section: "marketing", feature: "marketing_studio" },
+  { href: "/dashboard/marketing/leads",          label: "Leads Inbox",       icon: "📥", section: "marketing", feature: "marketing_studio" },
+  { href: "/dashboard/marketing/landing-pages",  label: "صفحات الهبوط",      icon: "🏠", section: "marketing", feature: "marketing_studio" },
+  { href: "/dashboard/marketing/analytics",      label: "تحليل التسويق",     icon: "📊", section: "marketing", feature: "marketing_studio" },
 
-  // Always-visible help — across every plan, every role, never hidden
-  // by per-tenant overrides
-  { href: "/dashboard/help", label: "مركز المساعدة 📚", icon: "📚", section: "settings" },
+  // ── Reports ──
+  { href: "/dashboard/analytics",          label: "لوحة التحليلات",  icon: "📊", section: "reports", feature: "employees" },
+  { href: "/dashboard/reports/attendance", label: "تقرير الحضور",    icon: "📋", section: "reports", feature: "attendance" },
+  { href: "/dashboard/reports/bridge",     label: "Bridge ✦",        icon: "✦",  section: "reports", feature: "bridge_analytics" },
+  { href: "/dashboard/audit-log",          label: "سجل النشاط",      icon: "🗂", section: "reports", visibleTo: ["admin"], feature: "audit_log" },
+
+  // ── Settings ──
+  { href: "/dashboard/settings/office-location",  label: "موقع المكتب",         icon: "📍", section: "settings", visibleTo: ["admin"] },
+  { href: "/dashboard/settings/leave-rollover",   label: "ترحيل الإجازات",     icon: "🗓", section: "settings", visibleTo: ["admin"] },
+  { href: "/dashboard/settings/holidays",         label: "العطلات الرسمية",    icon: "📅", section: "settings", visibleTo: ["admin"] },
+  { href: "/dashboard/help",                      label: "مركز المساعدة",       icon: "📚", section: "settings" },
 ];
 
 export function DashboardSidebar({
@@ -150,10 +192,13 @@ export function DashboardSidebar({
     return true;
   };
 
-  const mainItems = NAV_ITEMS.filter((i) => i.section === "main" && canSee(i));
-  const aiItems = NAV_ITEMS.filter((i) => i.section === "ai" && canSee(i));
-  const reportItems = NAV_ITEMS.filter((i) => i.section === "reports" && canSee(i));
-  const settingsItems = NAV_ITEMS.filter((i) => i.section === "settings" && canSee(i));
+  // Build an ordered list of {label, items} per SECTION_ORDER. Empty
+  // sections are dropped so users on a single-feature plan don't see
+  // headers above zero items.
+  const groupedSections = SECTION_ORDER.map(({ key, label }) => ({
+    label,
+    items: NAV_ITEMS.filter((i) => i.section === key && canSee(i)),
+  })).filter((s) => s.items.length > 0);
 
   return (
     <>
@@ -203,10 +248,16 @@ export function DashboardSidebar({
               </button>
             </div>
             <nav className="flex-1 overflow-y-auto p-3">
-              <NavSection label="الموديولات" items={mainItems} isActive={isActive} plan={plan} featureOverrides={featureOverrides} />
-              <NavSection label="✦ ذكاء" items={aiItems} isActive={isActive} plan={plan} featureOverrides={featureOverrides} />
-              <NavSection label="التقارير" items={reportItems} isActive={isActive} plan={plan} featureOverrides={featureOverrides} />
-              <NavSection label="الإعدادات" items={settingsItems} isActive={isActive} plan={plan} featureOverrides={featureOverrides} />
+              {groupedSections.map((s) => (
+                <NavSection
+                  key={s.label || "home"}
+                  label={s.label}
+                  items={s.items}
+                  isActive={isActive}
+                  plan={plan}
+                  featureOverrides={featureOverrides}
+                />
+              ))}
             </nav>
             <UserFooter
               userName={userName}
@@ -227,10 +278,16 @@ export function DashboardSidebar({
           <Logo />
         </div>
         <nav className="flex-1 overflow-y-auto p-3">
-          <NavSection label="الموديولات" items={mainItems} isActive={isActive} plan={plan} featureOverrides={featureOverrides} />
-          <NavSection label="✦ ذكاء" items={aiItems} isActive={isActive} plan={plan} featureOverrides={featureOverrides} />
-          <NavSection label="التقارير" items={reportItems} isActive={isActive} plan={plan} featureOverrides={featureOverrides} />
-          <NavSection label="الإعدادات" items={settingsItems} isActive={isActive} plan={plan} featureOverrides={featureOverrides} />
+          {groupedSections.map((s) => (
+            <NavSection
+              key={s.label || "home"}
+              label={s.label}
+              items={s.items}
+              isActive={isActive}
+              plan={plan}
+              featureOverrides={featureOverrides}
+            />
+          ))}
         </nav>
         <UserFooter
           userName={userName}
@@ -269,9 +326,13 @@ function NavSection({
   if (items.length === 0) return null;
   return (
     <>
-      <div className="text-[10px] text-slate-400 dark:text-slate-500 font-bold tracking-wider mb-2 px-3 font-cairo uppercase">
-        {label}
-      </div>
+      {/* Empty label = unlabeled section (used for the "home" link only) —
+          rendered without a header so it sits flush at the top of the nav. */}
+      {label && (
+        <div className="text-[10px] text-slate-400 dark:text-slate-500 font-bold tracking-wider mb-2 px-3 font-cairo uppercase">
+          {label}
+        </div>
+      )}
       <div className="space-y-1 mb-5">
         {items.map((item) => {
           const active = isActive(item.href);
