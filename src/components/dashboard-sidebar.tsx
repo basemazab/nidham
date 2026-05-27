@@ -130,6 +130,7 @@ const NAV_ITEMS: readonly NavItem[] = [
 
   // ── Marketing ──
   { href: "/dashboard/marketing",                label: "Marketing Studio", icon: "✦",  section: "marketing", feature: "marketing_studio" },
+  { href: "/dashboard/marketing/inbox",          label: "صندوق رسائل الإعلانات", icon: "💬", section: "marketing", feature: "marketing_studio" },
   { href: "/dashboard/marketing/leads",          label: "Leads Inbox",       icon: "📥", section: "marketing", feature: "marketing_studio" },
   { href: "/dashboard/marketing/landing-pages",  label: "صفحات الهبوط",      icon: "🏠", section: "marketing", feature: "marketing_studio" },
   { href: "/dashboard/marketing/analytics",      label: "تحليل التسويق",     icon: "📊", section: "marketing", feature: "marketing_studio" },
