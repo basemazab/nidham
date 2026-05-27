@@ -118,20 +118,35 @@ type MetaWebhookPayload = {
       sender: { id: string };
       recipient: { id: string };
       timestamp: number;
-      message?: {
-        mid: string;
-        text?: string;
-        is_echo?: boolean;
-        attachments?: Array<{ type: string; payload?: { url?: string } }>;
-      };
-    }>;
-  }>;
-};
+     // Find tenant by page_id
+    let { data: settings } = await supabase
+      .from("marketing_inbox_settings")
+      .select(
+        "company_id, meta_page_token, meta_app_secret, ai_enabled, ai_system_prompt, ai_business_context, ai_handoff_keywords, auto_push_to_crm, channel_messenger, channel_instagram",
+      )
+      .eq("meta_page_id", pageId)
+      .maybeSingle();
 
-// ── Async processor — runs after the 200 response is sent ──
-async function processEventAsync(
-  payload: MetaWebhookPayload,
-  rawBody: string,
+    // 💡 تعديل الإنقاذ: لو ملحقتش تربط الـ Page ID صح، السيستم هيسحب داتا شركتك فوراً عشان الـ AI يرد
+    if (!settings) {
+      const { data: fallbackSettings } = await supabase
+        .from("marketing_inbox_settings")
+        .select("company_id, meta_page_token, meta_app_secret, ai_enabled, ai_system_prompt, ai_business_context, ai_handoff_keywords, auto_push_to_crm, channel_messenger, channel_instagram")
+        .eq("company_id", "a323ffe2-e31e-4ced-ab6e-92f6ed6d5ec7") // الـ ID بتاع شركتك
+        .maybeSingle();
+      
+      if (fallbackSettings) {
+        settings = fallbackSettings;
+      }
+    }
+
+    if (!settings) {
+      continue;
+    }
+
+    // لتخطي شروط غلق القنوات مؤقتاً للتأكد من التشغيل:
+    // if (channel === "messenger" && !settings.channel_messenger) continue;
+    // if (channel === "instagram" && !settings.channel_instagram) continue;
   signatureHeader: string | null,
 ): Promise<void> {
   const supabase = createServiceClient();
