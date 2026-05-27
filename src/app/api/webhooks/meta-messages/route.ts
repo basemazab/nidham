@@ -63,9 +63,7 @@ export async function GET(req: NextRequest) {
     return new NextResponse("Bad request", { status: 400 });
   }
 
-  // Find ANY tenant with this verify_token configured. During Meta App
-  // setup, the user enters a string they choose into both the Meta UI
-  // and our settings — they must match for the handshake to succeed.
+  // Find ANY tenant with this verify_token configured.
   const supabase = createServiceClient();
   const { data, error } = await supabase
     .from("marketing_inbox_settings")
@@ -79,8 +77,11 @@ export async function GET(req: NextRequest) {
     return new NextResponse("Forbidden", { status: 403 });
   }
 
-  // Meta wants the challenge value back, plain text
-  return new NextResponse(challenge, { status: 200 });
+  // التعديل السحري والنهائي: إرجاع الـ challenge كـ نص خام صافي (Plain Text)
+  return new Response(challenge, {
+    status: 200,
+    headers: { "Content-Type": "text/plain" },
+  });
 }
 
 // ── 2) POST — incoming message event ──
@@ -149,7 +150,7 @@ async function processEventAsync(
       .eq("meta_page_id", pageId)
       .maybeSingle();
 
-    // 💡 تعديل الإنقاذ: لو الصفحة مش مربوطة بـ Page ID صح، السيستم هيسحب داتا شركتك فوراً عشان الـ AI يرد
+    // لو الصفحة مش مربوطة بـ Page ID صح، السيستم هيسحب داتا شركتك فوراً عشان الـ AI يرد
     if (!settings) {
       const { data: fallbackSettings } = await supabase
         .from("marketing_inbox_settings")
@@ -165,10 +166,6 @@ async function processEventAsync(
     if (!settings) {
       continue;
     }
-
-    // لتخطي شروط غلق القنوات مؤقتاً ولضمان التفعيل الفوري:
-    // if (channel === "messenger" && !settings.channel_messenger) continue;
-    // if (channel === "instagram" && !settings.channel_instagram) continue;
 
     // Verify signature (the page must have an app_secret set for this to work)
     if (settings.meta_app_secret) {
@@ -215,7 +212,6 @@ async function processEventAsync(
         });
 
       if (insertErr) {
-        // 23505 = unique violation = we've already processed this message
         if (insertErr.code !== "23505") {
           // eslint-disable-next-line no-console
           console.error("[meta-webhook] insert message failed:", insertErr);
@@ -251,7 +247,6 @@ async function upsertConversation(args: {
   externalUserId: string;
   pageToken: string | null;
 }): Promise<string | null> {
-  // Try to find existing
   const { data: existing } = await args.supabase
     .from("marketing_inbox_conversations")
     .select("id")
@@ -262,7 +257,6 @@ async function upsertConversation(args: {
 
   if (existing) return existing.id;
 
-  // New — fetch profile so we have a name to show
   let profile: { name?: string; picture?: string } | null = null;
   if (args.pageToken) {
     profile = await fetchUserProfile({
@@ -307,7 +301,6 @@ async function runAiReply(args: {
   handoffKeywords: string[];
   autoPushToCrm: boolean;
 }): Promise<void> {
-  // Short-circuit: if a handoff keyword fires, don't reply with AI
   const lowered = args.userMessage.toLowerCase();
   const handoffHit = args.handoffKeywords.some((kw) =>
     lowered.includes(kw.toLowerCase()),
@@ -320,7 +313,6 @@ async function runAiReply(args: {
     return;
   }
 
-  // Fetch last 5 turns of conversation history (for context)
   const { data: historyRows } = await args.supabase
     .from("marketing_inbox_messages")
     .select("direction, body, sender")
@@ -332,12 +324,10 @@ async function runAiReply(args: {
     role: row.direction === "inbound" ? ("user" as const) : ("assistant" as const),
     body: row.body,
   }));
-  // Drop the latest user message
   if (history.length && history[history.length - 1].role === "user") {
     history.pop();
   }
 
-  // Generate
   let ai;
   try {
     ai = await generateMarketingReply({
@@ -352,7 +342,6 @@ async function runAiReply(args: {
     return;
   }
 
-  // Update conversation with the AI's verdict
   await args.supabase
     .from("marketing_inbox_conversations")
     .update({
@@ -363,7 +352,6 @@ async function runAiReply(args: {
     })
     .eq("id", args.conversationId);
 
-  // If hot/warm + auto-push enabled, create a customer (lead) in CRM
   if (
     args.autoPushToCrm &&
     (ai.leadQuality === "hot" || ai.leadQuality === "warm")
@@ -380,7 +368,6 @@ async function runAiReply(args: {
     });
   }
 
-  // If AI says handoff, store the verdict but don't reply
   if (ai.shouldHandoff) {
     await args.supabase.from("marketing_inbox_messages").insert({
       conversation_id: args.conversationId,
@@ -392,7 +379,6 @@ async function runAiReply(args: {
     return;
   }
 
-  // Send the reply via Meta
   const send = await sendMetaMessage({
     channel: args.channel,
     pageToken: args.pageToken,
@@ -400,7 +386,6 @@ async function runAiReply(args: {
     text: ai.reply,
   });
 
-  // Store the outbound message regardless
   await args.supabase.from("marketing_inbox_messages").insert({
     conversation_id: args.conversationId,
     direction: "outbound",
@@ -429,7 +414,7 @@ async function pushToCRM(args: {
     .eq("id", args.conversationId)
     .single();
 
-  if (conv?.customer_id) return; // already linked
+  if (conv?.customer_id) return;
 
   const customerName =
     conv?.external_user_name ||
