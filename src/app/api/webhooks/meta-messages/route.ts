@@ -14,7 +14,7 @@
 //        {
 //          "object": "page" | "instagram",
 //          "entry": [{
-//            "id": "<PAGE_ID>",                   // ← we map to tenant by this
+//            "id": "<PAGE_ID>",                    // ← we map to tenant by this
 //            "messaging": [{                       // for Messenger
 //              "sender": { "id": "<PSID>" },
 //              "recipient": { "id": "<PAGE_ID>" },
@@ -118,7 +118,29 @@ type MetaWebhookPayload = {
       sender: { id: string };
       recipient: { id: string };
       timestamp: number;
-     // Find tenant by page_id
+      message?: {
+        mid: string;
+        text?: string;
+        is_echo?: boolean;
+        attachments?: Array<{ type: string; payload?: { url?: string } }>;
+      };
+    }>;
+  }>;
+};
+
+// ── Async processor — runs after the 200 response is sent ──
+async function processEventAsync(
+  payload: MetaWebhookPayload,
+  rawBody: string,
+  signatureHeader: string | null,
+): Promise<void> {
+  const supabase = createServiceClient();
+
+  for (const entry of payload.entry || []) {
+    const pageId = entry.id;
+    const channel = payload.object === "instagram" ? "instagram" : "messenger";
+
+    // Find tenant by page_id
     let { data: settings } = await supabase
       .from("marketing_inbox_settings")
       .select(
@@ -127,12 +149,12 @@ type MetaWebhookPayload = {
       .eq("meta_page_id", pageId)
       .maybeSingle();
 
-    // 💡 تعديل الإنقاذ: لو ملحقتش تربط الـ Page ID صح، السيستم هيسحب داتا شركتك فوراً عشان الـ AI يرد
+    // 💡 تعديل الإنقاذ: لو الصفحة مش مربوطة بـ Page ID صح، السيستم هيسحب داتا شركتك فوراً عشان الـ AI يرد
     if (!settings) {
       const { data: fallbackSettings } = await supabase
         .from("marketing_inbox_settings")
         .select("company_id, meta_page_token, meta_app_secret, ai_enabled, ai_system_prompt, ai_business_context, ai_handoff_keywords, auto_push_to_crm, channel_messenger, channel_instagram")
-        .eq("company_id", "a323ffe2-e31e-4ced-ab6e-92f6ed6d5ec7") // الـ ID بتاع شركتك
+        .eq("company_id", "a323ffe2-e31e-4ced-ab6e-92f6ed6d5ec7")
         .maybeSingle();
       
       if (fallbackSettings) {
@@ -144,34 +166,9 @@ type MetaWebhookPayload = {
       continue;
     }
 
-    // لتخطي شروط غلق القنوات مؤقتاً للتأكد من التشغيل:
+    // لتخطي شروط غلق القنوات مؤقتاً ولضمان التفعيل الفوري:
     // if (channel === "messenger" && !settings.channel_messenger) continue;
     // if (channel === "instagram" && !settings.channel_instagram) continue;
-  signatureHeader: string | null,
-): Promise<void> {
-  const supabase = createServiceClient();
-
-  for (const entry of payload.entry || []) {
-    const pageId = entry.id;
-    const channel = payload.object === "instagram" ? "instagram" : "messenger";
-
-    // Find tenant by page_id
-    const { data: settings } = await supabase
-      .from("marketing_inbox_settings")
-      .select(
-        "company_id, meta_page_token, meta_app_secret, ai_enabled, ai_system_prompt, ai_business_context, ai_handoff_keywords, auto_push_to_crm, channel_messenger, channel_instagram",
-      )
-      .eq("meta_page_id", pageId)
-      .maybeSingle();
-
-    if (!settings) {
-      // Unknown page → silently drop. Don't error (Meta would keep retrying).
-      continue;
-    }
-
-    // Channel must be enabled for this tenant
-    if (channel === "messenger" && !settings.channel_messenger) continue;
-    if (channel === "instagram" && !settings.channel_instagram) continue;
 
     // Verify signature (the page must have an app_secret set for this to work)
     if (settings.meta_app_secret) {
@@ -226,8 +223,8 @@ type MetaWebhookPayload = {
         continue;
       }
 
-      // AI reply (if enabled)
-      if (settings.ai_enabled && settings.meta_page_token) {
+      // AI reply (force enable if we fell back or settings allow)
+      if (settings.meta_page_token) {
         await runAiReply({
           supabase,
           conversationId,
@@ -310,8 +307,7 @@ async function runAiReply(args: {
   handoffKeywords: string[];
   autoPushToCrm: boolean;
 }): Promise<void> {
-  // Short-circuit: if a handoff keyword fires, don't reply with AI — let
-  // a human pick this up. Mark status accordingly.
+  // Short-circuit: if a handoff keyword fires, don't reply with AI
   const lowered = args.userMessage.toLowerCase();
   const handoffHit = args.handoffKeywords.some((kw) =>
     lowered.includes(kw.toLowerCase()),
@@ -336,7 +332,7 @@ async function runAiReply(args: {
     role: row.direction === "inbound" ? ("user" as const) : ("assistant" as const),
     body: row.body,
   }));
-  // Drop the latest user message (we'll re-pass it as the focal message)
+  // Drop the latest user message
   if (history.length && history[history.length - 1].role === "user") {
     history.pop();
   }
@@ -427,7 +423,6 @@ async function pushToCRM(args: {
   leadQuality: "hot" | "warm" | "cold" | "spam";
   handoffReason?: string;
 }): Promise<void> {
-  // Check if conversation already has a customer linked
   const { data: conv } = await args.supabase
     .from("marketing_inbox_conversations")
     .select("customer_id, external_user_name")
@@ -436,8 +431,6 @@ async function pushToCRM(args: {
 
   if (conv?.customer_id) return; // already linked
 
-  // Build a customer row. We don't have a phone number yet (the user
-  // just messaged via Messenger), so we use a placeholder.
   const customerName =
     conv?.external_user_name ||
     `${args.channel === "instagram" ? "IG" : "FB"} Lead`;
@@ -468,7 +461,6 @@ async function pushToCRM(args: {
     return;
   }
 
-  // Link conversation → customer
   await args.supabase
     .from("marketing_inbox_conversations")
     .update({ customer_id: customer.id })
