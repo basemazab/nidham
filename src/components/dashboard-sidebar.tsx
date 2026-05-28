@@ -110,9 +110,10 @@ const NAV_ITEMS: readonly NavItem[] = [
   { href: "/dashboard/requests",        label: "طلبات الموظفين",   icon: "📨", section: "time", feature: "requests" },
 
   // ── Payroll (المرتبات) ──
-  { href: "/dashboard/payroll",        label: "الرواتب",                 icon: "💰", section: "payroll", feature: "payroll" },
-  { href: "/dashboard/loans",          label: "السلف والمرتجعات",        icon: "💵", section: "payroll", feature: "payroll" },
-  { href: "/dashboard/eos-calculator", label: "مكافأة نهاية الخدمة",     icon: "⚖", section: "payroll", feature: "payroll" },
+  { href: "/dashboard/payroll",          label: "الرواتب",                 icon: "💰", section: "payroll", feature: "payroll" },
+  { href: "/dashboard/payroll/analytics", label: "تحليلات المرتبات",       icon: "📊", section: "payroll", feature: "payroll" },
+  { href: "/dashboard/loans",            label: "السلف والمرتجعات",        icon: "💵", section: "payroll", feature: "payroll" },
+  { href: "/dashboard/eos-calculator",   label: "مكافأة نهاية الخدمة",     icon: "⚖", section: "payroll", feature: "payroll" },
 
   // ── CRM (العملاء) ──
   { href: "/dashboard/customers",    label: "العملاء",     icon: "💼", section: "crm", feature: "crm" },

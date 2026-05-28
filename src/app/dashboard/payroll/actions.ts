@@ -622,6 +622,64 @@ export async function deletePayrollPeriod(periodId: string) {
   redirect("/dashboard/payroll");
 }
 
+export async function rollbackPayrollToDraft(periodId: string) {
+  const { profile } = await requireAdmin();
+  const supabase = await createClient();
+
+  // Only approved periods can be rolled back to draft. Paid or cancelled
+  // periods cannot be rolled back — financial data has been committed.
+  const { error } = await supabase
+    .from("payroll_periods")
+    .update({
+      status: "draft",
+      approved_at: null,
+      approved_by: null,
+    })
+    .eq("id", periodId)
+    .eq("company_id", profile.company_id)
+    .eq("status", "approved");
+
+  if (error) {
+    redirect(
+      `/dashboard/payroll/${periodId}?error=` +
+        encodeURIComponent(arabicizeDbError(error.message)),
+    );
+  }
+
+  revalidatePath(`/dashboard/payroll/${periodId}`);
+  bustDashboardCache();
+}
+
+export async function simulatePayrollRun(periodId: string) {
+  const { profile } = await requireHR();
+  const supabase = await createClient();
+
+  // Fetch the period + entries without any DB writes
+  const { data: period } = await supabase
+    .from("payroll_periods")
+    .select("*, payroll_entries(*)")
+    .eq("id", periodId)
+    .eq("company_id", profile.company_id)
+    .single();
+
+  if (!period) {
+    return { error: "فترة المرتبات غير موجودة" };
+  }
+
+  const entries = (period as any).payroll_entries || [];
+  const summary = {
+    total_employees: entries.length,
+    gross_total: entries.reduce((s: number, e: any) => s + Number(e.gross_salary || 0), 0),
+    net_total: entries.reduce((s: number, e: any) => s + Number(e.net_salary || 0), 0),
+    deductions_total: entries.reduce((s: number, e: any) => s + Number(e.total_deductions || 0), 0),
+    insurance_total: entries.reduce((s: number, e: any) => s + Number(e.social_insurance || 0), 0),
+    tax_total: entries.reduce((s: number, e: any) => s + Number(e.income_tax || 0), 0),
+    bonuses_total: entries.reduce((s: number, e: any) => s + Number(e.bonuses || 0), 0),
+  };
+
+  return { summary };
+}
+
 // ============================================================================
 // REGENERATE PERIOD ENTRIES
 // ============================================================================
