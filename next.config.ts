@@ -9,10 +9,40 @@ import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
-  // `standalone` produces a minimal `.next/standalone/` directory that the
-  // Enterprise Edition Dockerfile copies in — ~40 MB image instead of 1 GB.
-  // Harmless for the Vercel cloud build (Vercel ignores it).
   output: "standalone",
+
+  // Enable React strict mode for development warnings
+  reactStrictMode: true,
+
+  // Compress responses with gzip/brotli
+  compress: true,
+
+  // Cache static assets aggressively
+  async headers() {
+    return [
+      {
+        source: "/images/:path*",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
+        ],
+      },
+      {
+        source: "/fonts/:path*",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
+        ],
+      },
+      {
+        source: "/_next/static/:path*",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
+        ],
+      },
+    ];
+  },
+
+  // Prefer statically generating pages at build time
+  outputFileTracing: true,
 };
 
 export default withSentryConfig(nextConfig, {

@@ -16,19 +16,22 @@ import {
 const tajawal = Tajawal({
   variable: "--font-tajawal",
   subsets: ["arabic"],
-  weight: ["300", "400", "500", "700", "900"],
+  weight: ["400", "700"],
+  display: "swap",
 });
 
 const cairo = Cairo({
   variable: "--font-cairo",
   subsets: ["arabic"],
-  weight: ["400", "600", "700", "900"],
+  weight: ["400", "700"],
+  display: "swap",
 });
 
 const reemKufi = Reem_Kufi({
   variable: "--font-reem-kufi",
   subsets: ["arabic"],
-  weight: ["400", "500", "600", "700"],
+  weight: ["400", "700"],
+  display: "swap",
 });
 
 // metadataBase is required for OG / Twitter card resolution. NEXT_PUBLIC_SITE_URL
