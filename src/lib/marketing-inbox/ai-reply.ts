@@ -52,9 +52,9 @@ export const AiReplyResultSchema = z.object({
   handoffReason: z
     .string()
     .max(120)
-    .optional()
+    .default("")
     .describe(
-      "Short Arabic note for the sales rep — why this lead is hot or needs human attention.",
+      "Short Arabic note for the sales rep — why this lead is hot or needs human attention. Empty string if not needed.",
     ),
 });
 
