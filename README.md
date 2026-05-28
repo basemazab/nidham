@@ -1,36 +1,58 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# نِظام (Nidham) — HR + CRM + AI Recruitment
 
-## Getting Started
+**نظام إدارة موارد بشرية متكامل** للشركات المصرية — متوافق مع قانون العمل 12/2003 وقانون التأمينات 148/2019 و PDPL 151/2020.
 
-First, run the development server:
+## المميزات
+
+| الوحدة | الوصف |
+|--------|-------|
+| **HR** | موظفين، حضور، إجازات، سلف، عقود، دوام |
+| **Payroll** | رواتب شهرية/أسبوعية/يومية، تأمينات 11%، ضريبة دخل 2026، أوفرتايم قانوني (1.35/1.7/2.0) |
+| **التقارير** | كشوف مرتبات Excel/PDF، نموذج 41 ضريبة، كشف بنك SIF/CSV، استمارات تأمينات 1/2/6 |
+| **Recruitment** | وظائف عامة، تقديم، فرز سير ذاتية بالذكاء الاصطناعي |
+| **CRM** | عملاء، تفاعلات، عقود، مسار تحويل مبيعات |
+| **التسويق** | صفحات هبوط، حملات، إعلانات، صندوق وارد تواصل اجتماعي |
+| **AI** | مساعد ذكي، فرز CV، توليد محتوى تسويقي، رد آلي على وسائل التواصل |
+| **WhatsApp** | بوت للموظفين (حضور، إجازات، كشف مرتب) |
+| **التوقيع الإلكتروني** | توقيع المستندات إلكترونياً |
+
+## التقنيات
+
+- **Frontend:** Next.js 16 (App Router) + React 19 + Tailwind CSS v4
+- **Database:** Supabase (PostgreSQL + Auth + Storage + Vault للـ PII)
+- **AI:** Anthropic Claude, Google Gemini 2.5 Flash, Groq
+- **موبايل:** Expo/React Native
+- **Desktop:** Electron
+- **Enterprise:** Docker Compose + Kong API Gateway
+- **Monitoring:** Sentry
+- **Testing:** Vitest + Playwright + k6
+
+## البدء
 
 ```bash
+# 1. clone + install
+npm install
+
+# 2. انسخ .env.local.example إلى .env.local واملأ المفاتيح
+cp scripts/.env.local.example .env.local
+
+# 3. شغل
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+افتح http://localhost:3000
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## الاختبارات
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm test              # Unit + integration (Vitest)
+npm run test:e2e      # E2E (Playwright)
+npm run test:load     # Load (k6)
+npm run build         # Build إنتاجي
+```
 
-## Learn More
+## النشر
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **SaaS:** Vercel (auto-deploy على `git push`)
+- **Enterprise on-prem:** `enterprise/` (Docker Compose + Kong)
+- **Mobile:** `mobile/` (Expo + EAS Build)

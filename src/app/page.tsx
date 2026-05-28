@@ -1,6 +1,5 @@
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { MobileAppQR } from "@/components/mobile-app-qr";
 import { SectionHeader } from "./sections/section-helpers";
 
 const DynamicLiveScreenshots = dynamic(() => import("./sections/live-screenshots").then((m) => ({ default: m.LiveScreenshotsSection })), { loading: () => <div className="h-64 animate-pulse bg-slate-100 rounded-2xl" /> });

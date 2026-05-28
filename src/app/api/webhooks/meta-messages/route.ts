@@ -102,7 +102,7 @@ export async function POST(req: NextRequest) {
   // Acknowledge fast — Meta times out after 20s. We process async after
   // responding 200. (If processing throws, we'll log but not retry.)
   processEventAsync(payload, rawBody, signatureHeader).catch((err) => {
-    // eslint-disable-next-line no-console
+     
     console.error("[meta-webhook] async processing failed:", err);
   });
 
@@ -175,7 +175,7 @@ async function processEventAsync(
         appSecret: settings.meta_app_secret,
       });
       if (!valid) {
-        // eslint-disable-next-line no-console
+         
         console.warn("[meta-webhook] signature mismatch for page", pageId);
         continue;
       }
@@ -213,14 +213,17 @@ async function processEventAsync(
 
       if (insertErr) {
         if (insertErr.code !== "23505") {
-          // eslint-disable-next-line no-console
+           
           console.error("[meta-webhook] insert message failed:", insertErr);
         }
         continue;
       }
 
-      // AI reply (force enable if we fell back or settings allow)
-      if (settings.meta_page_token) {
+      // AI reply — only if enabled AND the channel is turned on
+      const channelEnabled =
+        (channel === "messenger" && settings.channel_messenger) ||
+        (channel === "instagram" && settings.channel_instagram);
+      if (settings.ai_enabled && channelEnabled && settings.meta_page_token) {
         await runAiReply({
           supabase,
           conversationId,
@@ -280,7 +283,7 @@ async function upsertConversation(args: {
     .single();
 
   if (error || !created) {
-    // eslint-disable-next-line no-console
+     
     console.error("[meta-webhook] upsert conv failed:", error);
     return null;
   }
@@ -337,7 +340,7 @@ async function runAiReply(args: {
       systemPromptOverride: args.systemPromptOverride || undefined,
     });
   } catch (err) {
-    // eslint-disable-next-line no-console
+     
     console.error("[meta-webhook] AI generation failed:", err);
     return;
   }
@@ -441,7 +444,7 @@ async function pushToCRM(args: {
     .single();
 
   if (error || !customer) {
-    // eslint-disable-next-line no-console
+     
     console.error("[meta-webhook] push to CRM failed:", error);
     return;
   }

@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { sendHumanReply } from "../actions";
 
 export function ReplyComposer({ conversationId }: { conversationId: string }) {
+  const router = useRouter();
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -15,6 +17,7 @@ export function ReplyComposer({ conversationId }: { conversationId: string }) {
       const res = await sendHumanReply({ conversationId, text });
       if (res.ok) {
         setText("");
+        router.refresh();
       } else {
         setError(res.error);
       }
@@ -24,8 +27,15 @@ export function ReplyComposer({ conversationId }: { conversationId: string }) {
   return (
     <div>
       {error && (
-        <div className="mb-2 text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">
-          ⚠️ {error}
+        <div className="mb-2 flex items-center gap-2 text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">
+          <span>⚠️ {error}</span>
+          <button
+            onClick={handleSend}
+            disabled={pending}
+            className="px-2 py-1 rounded-md bg-rose-200 text-rose-800 font-bold hover:bg-rose-300 disabled:opacity-50"
+          >
+            إعادة المحاولة
+          </button>
         </div>
       )}
       <div className="flex gap-2 items-end">

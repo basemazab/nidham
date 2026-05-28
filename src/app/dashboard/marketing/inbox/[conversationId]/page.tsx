@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireHRPage } from "@/lib/permissions";
 import { ReplyComposer } from "./reply-composer";
+import { AiPreviewButton } from "./ai-preview";
 
 // ============================================================================
 // /dashboard/marketing/inbox/[conversationId] — single thread view
@@ -82,14 +83,17 @@ export default async function ConversationPage({
           </div>
         </div>
 
-        {conv.customer_id && (
-          <Link
-            href={`/dashboard/customers/${conv.customer_id}`}
-            className="text-xs font-bold text-emerald-700 hover:underline"
-          >
-            ✓ ملف العميل ↗
-          </Link>
-        )}
+        <div className="flex items-center gap-2">
+          {conv.customer_id && (
+            <Link
+              href={`/dashboard/customers/${conv.customer_id}`}
+              className="text-xs font-bold text-emerald-700 hover:underline"
+            >
+              ✓ ملف العميل ↗
+            </Link>
+          )}
+          <AiPreviewButton conversationId={conversationId} />
+        </div>
       </div>
 
       {/* Messages */}

@@ -68,7 +68,7 @@ export default async function MarketingInboxPage() {
 
   const { data: settings } = await supabase
     .from("marketing_inbox_settings")
-    .select("ai_enabled, meta_page_id, channel_messenger, channel_instagram")
+    .select("ai_enabled, meta_page_id, channel_messenger, channel_instagram, meta_page_token, meta_verify_token")
     .eq("company_id", profile.company_id)
     .maybeSingle();
 
@@ -83,6 +83,10 @@ export default async function MarketingInboxPage() {
 
   const rows = (conversations || []) as ConversationRow[];
   const isConfigured = !!settings?.meta_page_id;
+  const hasWebhookEverFired = rows.length > 0;
+  const hasToken = !!settings?.meta_page_token;
+  const hasVerifyToken = !!settings?.meta_verify_token;
+  const isAiEnabled = !!settings?.ai_enabled;
 
   // Counts for the small dashboard at the top
   const counts = rows.reduce(
@@ -115,6 +119,46 @@ export default async function MarketingInboxPage() {
           ⚙️ الإعدادات
         </Link>
       </div>
+
+      {/* Webhook status banner */}
+      {isConfigured && !hasWebhookEverFired && (
+        <div className="mb-6 p-4 rounded-xl bg-amber-50 border border-amber-300 text-amber-900">
+          <div className="flex items-start gap-3">
+            <span className="text-2xl">⏳</span>
+            <div>
+              <div className="font-bold mb-1">في انتظار أول رسالة</div>
+              <p className="text-sm mb-2">
+                الإعدادات مكتملة بس لسه مفيش رسائل وصلت. تأكد من:
+              </p>
+              <ul className="text-sm space-y-1 list-disc pr-5">
+                {!hasToken && <li className="font-bold">Page Access Token ناقص — روح للإعدادات</li>}
+                {!hasVerifyToken && <li className="font-bold">Verify Token ناقص — روح للإعدادات</li>}
+                {hasToken && hasVerifyToken && (
+                  <>
+                    <li>إن الـ Webhook URL مضبوط في <a href="https://developers.facebook.com/apps" target="_blank" rel="noopener" className="underline font-bold">Meta Developer Portal</a></li>
+                    <li>إن الـ App <strong>Live mode</strong> (مش Test mode)</li>
+                    <li>إن الصفحة مشتركة في Webhook events: <code>messages</code> و <code>messaging_postbacks</code></li>
+                    <li>إن الـ <strong>Verify Token</strong> مطابق لللي في الإعدادات</li>
+                    <li>إن الـ <strong>Page ID</strong> مطابق للصفحة الحقيقية</li>
+                  </>
+                )}
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isConfigured && hasWebhookEverFired && !isAiEnabled && (
+        <div className="mb-6 p-4 rounded-xl bg-sky-50 border border-sky-200 text-sky-900">
+          <div className="flex items-center gap-2">
+            <span>ℹ️</span>
+            <span className="text-sm">
+              الـ AI التلقائي <strong>متوقف</strong>. الرسائل بتوصل بس مفيش رد تلقائي.
+            </span>
+            <a href="/dashboard/marketing/inbox/settings" className="text-sm font-bold underline mr-auto">فعّل AI</a>
+          </div>
+        </div>
+      )}
 
       {/* Configuration warning */}
       {!isConfigured && (

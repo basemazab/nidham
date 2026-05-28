@@ -740,7 +740,11 @@ export async function regeneratePeriodEntries(formData: FormData) {
   // dates, etc.) but starts fresh on the data side. Manual overrides
   // (bonuses, overtime) on the per-employee entries are LOST. The UI
   // warns the user before they click Regenerate.
-  await supabase.from("payroll_entries").delete().eq("period_id", periodId);
+  await supabase
+    .from("payroll_entries")
+    .delete()
+    .eq("period_id", periodId)
+    .eq("company_id", profile.company_id);
 
   // Auto-link advances per employee for the new period window
   const advanceDeductions = new Map<string, number>();
@@ -917,6 +921,7 @@ export async function cancelPayrollPeriod(formData: FormData) {
       cancellation_reason: reason,
     })
     .eq("id", periodId)
+    .eq("company_id", profile.company_id)
     .in("status", ["draft", "approved", "paid"]);
 
   if (error) {
@@ -992,7 +997,8 @@ export async function reopenPayrollPeriod(formData: FormData) {
   const { error } = await supabase
     .from("payroll_periods")
     .update(updates)
-    .eq("id", periodId);
+    .eq("id", periodId)
+    .eq("company_id", profile.company_id);
 
   if (error) {
     redirect(
@@ -1150,7 +1156,8 @@ export async function applyBulkBonus(formData: FormData) {
           total_deductions: result.totalDeductions,
           net_salary: result.netSalary,
         })
-        .eq("id", e.id);
+        .eq("id", e.id)
+        .eq("company_id", profile.company_id);
       if (!error) appliedCount += 1;
     }),
   );

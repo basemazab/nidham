@@ -15,7 +15,6 @@
 // state library.
 
 import { useState } from "react";
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { saveOnboardingStep, completeOnboarding } from "./actions";
 

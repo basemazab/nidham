@@ -435,10 +435,10 @@ async function screenApplicationInline(applicationId: string) {
   const supabase = await createClient();
   const MODEL = "gemini-2.5-flash";
 
-  const { data: app } = await supabase
+    const { data: app } = await supabase
     .from("applications")
     .select(
-      `id, cv_text,
+      `id, company_id, cv_text,
        jobs(title, department, description, requirements, responsibilities, experience_years_min, location, job_type),
        candidates(full_name, current_title, years_experience, location)`,
     )
@@ -481,7 +481,8 @@ async function screenApplicationInline(applicationId: string) {
         ai_model: MODEL,
         ai_error: null,
       })
-      .eq("id", applicationId);
+      .eq("id", applicationId)
+      .eq("company_id", app.company_id);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     await supabase
@@ -491,7 +492,8 @@ async function screenApplicationInline(applicationId: string) {
         ai_analyzed_at: new Date().toISOString(),
         ai_model: MODEL,
       })
-      .eq("id", applicationId);
+      .eq("id", applicationId)
+      .eq("company_id", app.company_id);
     throw err;
   }
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { saveSettings } from "../actions";
+import { saveSettings, testWebhookConnection } from "../actions";
 
 type Defaults = {
   channel_messenger: boolean;
@@ -198,8 +198,8 @@ export function SettingsForm({ defaultValues }: { defaultValues: Defaults }) {
         />
       </section>
 
-      {/* Submit */}
-      <div className="flex items-center gap-3">
+      {/* Actions */}
+      <div className="flex flex-wrap items-center gap-3">
         <button
           type="submit"
           disabled={pending}
@@ -218,6 +218,9 @@ export function SettingsForm({ defaultValues }: { defaultValues: Defaults }) {
           </span>
         )}
       </div>
+
+      {/* Test connection */}
+      <ConnectionTest />
     </form>
   );
 }
@@ -255,6 +258,63 @@ function Input({
         className={`w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/30 outline-none ${monospace ? "font-mono" : ""}`}
       />
     </div>
+  );
+}
+
+function ConnectionTest() {
+  const [state, setState] = useState<
+    | { status: "idle" }
+    | { status: "loading" }
+    | { status: "success"; pageName: string; conversationCount: number; lastMessageAt: string | null }
+    | { status: "error"; error: string }
+  >({ status: "idle" });
+
+  function handleTest() {
+    setState({ status: "loading" });
+    testWebhookConnection().then((res) => {
+      if (res.ok) {
+        setState({ status: "success", pageName: res.pageName, conversationCount: res.conversationCount, lastMessageAt: res.lastMessageAt });
+      } else {
+        setState({ status: "error", error: res.error });
+      }
+    });
+  }
+
+  return (
+    <section className="p-5 rounded-xl bg-white border border-slate-200">
+      <h2 className="font-black text-lg text-slate-900 mb-4">
+        🔍 اختبار الاتصال
+      </h2>
+      <button
+        type="button"
+        onClick={handleTest}
+        disabled={state.status === "loading"}
+        className="px-5 py-2.5 rounded-xl bg-slate-900 text-white font-bold text-sm hover:bg-slate-800 disabled:opacity-50 transition"
+      >
+        {state.status === "loading" ? "..." : "🧪 اختبر الاتصال بـ Meta"}
+      </button>
+
+      {state.status === "success" && (
+        <div className="mt-4 space-y-2 text-sm">
+          <div className="flex items-center gap-2 text-emerald-700">
+            <span>✅</span>
+            <span className="font-bold">اتصال ناجح</span>
+          </div>
+          <p>اسم الصفحة: {state.pageName}</p>
+          <p>عدد المحادثات: {state.conversationCount}</p>
+          {state.lastMessageAt ? (
+            <p>آخر رسالة: {new Date(state.lastMessageAt).toLocaleString("ar-EG")}</p>
+          ) : (
+            <p className="text-amber-700">⚠️ مفيش رسائل وصلت — تأكد إن الـ Webhook مضبوط في Meta</p>
+          )}
+        </div>
+      )}
+      {state.status === "error" && (
+        <div className="mt-4 text-sm text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-4 py-3">
+          ❌ {state.error}
+        </div>
+      )}
+    </section>
   );
 }
 
