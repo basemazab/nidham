@@ -33,7 +33,7 @@ const EMAIL = process.env.NIDHAM_EMAIL;
 const PASSWORD = process.env.NIDHAM_PASSWORD;
 
 if (!EMAIL || !PASSWORD) {
-  // eslint-disable-next-line no-console
+   
   console.error(
     "[capture] Missing NIDHAM_EMAIL or NIDHAM_PASSWORD in .env.local",
   );
@@ -152,7 +152,7 @@ async function freezeAndHide(page: Page): Promise<void> {
 }
 
 async function loginAndSaveState(browser: Browser): Promise<void> {
-  // eslint-disable-next-line no-console
+   
   console.log(`[capture] Logging in as ${EMAIL}...`);
   const context = await browser.newContext({ viewport: VIEWPORTS.desktop });
   const page = await context.newPage();
@@ -181,7 +181,7 @@ async function loginAndSaveState(browser: Browser): Promise<void> {
   ]);
 
   await context.storageState({ path: STORAGE_STATE });
-  // eslint-disable-next-line no-console
+   
   console.log(`[capture] Session saved to ${STORAGE_STATE}`);
   await context.close();
 }
@@ -212,7 +212,7 @@ async function captureOne(
   }
 
   const url = `${BASE_URL}${targetPath}`;
-  // eslint-disable-next-line no-console
+   
   console.log(`  → ${viewportName} ${capture.name} → ${url}`);
 
   await page.goto(url, { waitUntil: "networkidle", timeout: 30_000 });
@@ -251,7 +251,7 @@ async function run(): Promise<void> {
   const skipped: string[] = [];
 
   for (const viewportName of ["desktop", "mobile"] as const) {
-    // eslint-disable-next-line no-console
+     
     console.log(`\n[capture] Viewport: ${viewportName}`);
     const context = await browser.newContext({
       storageState: STORAGE_STATE,
@@ -265,7 +265,7 @@ async function run(): Promise<void> {
       const result = await captureOne(page, cap, viewportName);
       if (result.ok === true) continue;
       const reason = result.reason;
-      // eslint-disable-next-line no-console
+       
       console.warn(`    ⚠ ${cap.name}: ${reason}`);
       if (!cap.optional) {
         skipped.push(`${cap.name} (${reason})`);
@@ -300,9 +300,9 @@ async function run(): Promise<void> {
   );
 
   // 4. Print the URLs the user can share
-  // eslint-disable-next-line no-console
+   
   console.log("\n[capture] ✓ Done. URLs to share after `git push`:");
-  // eslint-disable-next-line no-console
+   
   console.log(`  Manifest: ${BASE_URL}/marketing/index.json`);
   for (const s of manifest.screenshots) {
     if (s.desktop_url) console.log(`  ✓ ${s.desktop_url}`);
@@ -311,7 +311,7 @@ async function run(): Promise<void> {
   }
 
   if (skipped.length > 0) {
-    // eslint-disable-next-line no-console
+     
     console.warn(
       `\n[capture] ⚠ ${skipped.length} required page(s) skipped:\n  ` +
         skipped.join("\n  "),
@@ -322,7 +322,7 @@ async function run(): Promise<void> {
 }
 
 run().catch((err) => {
-  // eslint-disable-next-line no-console
+   
   console.error("[capture] FAILED:", err);
   process.exit(1);
 });

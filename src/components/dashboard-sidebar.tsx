@@ -59,6 +59,7 @@ type NavSectionKey =
   | "crm"
   | "docs"
   | "ai"
+  | "automation"
   | "marketing"
   | "reports"
   | "settings";
@@ -84,6 +85,7 @@ const SECTION_ORDER: ReadonlyArray<{ key: NavSectionKey; label: string }> = [
   { key: "crm", label: "💼 العملاء والمبيعات" },
   { key: "docs", label: "📄 المستندات والامتثال" },
   { key: "ai", label: "🤖 ذكاء HR" },
+  { key: "automation", label: "⚡ الأتمتة" },
   { key: "marketing", label: "✦ تسويق" },
   { key: "reports", label: "📊 التقارير" },
   { key: "settings", label: "⚙ الإعدادات" },
@@ -128,6 +130,10 @@ const NAV_ITEMS: readonly NavItem[] = [
   { href: "/dashboard/whatsapp-test",   label: "اختبار بوت الواتساب",   icon: "💬", section: "ai", visibleTo: ["admin"] },
   { href: "/dashboard/jobs",       label: "التوظيف الذكي",        icon: "🎯", section: "ai", feature: "recruitment" },
   { href: "/dashboard/retention",  label: "احتفاظ بالموظفين",     icon: "🛡", section: "ai", feature: "retention_insights" },
+
+  // ── Automation — workflow engine ──
+  { href: "/dashboard/automation",     label: "أتمتة سير العمل",  icon: "⚡", section: "automation", visibleTo: ["admin", "manager"] },
+  { href: "/dashboard/automation/logs", label: "سجل التشغيل",      icon: "📋", section: "automation", visibleTo: ["admin"] },
 
   // ── Marketing ──
   { href: "/dashboard/marketing",                label: "Marketing Studio", icon: "✦",  section: "marketing", feature: "marketing_studio" },

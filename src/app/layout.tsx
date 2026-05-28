@@ -7,6 +7,7 @@ import { UrlToasts } from "@/components/url-toasts";
 import { ThemeProvider } from "@/components/theme-provider";
 import { MetaPixel } from "@/components/meta-pixel";
 import { PWAInstaller } from "@/components/pwa-installer";
+import { AppProviders } from "@/lib/providers/app-providers";
 import {
   OrganizationSchema,
   SoftwareApplicationSchema,
@@ -166,6 +167,7 @@ export default function RootLayout({
         <SoftwareApplicationSchema />
         <WebsiteSchema />
         <ThemeProvider>
+          <AppProviders>
           {children}
           {/* Sonner toaster — top-center so RTL feels natural. richColors
               gives success / error a subtle tint instead of the plain
@@ -198,6 +200,7 @@ export default function RootLayout({
               `beforeinstallprompt` event so <PWAInstallButton /> can fire
               it on user demand. Headless component. */}
           <PWAInstaller />
+          </AppProviders>
         </ThemeProvider>
       </body>
     </html>

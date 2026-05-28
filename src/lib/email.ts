@@ -79,7 +79,7 @@ export async function sendEmail(input: EmailInput): Promise<SendResult> {
 
     if (!res.ok) {
       const detail = await res.text().catch(() => "");
-      // eslint-disable-next-line no-console
+       
       console.warn(
         `[email] Resend returned ${res.status} for ${input.to}: ${detail.slice(0, 200)}`,
       );
@@ -94,7 +94,7 @@ export async function sendEmail(input: EmailInput): Promise<SendResult> {
     return { ok: true, id: data.id ?? "" };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    // eslint-disable-next-line no-console
+     
     console.warn(`[email] Send failed for ${input.to}: ${msg}`);
     return { ok: false, skipped: false, error: msg };
   }

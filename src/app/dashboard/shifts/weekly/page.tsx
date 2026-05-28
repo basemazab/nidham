@@ -158,7 +158,7 @@ export default async function WeeklyShiftPage({
           <button
             type="button"
             className="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm font-cairo transition print:hidden"
-            // eslint-disable-next-line @next/next/no-html-link-for-pages
+             
             data-print="1"
           >
             🖨 طباعة
@@ -326,7 +326,7 @@ export default async function WeeklyShiftPage({
 
       {/* Print-only client script: hook up the print button */}
       <script
-        // eslint-disable-next-line react/no-danger
+         
         dangerouslySetInnerHTML={{
           __html: `
             document.querySelector('[data-print="1"]')?.addEventListener('click', () => window.print());

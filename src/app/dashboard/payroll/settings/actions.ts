@@ -1,7 +1,6 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
 import { requireAdmin } from "@/lib/permissions";
 import { bustDashboardCache } from "@/lib/cache";
 

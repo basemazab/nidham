@@ -193,7 +193,7 @@ export async function generateImageBytes(args: {
     } catch (err) {
       geminiError =
         err instanceof Error ? err.message.slice(0, 200) : String(err);
-      // eslint-disable-next-line no-console
+       
       console.warn(
         "[social-images] Gemini failed, trying Pollinations:",
         geminiError,

@@ -346,7 +346,7 @@ export async function callWithFallback<T>(
       return await fn(cursor);
     } catch (err) {
       lastError = err;
-      // eslint-disable-next-line no-console
+       
       console.warn(`[ai-models] ${label} failed:`, errorSummary(err));
       if (!isRetryableError(err)) {
         // Non-retryable: bail immediately (e.g. bad schema, auth issue).

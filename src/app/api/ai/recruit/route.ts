@@ -208,7 +208,7 @@ export async function POST(req: Request) {
     return Response.json({ error: "Unknown mode" }, { status: 400 });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    // eslint-disable-next-line no-console
+     
     console.warn("ai-recruit failed:", msg);
     return Response.json(
       { error: `الـ AI ما قدرش يكمّل: ${msg.slice(0, 200)}` },

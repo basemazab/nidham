@@ -48,7 +48,7 @@ if (!gotTheLock) {
 // and pop up a dialog in production so the HR user has a chance to
 // screenshot the error.
 process.on("uncaughtException", (err) => {
-  // eslint-disable-next-line no-console
+   
   console.error("[main] uncaughtException:", err);
   if (app.isReady()) {
     dialog.showErrorBox(
@@ -58,7 +58,7 @@ process.on("uncaughtException", (err) => {
   }
 });
 process.on("unhandledRejection", (reason) => {
-  // eslint-disable-next-line no-console
+   
   console.error("[main] unhandledRejection:", reason);
 });
 
@@ -460,7 +460,7 @@ app
     }
   })
   .catch((err) => {
-    // eslint-disable-next-line no-console
+     
     console.error("[main] whenReady failed:", err);
     dialog.showErrorBox(
       "تعذّر بدء Nidham",

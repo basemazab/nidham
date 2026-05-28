@@ -94,7 +94,7 @@ export default async function CustomersPage() {
   // per customer in a single query, then build a map so the row render
   // can show the freshness pill ("الآن" / "5 أيام" / "⚠ مفيش تواصل").
   const customerIds = list.map((c) => c.id);
-  let lastContactByCustomer: Record<string, string> = {};
+  const lastContactByCustomer: Record<string, string> = {};
   if (customerIds.length > 0) {
     const { data: interactions } = await supabase
       .from("interactions")

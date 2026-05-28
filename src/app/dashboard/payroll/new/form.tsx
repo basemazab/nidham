@@ -63,7 +63,6 @@ export function NewPayrollForm({
     if (computed) setEndDate(computed);
     // intentionally omit endDate from deps -- we don't want a feedback loop
     // when the user manually nudges the end-date field.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startDate, frequency]);
 
   const eligibleCount =

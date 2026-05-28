@@ -26,7 +26,7 @@ export default function GlobalError({
     // is a silent no-op — no exception bubbles up.
     Sentry.captureException(error);
 
-    // eslint-disable-next-line no-console
+     
     console.error("Unhandled error in route:", error);
   }, [error]);
 

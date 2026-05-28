@@ -203,7 +203,7 @@ export default async function SignatureDetailPage({ params }: Props) {
       </div>
 
       <script
-        // eslint-disable-next-line react/no-danger
+         
         dangerouslySetInnerHTML={{
           __html: `document.querySelector('[data-print="1"]')?.addEventListener('click', () => window.print());`,
         }}

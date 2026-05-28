@@ -220,7 +220,7 @@ export async function POST(req: Request) {
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    // eslint-disable-next-line no-console
+     
     console.warn("parse-pdf failed:", msg);
     return Response.json(
       {

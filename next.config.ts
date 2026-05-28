@@ -41,8 +41,7 @@ const nextConfig: NextConfig = {
     ];
   },
 
-  // Prefer statically generating pages at build time
-  outputFileTracing: true,
+  // Standalone output traces dependencies automatically
 };
 
 export default withSentryConfig(nextConfig, {

@@ -112,7 +112,7 @@ export function DownloadPdfButton({
 
       pdf.save(filename);
     } catch (err) {
-      // eslint-disable-next-line no-console
+       
       console.error("PDF generation failed:", err);
       setError("مش قادر يحضّر الـ PDF — جرّب تاني");
     } finally {

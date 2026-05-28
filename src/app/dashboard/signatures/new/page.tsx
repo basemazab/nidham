@@ -279,7 +279,7 @@ export default async function NewSignatureRequestPage({
 
       {/* Tiny client script to wire template buttons + employee auto-fill */}
       <script
-        // eslint-disable-next-line react/no-danger
+         
         dangerouslySetInnerHTML={{
           __html: `
             document.querySelectorAll('[data-template-body]').forEach(btn => {

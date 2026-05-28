@@ -155,7 +155,6 @@ async function notifyDecision(
     // permission: no email for now -- noisy and HR usually approves the
     // same day. Easy to add later.
   } catch (err) {
-    // eslint-disable-next-line no-console
     console.warn("notifyDecision failed:", err);
   }
 }
@@ -210,7 +209,6 @@ export async function markAdvancePaid(id: string) {
         }),
       );
     } catch (err) {
-      // eslint-disable-next-line no-console
       console.warn("markAdvancePaid email failed:", err);
     }
   })();
