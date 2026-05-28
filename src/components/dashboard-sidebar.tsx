@@ -128,6 +128,8 @@ const NAV_ITEMS: readonly NavItem[] = [
   // ── AI / Smart features ──
   { href: "/dashboard/ai",              label: "المساعد الذكي",          icon: "🤖", section: "ai", feature: "ai_assistant" },
   { href: "/dashboard/ai/tools",        label: "تقارير AI",             icon: "📡", section: "ai", feature: "ai_assistant" },
+  { href: "/dashboard/ai/knowledge",    label: "قاعدة المعرفة",          icon: "📚", section: "ai", feature: "ai_assistant" },
+  { href: "/dashboard/ai/audit",        label: "سجل نشاط AI",           icon: "📋", section: "ai", visibleTo: ["admin"] },
   { href: "/dashboard/whatsapp-test",   label: "اختبار بوت الواتساب",   icon: "💬", section: "ai", visibleTo: ["admin"] },
   { href: "/dashboard/jobs",       label: "التوظيف الذكي",        icon: "🎯", section: "ai", feature: "recruitment" },
   { href: "/dashboard/retention",  label: "احتفاظ بالموظفين",     icon: "🛡", section: "ai", feature: "retention_insights" },
