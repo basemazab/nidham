@@ -237,6 +237,16 @@ async function processEventAsync(
           handoffKeywords: settings.ai_handoff_keywords || [],
           autoPushToCrm: settings.auto_push_to_crm,
         });
+      } else if (!settings.ai_enabled) {
+        await supabase
+          .from("marketing_inbox_conversations")
+          .update({ ai_intent: "ai_not_enabled" })
+          .eq("id", conversationId);
+      } else if (!channelEnabled) {
+        await supabase
+          .from("marketing_inbox_conversations")
+          .update({ ai_intent: "channel_disabled" })
+          .eq("id", conversationId);
       }
     }
   }
@@ -340,8 +350,16 @@ async function runAiReply(args: {
       systemPromptOverride: args.systemPromptOverride || undefined,
     });
   } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
      
-    console.error("[meta-webhook] AI generation failed:", err);
+    console.error("[meta-webhook] AI generation failed:", errMsg);
+    await args.supabase
+      .from("marketing_inbox_conversations")
+      .update({
+        ai_intent: `ai_error: ${errMsg.slice(0, 200)}`,
+        ai_last_run_at: new Date().toISOString(),
+      })
+      .eq("id", args.conversationId);
     return;
   }
 
