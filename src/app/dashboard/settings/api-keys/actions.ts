@@ -2,18 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import { generateApiKey, hashApiKey, validateApiKeyFormat, API_SCOPES } from "./keys";
-
-export async function listApiKeys() {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("api_keys")
-    .select("*")
-    .order("created_at", { ascending: false });
-
-  if (error) throw new Error(error.message);
-  return data;
-}
+import { generateApiKey } from "@/lib/api/keys";
 
 export async function createApiKey(formData: FormData) {
   const supabase = await createClient();

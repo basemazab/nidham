@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createApiKey, revokeApiKey, deleteApiKey } from "@/lib/api/actions";
+import { createApiKey, revokeApiKey, deleteApiKey } from "./actions";
 import { API_SCOPES } from "@/lib/api/keys";
 import { Copy, Trash2, Plus, X, Check, Key } from "lucide-react";
 
