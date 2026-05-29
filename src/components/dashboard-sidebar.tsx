@@ -162,7 +162,7 @@ const NAV_ITEMS: readonly NavItem[] = [
   { href: "/dashboard/settings/holidays",         label: "العطلات الرسمية",    icon: "📅", section: "settings", visibleTo: ["admin"] },
   { href: "/dashboard/settings/api-keys",         label: "مفاتيح API",          icon: "🔑", section: "settings", visibleTo: ["admin"] },
   { href: "/api-docs",                            label: "توثيق API",           icon: "📖", section: "settings" },
-  { href: "/dashboard/help",                      label: "مركز المساعدة",       icon: "📚", section: "settings" },
+  { href: "/dashboard/academy",                   label: "الأكاديمية",          icon: "🎓", section: "settings" },
 ];
 
 export function DashboardSidebar({

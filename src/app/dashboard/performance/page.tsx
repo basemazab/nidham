@@ -102,12 +102,20 @@ export default async function PerformancePage() {
               تقييمات شهرية / ربع سنوية / سنوية للموظفين مع KPIs ونتائج
             </p>
           </div>
-          <Link
-            href="/dashboard/performance/new"
-            className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-white font-bold shadow-lg font-cairo text-sm"
-          >
-            + تقييم جديد
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/dashboard/performance/analytics"
+              className="px-4 py-2.5 rounded-xl bg-white border-2 border-indigo-200 text-indigo-700 hover:bg-indigo-50 font-bold text-sm shadow-sm font-cairo transition"
+            >
+              📊 تحليلات
+            </Link>
+            <Link
+              href="/dashboard/performance/new"
+              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-white font-bold shadow-lg font-cairo text-sm"
+            >
+              + تقييم جديد
+            </Link>
+          </div>
         </header>
 
         {/* KPI strip */}
