@@ -64,6 +64,13 @@ const CATEGORIES: Record<
 
 const FORMS: FormCard[] = [
   {
+    href: "/dashboard/forms/ai-generator",
+    title: "المولّد الذكي للمستندات",
+    description: "AI بيكتب عقود، إنذارات، مخالصات، شهادات خبرة وراتب بالعربية القانونية",
+    icon: "🤖",
+    category: "letter",
+  },
+  {
     href: "/dashboard/forms/hr-letter",
     title: "خطاب موارد بشرية",
     description: "خطاب رسمي بصفة الموظف ومرتبه — لكل الجهات (بنوك، سفارات، حكومي)",
@@ -221,9 +228,9 @@ export default async function FormsHubPage({
             نماذج الموارد البشرية
           </h1>
           <p className="text-sm text-slate-500 font-cairo leading-relaxed max-w-2xl">
-            ٨ نماذج رسمية احترافية جاهزة للطباعة. كل نموذج بيتطبع بترويسة
-            شركتك تلقائياً ومتوافق مع قانون العمل المصري. اختار نموذج
-            وحمّله PDF أو اطبعه مباشرة.
+            ٩ نماذج رسمية احترافية — ٨ جاهزة للطباعة + المولّد الذكي اللي بيكتب
+            المستندات بالذكاء الاصطناعي تلقائياً. اختار نموذج وحمّله PDF أو
+            اطبعه مباشرة.
           </p>
         </header>
 

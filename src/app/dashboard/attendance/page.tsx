@@ -226,6 +226,13 @@ export default async function AttendancePage({
               deleteAction={bulkDeleteAttendance}
             />
             <Link
+              href="/dashboard/attendance/intelligence"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-l from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600 text-white font-bold text-sm shadow-md font-cairo transition"
+            >
+              <span>🧠</span>
+              <span>ذكاء الحضور</span>
+            </Link>
+            <Link
               href="/dashboard/attendance/import"
               className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-bold text-sm shadow-md font-cairo transition"
             >
