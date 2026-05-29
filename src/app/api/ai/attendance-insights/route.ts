@@ -29,43 +29,30 @@ export async function GET(req: NextRequest) {
     since.setDate(since.getDate() - days);
     const sinceStr = since.toISOString().split("T")[0];
 
-    // Fetch attendance data
     const { data: attendanceData, error: attErr } = await supabase
       .from("attendance")
-      .select("employee_id, date, check_in, check_out, overtime_minutes, status, gps_lat, gps_lng")
+      .select("employee_id, date, check_in, check_out, status, tardiness_minutes, early_leave_minutes")
       .eq("company_id", profile.company_id)
       .gte("date", sinceStr)
       .order("date", { ascending: false });
 
     if (attErr) throw attErr;
 
-    // Fetch employees
     const { data: employees } = await supabase
       .from("employees")
-      .select("id, full_name, department_name")
+      .select("id, full_name, department")
       .eq("company_id", profile.company_id);
 
     if (!employees || !attendanceData) {
       return Response.json({ insights: null, summary: { totalAnomalies: 0 } });
     }
 
-    // Get company location from company profile
-    const { data: company } = await supabase
-      .from("companies")
-      .select("gps_lat, gps_lng, geofence_radius")
-      .eq("id", profile.company_id)
-      .single();
+    const mapped = attendanceData.map((r: any) => ({
+      ...r,
+      employee_name: employees.find((e: any) => e.id === r.employee_id)?.full_name || "",
+    }));
 
-    const insights = analyzeAttendanceAnomalies(
-      attendanceData.map((r) => ({
-        ...r,
-        employee_name: employees.find((e) => e.id === r.employee_id)?.full_name || "",
-      })),
-      employees,
-      company?.gps_lat,
-      company?.gps_lng,
-      company?.geofence_radius,
-    );
+    const insights = analyzeAttendanceAnomalies(mapped, employees);
 
     return Response.json(insights);
   } catch (err) {

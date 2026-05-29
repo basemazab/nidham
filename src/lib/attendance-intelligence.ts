@@ -2,11 +2,10 @@ export interface AttendanceAnomaly {
   employeeId: string;
   employeeName: string;
   type:
-    | "fake_gps"
     | "unusual_overtime"
     | "repeated_pattern"
-    | "suspicious_attendance"
     | "missing_checkout"
+    | "excessive_tardiness"
     | "abnormal_behavior";
   severity: "critical" | "warning" | "info";
   description: string;
@@ -49,19 +48,28 @@ type AttendanceRow = {
   date: string;
   check_in: string | null;
   check_out: string | null;
-  overtime_minutes: number;
   status: string;
-  department_name?: string;
-  gps_lat?: number | null;
-  gps_lng?: number | null;
+  department?: string;
+  tardiness_minutes?: number | null;
+  early_leave_minutes?: number | null;
 };
+
+function computeOvertimeMinutes(checkIn: string | null, checkOut: string | null): number {
+  if (!checkIn || !checkOut) return 0;
+  const [inH, inM] = checkIn.split(":").map(Number);
+  const [outH, outM] = checkOut.split(":").map(Number);
+  if (!Number.isFinite(inH) || !Number.isFinite(inM) || !Number.isFinite(outH) || !Number.isFinite(outM)) return 0;
+  let inMins = inH * 60 + inM;
+  let outMins = outH * 60 + outM;
+  if (outMins < inMins) outMins += 24 * 60;
+  const worked = outMins - inMins;
+  const expected = 9 * 60;
+  return Math.max(0, worked - expected);
+}
 
 export function analyzeAttendanceAnomalies(
   attendanceData: AttendanceRow[],
-  employees: { id: string; full_name: string; department_name?: string }[],
-  companyLat?: number,
-  companyLng?: number,
-  geofenceRadiusMeters?: number,
+  employees: { id: string; full_name: string; department?: string }[],
 ): AttendanceInsights {
   const anomalies: AttendanceAnomaly[] = [];
   const employeeMap = new Map(employees.map((e) => [e.id, e]));
@@ -90,8 +98,18 @@ export function analyzeAttendanceAnomalies(
     summaryMap[type] = (summaryMap[type] || 0) + 1;
   }
 
+  const employeeOvertimeCount = new Map<string, number>();
+  const employeeDaysMap = new Map<string, { dates: string[]; checkIns: string[] }>();
+
   for (const row of attendanceData) {
     const date = row.date;
+
+    if (!employeeDaysMap.has(row.employee_id)) {
+      employeeDaysMap.set(row.employee_id, { dates: [], checkIns: [] });
+    }
+    const dayEntry = employeeDaysMap.get(row.employee_id)!;
+    dayEntry.dates.push(date);
+    if (row.check_in) dayEntry.checkIns.push(row.check_in);
 
     // --- 1. Missing check-out detection ---
     if (row.check_in && !row.check_out) {
@@ -107,66 +125,59 @@ export function analyzeAttendanceAnomalies(
     }
 
     // --- 2. Unusual overtime detection ---
-    if (row.overtime_minutes > 180) {
-      addAnomaly(
-        "unusual_overtime",
-        row.overtime_minutes > 300 ? "critical" : "warning",
-        row.employee_id,
-        `أوفرتايم غير معتاد: ${minutesToHours(row.overtime_minutes)} ساعة في ${date}`,
-        { overtime_minutes: row.overtime_minutes, date },
-        date,
-        row.overtime_minutes > 300
-          ? "مراجعة فورية — أوفرتايم يتجاوز 5 ساعات"
-          : "مراجعة أسباب الأوفرتايم المستمر",
-      );
-    }
-
-    // --- 3. GPS anomaly detection (fake GPS) ---
-    if (row.gps_lat && row.gps_lng && companyLat && companyLng) {
-      const dist = getDistanceFromLatLngInMeters(
-        row.gps_lat,
-        row.gps_lng,
-        companyLat,
-        companyLng,
-      );
-      const radius = geofenceRadiusMeters || 500;
-      if (dist > radius * 3) {
+    if (row.check_in && row.check_out) {
+      const overtime = computeOvertimeMinutes(row.check_in, row.check_out);
+      if (overtime > 180) {
+        employeeOvertimeCount.set(row.employee_id, (employeeOvertimeCount.get(row.employee_id) || 0) + 1);
         addAnomaly(
-          "fake_gps",
-          "critical",
+          "unusual_overtime",
+          overtime > 300 ? "critical" : "warning",
           row.employee_id,
-          `تسجيل حضور من خارج النطاق الجغرافي للشركة (${dist.toFixed(0)}م)`,
-          { gps_lat: row.gps_lat, gps_lng: row.gps_lng, distance_meters: Math.round(dist) },
+          `أوفرتايم غير معتاد: ${minutesToHours(overtime)} ساعة في ${date}`,
+          { overtime_minutes: overtime, date },
           date,
-          "التحقق من صحة تسجيل الحضور — قد يكون GPS مزيف",
+          overtime > 300
+            ? "مراجعة فورية — أوفرتايم يتجاوز 5 ساعات"
+            : "مراجعة أسباب الأوفرتايم المستمر",
         );
       }
     }
 
-    // --- 4. Repeated pattern (same check-in time for 3+ consecutive days) ---
-    // (this is checked below after grouping)
+    // --- 3. Excessive tardiness ---
+    if ((row.tardiness_minutes ?? 0) > 60) {
+      addAnomaly(
+        "excessive_tardiness",
+        row.tardiness_minutes! > 120 ? "critical" : "warning",
+        row.employee_id,
+        `تأخير كبير: ${row.tardiness_minutes} دقيقة في ${date}`,
+        { tardiness_minutes: row.tardiness_minutes, date },
+        date,
+        "تحقق من سبب التأخير المستمر — قد يحتاج إنذار",
+      );
+    }
 
-    // --- 5. Abnormal behavior: weekend attendance without overtime ---
-    if (row.check_in && row.overtime_minutes === 0) {
+    // --- 4. Abnormal behavior: weekend attendance ---
+    if (row.check_in) {
       const d = new Date(date);
       const day = d.getDay();
       if (day === 5 || day === 6) {
-        addAnomaly(
-          "abnormal_behavior",
-          "info",
-          row.employee_id,
-          `حضور يوم ${getDayName(d)} بدون أوفرتايم مسجل`,
-          { date, day_name: getDayName(d) },
-          date,
-          "تحقق من تسجيل الأوفرتايم في الإجازة الأسبوعية",
-        );
+        const overtime = computeOvertimeMinutes(row.check_in, row.check_out);
+        if (overtime === 0) {
+          addAnomaly(
+            "abnormal_behavior",
+            "info",
+            row.employee_id,
+            `حضور يوم ${getDayName(d)} بدون أوفرتايم مسجل`,
+            { date, day_name: getDayName(d) },
+            date,
+            "تحقق من تسجيل الأوفرتايم في الإجازة الأسبوعية",
+          );
+        }
       }
     }
-
-    // --- 6. Repeated late check-in pattern (within same employee) ---
   }
 
-  // Detect repeated patterns: same employee checking in at same time 3+ times
+  // --- 5. Repeated late check-in pattern (3+ same time) ---
   const timePatterns = new Map<string, { dates: string[]; times: string[] }>();
   for (const row of attendanceData) {
     if (!row.check_in || !row.check_out) continue;
@@ -193,7 +204,6 @@ export function analyzeAttendanceAnomalies(
     }
   }
 
-  // Sort by severity: critical first
   anomalies.sort((a, b) => {
     const order = { critical: 0, warning: 1, info: 2 };
     return order[a.severity] - order[b.severity];
@@ -203,7 +213,6 @@ export function analyzeAttendanceAnomalies(
   const warningCount = anomalies.filter((a) => a.severity === "warning").length;
   const infoCount = anomalies.filter((a) => a.severity === "info").length;
 
-  // Top issues
   const typeCounts: Record<string, number> = {};
   for (const a of anomalies) {
     typeCounts[a.type] = (typeCounts[a.type] || 0) + 1;
@@ -213,40 +222,36 @@ export function analyzeAttendanceAnomalies(
     .slice(0, 3)
     .map(([type]) => {
       const labels: Record<string, string> = {
-        fake_gps: "GPS مشبوه",
         unusual_overtime: "أوفرتايم غير معتاد",
         repeated_pattern: "أنماط متكررة",
-        suspicious_attendance: "حضور مشبوه",
         missing_checkout: "خروج غير مسجل",
+        excessive_tardiness: "تأخير مفرط",
         abnormal_behavior: "سلوك غير معتاد",
       };
       return labels[type] || type;
     });
 
   // Department ranks
-  const deptMap = new Map<
-    string,
-    { total: number; tardy: number; overtime: number; anomalies: number; present: number }
-  >();
+  const deptMap = new Map<string, { total: number; tardy: number; overtime: number; anomalies: number; present: number }>();
   for (const emp of employees) {
-    const dept = emp.department_name || "بدون قسم";
+    const dept = emp.department || "بدون قسم";
     if (!deptMap.has(dept)) {
       deptMap.set(dept, { total: 0, tardy: 0, overtime: 0, anomalies: 0, present: 0 });
     }
   }
   for (const row of attendanceData) {
     const emp = employeeMap.get(row.employee_id);
-    const dept = emp?.department_name || "بدون قسم";
+    const dept = emp?.department || "بدون قسم";
     const d = deptMap.get(dept);
     if (!d) continue;
     d.total++;
     if (row.status === "present" || row.check_in) d.present++;
-    if (row.status === "late") d.tardy++;
-    d.overtime += row.overtime_minutes || 0;
+    if (row.status === "late" || (row.tardiness_minutes ?? 0) > 0) d.tardy++;
+    d.overtime += computeOvertimeMinutes(row.check_in, row.check_out);
   }
   for (const a of anomalies) {
     const emp = employeeMap.get(a.employeeId);
-    const dept = emp?.department_name || "بدون قسم";
+    const dept = emp?.department || "بدون قسم";
     const d = deptMap.get(dept);
     if (d) d.anomalies++;
   }
@@ -271,27 +276,4 @@ export function analyzeAttendanceAnomalies(
     },
     departmentRanks,
   };
-}
-
-function getDistanceFromLatLngInMeters(
-  lat1: number,
-  lng1: number,
-  lat2: number,
-  lng2: number,
-): number {
-  const R = 6371000;
-  const dLat = toRad(lat2 - lat1);
-  const dLng = toRad(lng2 - lng1);
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(toRad(lat1)) *
-      Math.cos(toRad(lat2)) *
-      Math.sin(dLng / 2) *
-      Math.sin(dLng / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-}
-
-function toRad(deg: number): number {
-  return (deg * Math.PI) / 180;
 }
