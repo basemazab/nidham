@@ -1,28 +1,7 @@
-// ============================================================================
-// Marketing Inbox — AI auto-reply engine
-// ============================================================================
-//
-// Generates a reply (in Egyptian Arabic) to an inbound message from a
-// marketing channel (Messenger ad reply, IG DM, etc.) plus extracts the
-// "intent" + "lead quality" so the conversation can be routed correctly:
-//
-//   • intent = "pricing_inquiry" / "demo_request" / "support" / "complaint" / "spam" / "other"
-//   • leadQuality = "hot" / "warm" / "cold" / "spam"
-//   • shouldHandoff = true when the AI should stop replying and a human takes over
-//
-// The reply is short (≤ 60 words), in Egyptian Arabic, and ALWAYS ends
-// with a CTA that pulls the user toward signup or the relevant marketing
-// page. No emojis except 1-2 max — feels less salesy.
-//
-// Uses the project's existing pickAgentModel() so the same Groq/Gemini
-// fallback that powers the HR chat agent powers this too — no extra
-// API keys, no extra cost beyond what the tenant is already paying.
-
 import { z } from "zod";
-import { generateObject } from "ai";
+import { generateText } from "ai";
 import { pickAgentModel } from "@/lib/ai-models";
 
-// ── Schema for what the AI returns ──
 export const AiReplyResultSchema = z.object({
   reply: z
     .string()
@@ -59,12 +38,6 @@ export const AiReplyResultSchema = z.object({
 
 export type AiReplyResult = z.infer<typeof AiReplyResultSchema>;
 
-// ── The system prompt — Nidham HR persona ──
-//
-// We pass the tenant's `business_context` as a variable so each company
-// can tune what the AI knows. If they don't customize, the default below
-// is Nidham HR's own self-marketing (you can use this as a template for
-// other tenants once they start writing their own).
 const DEFAULT_BUSINESS_CONTEXT = `
 الشركة: نِظام HR — أول نظام HR + Payroll + CRM مصري متكامل.
 متوافق مع قانون العمل 12/2003 وقانون التأمينات 148/2019.
@@ -77,20 +50,11 @@ const DEFAULT_BUSINESS_CONTEXT = `
 موقع: https://www.nidhamhr.com
 `;
 
-// Conversation history shape — what came before this turn
 export type ConversationTurn = {
   role: "user" | "assistant";
   body: string;
 };
 
-// ── Main entrypoint ──
-//
-// Pass in:
-//   • the latest user message
-//   • the previous turns (for context — up to last 5)
-//   • optional tenant-specific business context + system prompt override
-//
-// Returns the AI's reply + extracted intent/lead quality.
 export async function generateMarketingReply(input: {
   userMessage: string;
   history?: ConversationTurn[];
@@ -118,13 +82,17 @@ export async function generateMarketingReply(input: {
 معلومات عن الشركة (استخدمها للرد):
 ${businessContext}
 
-بعد ما تكتب الرد، صنّف:
-- intent: نوع الرسالة (سؤال سعر / طلب demo / سؤال ميزة / إلخ)
-- leadQuality: hot لو فيه نية شراء واضحة، warm لو مهتم بيستكشف، cold لو سؤال عام، spam لو إعلان مزعج
-- shouldHandoff: true لو الموضوع معقد ومحتاج بشر (سعر خاص، شكوى، محادثة طويلة)`.trim();
+ردّ بجسون ONLY — أي كلام برة الجسون هيكسر التطبيق وبيعتبر خطأ.
+اكتب JSON بالشكل ده بالظبط (ممنوع إضافة أي text خارج الـ JSON):
+{
+  "reply": "ردك بالعامية المصرية",
+  "intent": "pricing_inquiry | demo_request | feature_question | support_request | complaint | spam | greeting | other",
+  "leadQuality": "hot | warm | cold | spam",
+  "shouldHandoff": true أو false,
+  "handoffReason": "سبب التحويل لبشر (أو نص فاضي لو shouldHandoff = false)"
+}`.trim();
 
-  // Build the messages array for the LLM
-  const historyTurns = (input.history || []).slice(-5); // last 5 turns max
+  const historyTurns = (input.history || []).slice(-5);
   const conversationContext = historyTurns
     .map((t) => `${t.role === "user" ? "العميل" : "المساعد"}: ${t.body}`)
     .join("\n");
@@ -133,27 +101,30 @@ ${businessContext}
 ${conversationContext ? `المحادثة قبل كده:\n${conversationContext}\n\n` : ""}الرسالة الجديدة من العميل:
 "${input.userMessage}"
 
-اكتب الرد مع التصنيف.
+اكتب JSON فقط — من غير أي كلام تاني.
   `.trim();
 
   const { model } = pickAgentModel();
 
-  const result = await generateObject({
+  const result = await generateText({
     model,
-    schema: AiReplyResultSchema,
     system: systemPrompt,
     prompt: userPrompt,
-    temperature: 0.4, // mostly deterministic but allow personality
+    temperature: 0.4,
   });
 
-  return result.object;
+  const text = result.text.trim();
+  const jsonStart = text.indexOf("{");
+  const jsonEnd = text.lastIndexOf("}");
+  if (jsonStart === -1 || jsonEnd === -1) {
+    throw new Error("AI response did not contain valid JSON");
+  }
+  const jsonStr = text.slice(jsonStart, jsonEnd + 1);
+  const parsed = JSON.parse(jsonStr);
+  const validated = AiReplyResultSchema.parse(parsed);
+  return validated;
 }
 
-// ── Heuristic short-circuit ──
-//
-// If the message clearly matches one of the configured templates by
-// keyword, skip the LLM call (faster + free + deterministic).
-// Templates come from marketing_inbox_templates table.
 export function tryTemplateMatch(input: {
   userMessage: string;
   templates: Array<{ trigger_keywords: string[]; reply_text: string }>;
