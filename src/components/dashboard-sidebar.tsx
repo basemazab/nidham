@@ -114,6 +114,7 @@ const NAV_ITEMS: readonly NavItem[] = [
   // ── Payroll (المرتبات) ──
   { href: "/dashboard/payroll",          label: "الرواتب",                 icon: "💰", section: "payroll", feature: "payroll" },
   { href: "/dashboard/payroll/analytics", label: "تحليلات المرتبات",       icon: "📊", section: "payroll", feature: "payroll" },
+  { href: "/dashboard/payroll/audit",     label: "مراجعة المرتبات AI",     icon: "🔍", section: "payroll", feature: "payroll" },
   { href: "/dashboard/loans",            label: "السلف والمرتجعات",        icon: "💵", section: "payroll", feature: "payroll" },
   { href: "/dashboard/eos-calculator",   label: "مكافأة نهاية الخدمة",     icon: "⚖", section: "payroll", feature: "payroll" },
 
@@ -148,6 +149,7 @@ const NAV_ITEMS: readonly NavItem[] = [
   { href: "/dashboard/marketing/analytics",      label: "تحليل التسويق",     icon: "📊", section: "marketing", feature: "marketing_studio" },
 
   // ── Reports ──
+  { href: "/dashboard/intelligence",      label: "ذكاء الأعمال",    icon: "🧠", section: "reports", feature: "employees" },
   { href: "/dashboard/analytics",          label: "لوحة التحليلات",  icon: "📊", section: "reports", feature: "employees" },
   { href: "/dashboard/reports/attendance", label: "تقرير الحضور",    icon: "📋", section: "reports", feature: "attendance" },
   { href: "/dashboard/reports/bridge",     label: "Bridge ✦",        icon: "✦",  section: "reports", feature: "bridge_analytics" },
