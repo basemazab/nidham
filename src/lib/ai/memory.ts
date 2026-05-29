@@ -212,18 +212,22 @@ export async function logAiAction(params: {
   errorMessage?: string;
   latencyMs?: number;
 }) {
-  const supabase = await createClient();
-  await supabase.from("ai_audit_log").insert({
-    company_id: params.companyId,
-    user_id: params.userId,
-    conversation_id: params.conversationId,
-    action_type: params.actionType,
-    action_input: params.actionInput as any,
-    action_result: params.actionResult as any,
-    success: params.success,
-    error_message: params.errorMessage,
-    latency_ms: params.latencyMs,
-  });
+  try {
+    const supabase = await createClient();
+    await supabase.from("ai_audit_log").insert({
+      company_id: params.companyId,
+      user_id: params.userId,
+      conversation_id: params.conversationId,
+      action_type: params.actionType,
+      action_input: params.actionInput as any,
+      action_result: params.actionResult as any,
+      success: params.success,
+      error_message: params.errorMessage,
+      latency_ms: params.latencyMs,
+    });
+  } catch {
+    // audit log is non-critical; don't crash the caller
+  }
 }
 
 export async function listAiAuditLog(

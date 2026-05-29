@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { logout } from "@/app/login/actions";
 import { TierBadge } from "@/components/tier-badge";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { NotificationBell } from "@/components/notification-bell";
 import { hasFeature, type Plan, type Feature } from "@/lib/subscriptions";
 
 type Role = "admin" | "manager" | "employee";
@@ -94,6 +95,7 @@ const SECTION_ORDER: ReadonlyArray<{ key: NavSectionKey; label: string }> = [
 const NAV_ITEMS: readonly NavItem[] = [
   // ── Home ──
   { href: "/dashboard", label: "الرئيسية", icon: "🏠", section: "home" },
+  { href: "/dashboard/notifications", label: "الإشعارات", icon: "🔔", section: "home" },
 
   // ── People (الفريق) ──
   { href: "/dashboard/employees",    label: "الموظفين",         icon: "👥", section: "people", feature: "employees" },
@@ -221,6 +223,7 @@ export function DashboardSidebar({
       <header className="md:hidden sticky top-0 z-40 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 py-3 flex items-center justify-between">
         <Logo />
         <div className="flex items-center gap-2">
+          <NotificationBell />
           <ThemeToggle size="sm" />
           <button
             type="button"
@@ -289,8 +292,9 @@ export function DashboardSidebar({
 
       {/* Desktop sidebar — visible on md+ */}
       <aside className="hidden md:flex w-64 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 flex-col shrink-0">
-        <div className="p-5 border-b border-slate-100 dark:border-slate-800">
+        <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
           <Logo />
+          <NotificationBell />
         </div>
         <nav className="flex-1 overflow-y-auto p-3">
           {groupedSections.map((s) => (

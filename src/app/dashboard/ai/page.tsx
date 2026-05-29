@@ -1,4 +1,5 @@
 import { getMyProfile } from "@/lib/permissions";
+import { listConversations } from "@/lib/ai/memory";
 import { AIChatWithMemory } from "@/components/ai-chat-with-memory";
 import { ChatErrorBoundary } from "@/components/chat-error-boundary";
 import Link from "next/link";
@@ -28,6 +29,13 @@ export default async function AIPage() {
       );
     }
 
+    let conversations: Awaited<ReturnType<typeof listConversations>> = [];
+    try {
+      conversations = await listConversations(profile.id, profile.company_id);
+    } catch {
+      // table might not exist in all environments yet
+    }
+
     return (
       <main className="flex-1 px-4 md:px-6 py-6 bg-gradient-to-b from-slate-50 via-white to-cyan-50/30 min-h-screen">
         <div className="max-w-6xl mx-auto mb-4">
@@ -49,7 +57,7 @@ export default async function AIPage() {
         <div className="bg-white rounded-2xl shadow-md border border-slate-100 overflow-hidden">
           <ChatErrorBoundary>
             <AIChatWithMemory
-              conversations={[]}
+              conversations={conversations}
               userId={profile.id}
               companyId={profile.company_id}
               userName={profile.full_name ?? ""}
